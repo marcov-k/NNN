@@ -1,26 +1,26 @@
 ﻿using MathNet.Numerics.Distributions;
 using MathNet.Numerics.LinearAlgebra;
 
-int epochs = 10000;
-double alpha = 0.01;
+int epochs = 1000000;
+double alpha = 0.0001;
 Matrix<double> x = Matrix<double>.Build.Dense(10, 1, new double[] { 1, 3, 7, 17, 21, 44, 56, 71, 88, 100 });
-int[] n = { 1, 3, 3, 1 };
+int[] n;
 List<Matrix<double>> wVals = new List<Matrix<double>>();
 List<Matrix<double>> bDefVals = new List<Matrix<double>>();
 Matrix<double> y = Matrix<double>.Build.Dense(10, 1);
 for (int i = 0; i < x.RowCount; i++)
 {
-    y[i, 0] = Math.Sqrt(x[i, 0]);
+    y[i, 0] = Math.Pow(x[i, 0], 2);
 }
 y = y.Transpose();
 int m = x.RowCount;
-Matrix<double> finalTest = Matrix<double>.Build.Dense(10, 1, new double[10] {1, 4, 9, 16, 25, 36, 49, 64, 81, 100});
+Matrix<double> finalTest = Matrix<double>.Build.Dense(10, 1, new double[10] {1, 4, 9, 16, 25, 36, 49, 64, 81, 144});
 finalTest = finalTest.Transpose();
 Main();
 
 void Main()
 {
-    CreateNetworkDefaults(1, 2, 3, 1);
+    CreateNetworkDefaults(1, 2, 40, 1);
     Train();
     Console.WriteLine($"Inputs: ");
     Matrix<double> output = FeedForward(finalTest).yHat;
@@ -72,7 +72,14 @@ List<double> Train()
     {
         z = wVals[i] * a;
         z += Broadcast(bDefVals[i], z.ColumnCount);
-        a = Sigmoid(z);
+        if (i < n.Length - 2)
+        {
+            a = Sigmoid(z);
+        }
+        else
+        {
+            a = z;
+        }
         cache.aVals.Add(a);
     }
     Matrix<double> yHat = cache.aVals[cache.aVals.Count() - 1];
@@ -89,9 +96,7 @@ void HandleBackprop(Matrix<double> yHat, Matrix<double> y, int m, Cache cache)
     dC_dbs.Insert(0, dC_dbL);
     for (int i = cache.aVals.Count() - 1; i > 1; i--)
     {
-        Console.WriteLine($"a{i - 1}: {cache.aVals[i] - 1}");
-        Console.WriteLine($"a{i}: {cache.aVals[i]}");
-        (dC_dWL, dC_dbL, dC_dAL) = BackpropHiddenLayer(dC_dAL, cache.aVals[i - 1], cache.aVals[i], wVals[i]);
+        (dC_dWL, dC_dbL, dC_dAL) = BackpropHiddenLayer(dC_dAL, cache.aVals[i - 1], cache.aVals[i], wVals[i - 1]);
         dC_dWs.Insert(0, dC_dWL);
         dC_dbs.Insert(0, dC_dbL);
     }
