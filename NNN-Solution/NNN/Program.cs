@@ -3,24 +3,24 @@ using MathNet.Numerics.LinearAlgebra;
 
 int epochs = 1000000;
 double alpha = 0.0001;
-Matrix<double> x = Matrix<double>.Build.Dense(10, 1, new double[] { 1, 3, 7, 17, 21, 44, 56, 71, 88, 100 });
+Matrix<double> x = Matrix<double>.Build.Dense(14, 1, new double[14] { 1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130 });
 int[] n;
 List<Matrix<double>> wVals = new List<Matrix<double>>();
 List<Matrix<double>> bDefVals = new List<Matrix<double>>();
-Matrix<double> y = Matrix<double>.Build.Dense(10, 1);
+Matrix<double> y = Matrix<double>.Build.Dense(14, 1);
 for (int i = 0; i < x.RowCount; i++)
 {
-    y[i, 0] = Math.Pow(x[i, 0], 2);
+    y[i, 0] = Math.Sqrt(x[i, 0]);
 }
 y = y.Transpose();
 int m = x.RowCount;
-Matrix<double> finalTest = Matrix<double>.Build.Dense(10, 1, new double[10] {1, 4, 9, 16, 25, 36, 49, 64, 81, 144});
+Matrix<double> finalTest = Matrix<double>.Build.Dense(10, 1, new double[10] {1, 4, 9, 16, 25, 36, 49, 64, 81, 100});
 finalTest = finalTest.Transpose();
 Main();
 
 void Main()
 {
-    CreateNetworkDefaults(1, 2, 40, 1);
+    CreateNetworkDefaults(1, 4, 20, 1);
     Train();
     Console.WriteLine($"Inputs: ");
     Matrix<double> output = FeedForward(finalTest).yHat;
