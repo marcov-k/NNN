@@ -1,8 +1,8 @@
 ﻿using MathNet.Numerics.Distributions;
 using MathNet.Numerics.LinearAlgebra;
 
-int epochs = 1000000;
-double alpha = 0.0001;
+int epochs = 1000;
+double alpha = 0.001;
 Matrix<double> x = Matrix<double>.Build.Dense(14, 1, new double[14] { 1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130 });
 int[] n;
 List<Matrix<double>> wVals = new List<Matrix<double>>();
@@ -14,6 +14,7 @@ for (int i = 0; i < x.RowCount; i++)
 }
 y = y.Transpose();
 int m = x.RowCount;
+double reLUAlpha = 0.01;
 Matrix<double> finalTest = Matrix<double>.Build.Dense(10, 1, new double[10] {1, 4, 9, 16, 25, 36, 49, 64, 81, 100});
 finalTest = finalTest.Transpose();
 Main();
@@ -55,6 +56,7 @@ List<double> Train()
         double error = Cost(yHat, y, m);
         costs.Add(error);
         HandleBackprop(yHat, y, m, cache);
+        if (Double.IsNaN(error)) Console.WriteLine($"Cost failed at epoch {i}");
         if (i % 20 == 0) Console.WriteLine($"epoch {i}: cost = {error}");
     }
     return costs;
@@ -65,25 +67,22 @@ List<double> Train()
     Cache cache = new Cache();
     cache.aVals.Add(a0);
     Matrix<double> z = wVals[0] * a0;
+    cache.zVals.Add(z);
     z += Broadcast(bDefVals[0], z.ColumnCount);
-    Matrix<double> a = Sigmoid(z);
+    Matrix<double> a = LeakyReLU(z);
     cache.aVals.Add(a);
+    cache.zVals.Add(z);
     for (int i = 1; i < n.Length - 1; i++)
     {
         z = wVals[i] * a;
         z += Broadcast(bDefVals[i], z.ColumnCount);
-        if (i < n.Length - 2)
-        {
-            a = Sigmoid(z);
-        }
-        else
-        {
-            a = z;
-        }
+        a = LeakyReLU(z);
         cache.aVals.Add(a);
+        cache.zVals.Add(z);
     }
     Matrix<double> yHat = cache.aVals[cache.aVals.Count() - 1];
     cache.aVals.RemoveAt(cache.aVals.Count() - 1);
+    cache.zVals.RemoveAt(cache.zVals.Count() - 1);
     return (yHat, cache);
 }
 
@@ -96,11 +95,11 @@ void HandleBackprop(Matrix<double> yHat, Matrix<double> y, int m, Cache cache)
     dC_dbs.Insert(0, dC_dbL);
     for (int i = cache.aVals.Count() - 1; i > 1; i--)
     {
-        (dC_dWL, dC_dbL, dC_dAL) = BackpropHiddenLayer(dC_dAL, cache.aVals[i - 1], cache.aVals[i], wVals[i - 1]);
+        (dC_dWL, dC_dbL, dC_dAL) = BackpropHiddenLayer(dC_dAL, cache.aVals[i - 1], cache.zVals[i], wVals[i - 1]);
         dC_dWs.Insert(0, dC_dWL);
         dC_dbs.Insert(0, dC_dbL);
     }
-    (dC_dWL, dC_dbL) = BackpropLayer1(dC_dAL, cache.aVals[1], cache.aVals[0], wVals[0]);
+    (dC_dWL, dC_dbL) = BackpropLayer1(dC_dAL, cache.zVals[1], cache.aVals[0], wVals[0]);
     dC_dWs.Insert(0, dC_dWL);
     dC_dbs.Insert(0, dC_dbL);
     for (int i = wVals.Count() - 1; i >= 0; i--)
@@ -122,25 +121,25 @@ void HandleBackprop(Matrix<double> yHat, Matrix<double> y, int m, Cache cache)
     return (dC_dWL, dC_dbL, dC_dAL1);
 }
 
-(Matrix<double> dC_dWL, Matrix<double> dC_dL2, Matrix<double> dC_dAL1) BackpropHiddenLayer(Matrix<double> propagator_dC_dAL2, Matrix<double> aL1, Matrix<double> aL2, Matrix<double> wL)
+(Matrix<double> dC_dWL, Matrix<double> dC_dL2, Matrix<double> dC_dAL1) BackpropHiddenLayer(Matrix<double> propagator_dC_dAL2, Matrix<double> aL1, Matrix<double> zL, Matrix<double> wL)
 {
-    Matrix<double> dAL2_dZL = aL2.PointwiseMultiply(1 - aL2);
+    Matrix<double> dAL2_dZL = zL.PointwiseMultiply(LeakyReLUDeriv(zL));
     Matrix<double> dC_dZL = propagator_dC_dAL2.PointwiseMultiply(dAL2_dZL);
     Matrix<double> dZL_dWL = aL1;
     Matrix<double> dC_dWL = dC_dZL * dZL_dWL.Transpose();
-    Matrix<double> dC_dbL = CalculateBiasC(dC_dWL);
+    Matrix<double> dC_dbL = CalculateBiasC(dC_dZL);
     Matrix<double> dZL_dAL1 = wL;
     Matrix<double> dC_dAL1 = dZL_dAL1.Transpose() * dC_dZL;
     return (dC_dWL, dC_dbL, dC_dAL1);
 }
 
-(Matrix<double> dC_dW1, Matrix<double> dC_db1) BackpropLayer1(Matrix<double> propagator_dC_dA1, Matrix<double> a1, Matrix<double> a0, Matrix<double> w1)
+(Matrix<double> dC_dW1, Matrix<double> dC_db1) BackpropLayer1(Matrix<double> propagator_dC_dA1, Matrix<double> z1, Matrix<double> a0, Matrix<double> w1)
 {
-    Matrix<double> dA1_dZ1 = a1.PointwiseMultiply(1 - a1);
+    Matrix<double> dA1_dZ1 = z1.PointwiseMultiply(LeakyReLUDeriv(z1));
     Matrix<double> dC_dZ1 = propagator_dC_dA1.PointwiseMultiply(dA1_dZ1);
     Matrix<double> dZ1_dW1 = a0;
     Matrix<double> dC_dW1 = dC_dZ1 * dZ1_dW1.Transpose();
-    Matrix<double> dC_db1 = CalculateBiasC(dC_dW1);
+    Matrix<double> dC_db1 = CalculateBiasC(dC_dZ1);
     return (dC_dW1, dC_db1);
 }
 
@@ -186,12 +185,40 @@ static Matrix<double> GenerateMatrix(int rows, int columns)
     return matrix;
 }
 
-static Matrix<double> Sigmoid(Matrix<double> matrix)
+Matrix<double> LeakyReLU(Matrix<double> matrix)
 {
-    Matrix<double> negMatrix = matrix * -1;
-    Matrix<double> expNegMatrix = negMatrix.PointwiseExp();
-    Matrix<double> denom = expNegMatrix + 1;
-    Matrix<double> result = 1 / denom;
+    Matrix<double> result = Matrix<double>.Build.Dense(matrix.RowCount, matrix.ColumnCount);
+    for (int i = 0; i < matrix.RowCount; i++)
+    {
+        for (int j = 0; j < matrix.ColumnCount; j++)
+        {
+            result[i, j] = matrix[i, j];
+            if (result[i, j] < 0)
+            {
+                result[i, j] *= reLUAlpha;
+            }
+        }
+    }
+    return result;
+}
+
+Matrix<double> LeakyReLUDeriv(Matrix<double> matrix)
+{
+    Matrix<double> result = Matrix<double>.Build.Dense(matrix.RowCount, matrix.ColumnCount);
+    for (int i = 0; i < matrix.RowCount; i++)
+    {
+        for (int j = 0; j < matrix.ColumnCount; j++)
+        {
+            if (matrix[i, j] < 0)
+            {
+                result[i, j] = reLUAlpha;
+            }
+            else
+            {
+                result[i, j] = 1;
+            }
+        }
+    }
     return result;
 }
 
@@ -224,4 +251,5 @@ void WriteMatrix<T>(Matrix<T> matrix) where T : struct, IEquatable<T>, IFormatta
 public class Cache
 {
     public List<Matrix<double>> aVals = new List<Matrix<double>>();
+    public List<Matrix<double>> zVals = new List<Matrix<double>>();
 }
