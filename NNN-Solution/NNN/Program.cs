@@ -1,31 +1,30 @@
 ﻿using MathNet.Numerics.Distributions;
 using MathNet.Numerics.LinearAlgebra;
 
-int epochs = 1000;
-double alpha = 0.001;
-Matrix<double> x = Matrix<double>.Build.Dense(14, 1, new double[14] { 1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130 });
+int epochs = 100000;
+double alpha = 0.00000005;
+int epochsRun = 0;
+Matrix<double> x;
 int[] n;
 List<Matrix<double>> wVals = new List<Matrix<double>>();
 List<Matrix<double>> bDefVals = new List<Matrix<double>>();
-Matrix<double> y = Matrix<double>.Build.Dense(14, 1);
-for (int i = 0; i < x.RowCount; i++)
-{
-    y[i, 0] = Math.Sqrt(x[i, 0]);
-}
-y = y.Transpose();
-int m = x.RowCount;
+Matrix<double> y;
+int m;
 double reLUAlpha = 0.01;
-Matrix<double> finalTest = Matrix<double>.Build.Dense(10, 1, new double[10] {1, 4, 9, 16, 25, 36, 49, 64, 81, 100});
-finalTest = finalTest.Transpose();
+double normIn;
+double normOut;
+Matrix<double> finalTest;
 Main();
 
 void Main()
 {
     CreateNetworkDefaults(1, 4, 20, 1);
+    PrepareTrainingData();
+    PrepareTestData();
     Train();
     Console.WriteLine($"Inputs: ");
-    Matrix<double> output = FeedForward(finalTest).yHat;
-    WriteMatrix(finalTest);
+    Matrix<double> output = FeedForward(finalTest).yHat * normOut;
+    WriteMatrix(finalTest * normIn);
     Console.WriteLine($"Outputs: ");
     WriteMatrix(output);
 }
@@ -44,6 +43,48 @@ void CreateNetworkDefaults(int inputs, int hiddenLayers, int hiddenNodes, int ou
         wVals.Add(GenerateMatrix(n[i], n[i - 1]));
         bDefVals.Add(GenerateMatrix(n[i], 1));
     }
+    Console.WriteLine("Initial weight: ");
+    WriteMatrix(wVals[0]);
+    Console.WriteLine("Initial bias: ");
+    WriteMatrix(bDefVals[0]);
+}
+
+void PrepareTrainingData()
+{
+    List<double> inputs = new List<double>() { 1, 4, 9 };
+    x = Matrix<double>.Build.Dense(inputs.Count(), 1, inputs.ToArray());
+    m = x.RowCount;
+    List<double> outputs = new List<double>();
+    foreach (double input in inputs)
+    {
+        outputs.Add(Math.Sqrt(input));
+    }
+    y = Matrix<double>.Build.Dense(outputs.Count(), 1, outputs.ToArray());
+    y = y.Transpose();
+    (normIn, x) = NormalizeMatrix(x);
+    (normOut, y) = NormalizeMatrix(y);
+}
+
+void PrepareTestData()
+{
+    List<double> inputs = new List<double>() { 1, 4, 9 };
+    finalTest = Matrix<double>.Build.Dense(inputs.Count(), 1, inputs.ToArray());
+    finalTest = finalTest.Transpose();
+    finalTest /= normIn;
+}
+
+(double max, Matrix<double> result) NormalizeMatrix(Matrix<double> matrix)
+{
+    double max = matrix.Enumerate().Max();
+    Matrix<double> result = Matrix<double>.Build.Dense(matrix.RowCount, matrix.ColumnCount);
+    for (int i = 0; i < matrix.RowCount; i++)
+    {
+        for (int j = 0; j < matrix.ColumnCount; j++)
+        {
+            result[i, j] = matrix[i, j] / max;
+        }
+    }
+    return (max, result);
 }
 
 List<double> Train()
@@ -52,12 +93,13 @@ List<double> Train()
     List<double> costs = new List<double>();
     for (int i = 0; i < epochs; i++)
     {
+        epochsRun++;
         var (yHat, cache) = FeedForward(a0);
         double error = Cost(yHat, y, m);
+        if (costs.Count() > 0 && error > costs[costs.Count() - 1]) { Console.WriteLine("cost rising: " + error); }
         costs.Add(error);
         HandleBackprop(yHat, y, m, cache);
-        if (Double.IsNaN(error)) Console.WriteLine($"Cost failed at epoch {i}");
-        if (i % 20 == 0) Console.WriteLine($"epoch {i}: cost = {error}");
+        if (i % 20 == 0) { Console.WriteLine($"Epoch {i}: Cost = {error}"); }
     }
     return costs;
 }
@@ -67,22 +109,18 @@ List<double> Train()
     Cache cache = new Cache();
     cache.aVals.Add(a0);
     Matrix<double> z = wVals[0] * a0;
-    cache.zVals.Add(z);
     z += Broadcast(bDefVals[0], z.ColumnCount);
     Matrix<double> a = LeakyReLU(z);
     cache.aVals.Add(a);
-    cache.zVals.Add(z);
     for (int i = 1; i < n.Length - 1; i++)
     {
         z = wVals[i] * a;
         z += Broadcast(bDefVals[i], z.ColumnCount);
         a = LeakyReLU(z);
         cache.aVals.Add(a);
-        cache.zVals.Add(z);
     }
     Matrix<double> yHat = cache.aVals[cache.aVals.Count() - 1];
     cache.aVals.RemoveAt(cache.aVals.Count() - 1);
-    cache.zVals.RemoveAt(cache.zVals.Count() - 1);
     return (yHat, cache);
 }
 
@@ -95,11 +133,11 @@ void HandleBackprop(Matrix<double> yHat, Matrix<double> y, int m, Cache cache)
     dC_dbs.Insert(0, dC_dbL);
     for (int i = cache.aVals.Count() - 1; i > 1; i--)
     {
-        (dC_dWL, dC_dbL, dC_dAL) = BackpropHiddenLayer(dC_dAL, cache.aVals[i - 1], cache.zVals[i], wVals[i - 1]);
+        (dC_dWL, dC_dbL, dC_dAL) = BackpropHiddenLayer(dC_dAL, cache.aVals[i - 1], cache.aVals[i], wVals[i - 1]);
         dC_dWs.Insert(0, dC_dWL);
         dC_dbs.Insert(0, dC_dbL);
     }
-    (dC_dWL, dC_dbL) = BackpropLayer1(dC_dAL, cache.zVals[1], cache.aVals[0], wVals[0]);
+    (dC_dWL, dC_dbL) = BackpropLayer1(dC_dAL, cache.aVals[1], cache.aVals[0], wVals[0]);
     dC_dWs.Insert(0, dC_dWL);
     dC_dbs.Insert(0, dC_dbL);
     for (int i = wVals.Count() - 1; i >= 0; i--)
@@ -154,7 +192,7 @@ static Matrix<double> CalculateBiasC(Matrix<double> dC_dZ)
     return result;
 }
 
-static double Cost(Matrix<double> yHat, Matrix<double> y, int m)
+double Cost(Matrix<double> yHat, Matrix<double> y, int m)
 {
     Matrix<double> losses = Matrix<double>.Build.Dense(yHat.RowCount, yHat.ColumnCount);
     double cost = 0;
@@ -251,5 +289,4 @@ void WriteMatrix<T>(Matrix<T> matrix) where T : struct, IEquatable<T>, IFormatta
 public class Cache
 {
     public List<Matrix<double>> aVals = new List<Matrix<double>>();
-    public List<Matrix<double>> zVals = new List<Matrix<double>>();
 }
