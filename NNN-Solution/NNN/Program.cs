@@ -1,9 +1,9 @@
 ﻿using MathNet.Numerics.Distributions;
 using MathNet.Numerics.LinearAlgebra;
 
-int epochs = 100000;
-double alpha = 0.00000005;
-int epochsRun = 0;
+int epochs = 1000000;
+double alpha = 0.005;
+double clipThreshold = 500;
 Matrix<double> x;
 int[] n;
 List<Matrix<double>> wVals = new List<Matrix<double>>();
@@ -40,18 +40,18 @@ void CreateNetworkDefaults(int inputs, int hiddenLayers, int hiddenNodes, int ou
     n[n.Length - 1] = outputs;
     for (int i = 1; i < n.Length; i++)
     {
-        wVals.Add(GenerateMatrix(n[i], n[i - 1]));
-        bDefVals.Add(GenerateMatrix(n[i], 1));
+        wVals.Add(GenerateMatrix(n[i], n[i - 1], n[i - 1]));
+        bDefVals.Add(GenerateMatrix(n[i], 1, n[i - 1]));
     }
-    Console.WriteLine("Initial weight: ");
-    WriteMatrix(wVals[0]);
-    Console.WriteLine("Initial bias: ");
-    WriteMatrix(bDefVals[0]);
 }
 
 void PrepareTrainingData()
 {
-    List<double> inputs = new List<double>() { 1, 4, 9 };
+    List<double> inputs = new List<double>() { 1 };
+    for (int i = 1; i < 20; i++)
+    {
+        inputs.Add(i * 5);
+    }
     x = Matrix<double>.Build.Dense(inputs.Count(), 1, inputs.ToArray());
     m = x.RowCount;
     List<double> outputs = new List<double>();
@@ -93,13 +93,12 @@ List<double> Train()
     List<double> costs = new List<double>();
     for (int i = 0; i < epochs; i++)
     {
-        epochsRun++;
         var (yHat, cache) = FeedForward(a0);
         double error = Cost(yHat, y, m);
-        if (costs.Count() > 0 && error > costs[costs.Count() - 1]) { Console.WriteLine("cost rising: " + error); }
         costs.Add(error);
         HandleBackprop(yHat, y, m, cache);
-        if (i % 20 == 0) { Console.WriteLine($"Epoch {i}: Cost = {error}"); }
+        if (i % 100 == 0) { Console.WriteLine($"Epoch {i}: Cost = {error}"); }
+        if (i == Math.Round(epochs * 0.75)) { alpha *= 0.5; }
     }
     return costs;
 }
@@ -140,11 +139,39 @@ void HandleBackprop(Matrix<double> yHat, Matrix<double> y, int m, Cache cache)
     (dC_dWL, dC_dbL) = BackpropLayer1(dC_dAL, cache.aVals[1], cache.aVals[0], wVals[0]);
     dC_dWs.Insert(0, dC_dWL);
     dC_dbs.Insert(0, dC_dbL);
+    (dC_dWs, dC_dbs) = ClipGradients(dC_dWs, dC_dbs);
     for (int i = wVals.Count() - 1; i >= 0; i--)
     {
         wVals[i] -= alpha * dC_dWs[i];
         bDefVals[i] -= Broadcast(alpha * dC_dbs[i], bDefVals[i].ColumnCount);
     }
+}
+
+(List<Matrix<double>> dC_dWs, List<Matrix<double>> dC_dbs) ClipGradients(List<Matrix<double>> inputdC_dWs, List<Matrix<double>> inputdC_dbs)
+{
+    List<Matrix<double>> dC_dWs = new List<Matrix<double>>();
+    List<Matrix<double>> dC_dbs = new List<Matrix<double>>();
+    foreach (Matrix<double> gradient in inputdC_dWs)
+    {
+        Matrix<double> newGradient = gradient.Clone();
+        double norm = newGradient.FrobeniusNorm();
+        if (norm > clipThreshold)
+        {
+            newGradient *= clipThreshold / norm;
+        }
+        dC_dWs.Add(newGradient);
+    }
+    foreach (Matrix<double> gradient in inputdC_dbs)
+    {
+        Matrix<double> newGradient = gradient.Clone();
+        double norm = newGradient.FrobeniusNorm();
+        if (norm > clipThreshold)
+        {
+            newGradient *= clipThreshold / norm;
+        }
+        dC_dbs.Add(newGradient);
+    }
+    return (dC_dWs, dC_dbs);
 }
 
 (Matrix<double> dC_dWL, Matrix<double> dC_dbL, Matrix<double> dC_dAL1) BackpropFinalLayer(Matrix<double> yHat, Matrix<double> y, int m, Matrix<double> aL1, Matrix<double> wL)
@@ -181,7 +208,7 @@ void HandleBackprop(Matrix<double> yHat, Matrix<double> y, int m, Cache cache)
     return (dC_dW1, dC_db1);
 }
 
-static Matrix<double> CalculateBiasC(Matrix<double> dC_dZ)
+Matrix<double> CalculateBiasC(Matrix<double> dC_dZ)
 {
     Matrix<double> result = Matrix<double>.Build.Dense(dC_dZ.RowCount, 1);
     Vector<double> sums = dC_dZ.RowSums();
@@ -208,9 +235,9 @@ double Cost(Matrix<double> yHat, Matrix<double> y, int m)
     return cost;
 }
 
-static Matrix<double> GenerateMatrix(int rows, int columns)
+Matrix<double> GenerateMatrix(int rows, int columns, int distribution = 1)
 {
-    Normal nd = new Normal();
+    Normal nd = new Normal(0, 2 / ((1 + Math.Pow(reLUAlpha, 2)) * distribution));
     Matrix<double> matrix = Matrix<double>.Build.Dense(rows, columns);
     for (int i = 0; i < rows; i++)
     {
@@ -260,7 +287,7 @@ Matrix<double> LeakyReLUDeriv(Matrix<double> matrix)
     return result;
 }
 
-static Matrix<double> Broadcast(Matrix<double> input, int columns)
+Matrix<double> Broadcast(Matrix<double> input, int columns)
 {
     Matrix<double> result = Matrix<double>.Build.Dense(input.RowCount, columns);
     for (int i = 0; i < input.RowCount; i++)
