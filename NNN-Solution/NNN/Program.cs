@@ -53,6 +53,7 @@ public class NeuralNetwork
 
     List<double> TrainNetwork()
     {
+        double initialAlpha = alpha;
         Matrix<double> a0 = x.Transpose();
         List<double> costs = new List<double>();
         for (int i = 0; i < epochs; i++)
@@ -64,6 +65,7 @@ public class NeuralNetwork
             if (i % 100 == 0) { Console.WriteLine($"Epoch {i}: Cost = {error}"); }
             if (i == Math.Round(epochs * 0.75)) { alpha *= 0.5; }
         }
+        alpha = initialAlpha;
         return costs;
     }
 
