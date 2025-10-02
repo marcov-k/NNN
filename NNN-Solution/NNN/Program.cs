@@ -2,6 +2,29 @@
 using MathNet.Numerics.LinearAlgebra;
 using System.Text.Json;
 
+List<double> inputs = new List<double>() { 1, 3, 8, 12 };
+Matrix<double> x = Matrix<double>.Build.Dense(inputs.Count(), 1, inputs.ToArray());
+List<double> outputs = new List<double>();
+foreach (double input in inputs)
+{
+    outputs.Add(Math.Sqrt(input));
+}
+Matrix<double> y = Matrix<double>.Build.Dense(outputs.Count(), 1, outputs.ToArray());
+List<double> testVals = new List<double>() { 1, 4, 9 };
+Matrix<double> test = Matrix<double>.Build.Dense(testVals.Count(), 1, testVals.ToArray());
+NeuralNetwork network = new NeuralNetwork(1, 2, 25, 1);
+network.SetTrainingData(x, y);
+network.LogTraining(false);
+Console.WriteLine("Square Root Training Demo:");
+Console.WriteLine("Inputs:");
+Console.WriteLine(test);
+Console.WriteLine("Initial Output:");
+Console.WriteLine(network.ProcessInput(test));
+Console.WriteLine("Training...");
+network.Train();
+Console.WriteLine("Trained Output:");
+Console.WriteLine(network.ProcessInput(test));
+
 public class NeuralNetwork
 {
     int epochs = 1000000;
@@ -16,6 +39,7 @@ public class NeuralNetwork
     double reLUAlpha = 0.01;
     double normIn = 0;
     double normOut = 0;
+    bool logTraining = true;
 
     void CreateLayers(int inputs, int hiddenLayers, int hiddenNodes, int outputs)
     {
@@ -62,7 +86,7 @@ public class NeuralNetwork
             double error = Cost(yHat, y, m);
             costs.Add(error);
             HandleBackprop(yHat, y, m, cache);
-            if (i % 100 == 0) { Console.WriteLine($"Epoch {i}: Cost = {error}"); }
+            if (logTraining && i % 100 == 0) { Console.WriteLine($"Epoch {i}: Cost = {error}"); }
             if (i == Math.Round(epochs * 0.75)) { alpha *= 0.5; }
         }
         alpha = initialAlpha;
@@ -139,6 +163,11 @@ public class NeuralNetwork
         {
             y /= normOut;
         }
+    }
+
+    public void LogTraining(bool logTraining)
+    {
+        this.logTraining = logTraining;
     }
 
     public List<double> Train(int? epochs = null, double? alpha = null, double? clipThreshold = null)
