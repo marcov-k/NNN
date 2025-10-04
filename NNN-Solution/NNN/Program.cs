@@ -2,7 +2,12 @@
 using MathNet.Numerics.LinearAlgebra;
 using System.Text.Json;
 
-List<double> inputs = new List<double>() { 1, 3, 8, 12 };
+List<double> inputs = new List<double>();
+inputs.Add(0.8);
+for (int i = 1; i < 10; i++)
+{
+    inputs.Add(i * 2);
+}
 Matrix<double> x = Matrix<double>.Build.Dense(inputs.Count(), 1, inputs.ToArray());
 List<double> outputs = new List<double>();
 foreach (double input in inputs)
@@ -10,25 +15,31 @@ foreach (double input in inputs)
     outputs.Add(Math.Sqrt(input));
 }
 Matrix<double> y = Matrix<double>.Build.Dense(outputs.Count(), 1, outputs.ToArray());
-List<double> testVals = new List<double>() { 1, 4, 9 };
+List<double> testVals = new List<double>() { 1, 2, 4, 9, 16, 25 };
 Matrix<double> test = Matrix<double>.Build.Dense(testVals.Count(), 1, testVals.ToArray());
-NeuralNetwork network = new NeuralNetwork(1, 2, 25, 1);
+NeuralNetwork network = new NeuralNetwork(1, 2, 10, 1);
 network.SetTrainingData(x, y);
 network.LogTraining(false);
 Console.WriteLine("Square Root Training Demo:");
+Console.WriteLine();
 Console.WriteLine("Inputs:");
 Console.WriteLine(test);
 Console.WriteLine("Initial Output:");
 Console.WriteLine(network.ProcessInput(test));
+Console.WriteLine("Training Data:");
+Console.WriteLine(x);
 Console.WriteLine("Training...");
-network.Train();
+network.Train(null, 0.02);
+Console.WriteLine();
 Console.WriteLine("Trained Output:");
 Console.WriteLine(network.ProcessInput(test));
+Console.WriteLine("Press any key to exit...");
+Console.ReadKey(true);
 
 public class NeuralNetwork
 {
     int epochs = 1000000;
-    double alpha = 0.005;
+    double alpha = 0.01;
     double clipThreshold = 500;
     Matrix<double>? x;
     int[]? n;
@@ -37,6 +48,7 @@ public class NeuralNetwork
     Matrix<double>? y;
     int m;
     double reLUAlpha = 0.01;
+    double costDelta = 1;
     double normIn = 0;
     double normOut = 0;
     bool logTraining = true;
@@ -87,7 +99,7 @@ public class NeuralNetwork
             costs.Add(error);
             HandleBackprop(yHat, y, m, cache);
             if (logTraining && i % 100 == 0) { Console.WriteLine($"Epoch {i}: Cost = {error}"); }
-            if (i == Math.Round(epochs * 0.75)) { alpha *= 0.5; }
+            if (i == Math.Round(epochs * 0.8)) { alpha *= 0.5; }
         }
         alpha = initialAlpha;
         return costs;
@@ -170,11 +182,12 @@ public class NeuralNetwork
         this.logTraining = logTraining;
     }
 
-    public List<double> Train(int? epochs = null, double? alpha = null, double? clipThreshold = null)
+    public List<double> Train(int? epochs = null, double? alpha = null, double? clipThreshold = null, double? costDelta = null)
     {
         this.epochs = epochs ?? this.epochs;
         this.alpha = alpha ?? this.alpha;
         this.clipThreshold = clipThreshold ?? this.clipThreshold;
+        this.costDelta = costDelta ?? this.costDelta;
         List<double> costs = TrainNetwork();
         return costs.ToList();
     }
@@ -182,7 +195,9 @@ public class NeuralNetwork
     public Matrix<double> ProcessInput(Matrix<double> input)
     {
         Matrix<double> a0 = input.Clone().Transpose();
+        if (normIn != 0) { a0 /= normIn; }
         Matrix<double> output = FeedForward(a0).yHat.Clone();
+        if (normOut != 0) { output *= normOut; }
         return output;
     }
 
@@ -285,7 +300,7 @@ public class NeuralNetwork
         return result;
     }
 
-    static double Cost(Matrix<double> yHat, Matrix<double> y, int m)
+    double Cost(Matrix<double> yHat, Matrix<double> y, int m)
     {
         Matrix<double> losses = Matrix<double>.Build.Dense(yHat.RowCount, yHat.ColumnCount);
         double cost = 0;
@@ -293,7 +308,14 @@ public class NeuralNetwork
         {
             for (int j = 0; j < yHat.ColumnCount; j++)
             {
-                losses[i, j] = Math.Pow(y[i, j] - yHat[i, j], 2);
+                if (Math.Abs(yHat[i, j] - y[i, j]) < costDelta)
+                {
+                    losses[i, j] = 0.5 * Math.Pow(yHat[i, j] - y[i, j], 2);
+                }
+                else
+                {
+                    losses[i, j] = costDelta * (Math.Abs(yHat[i, j] - y[i, j]) - 0.5 * costDelta);
+                }
             }
         }
         Vector<double> summedLosses = (1 / (double)m) * losses.RowSums();
