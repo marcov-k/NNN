@@ -2,6 +2,94 @@
 using MathNet.Numerics.LinearAlgebra;
 using System.Text.Json;
 
+public class SimpleEnv
+{
+    public int Position { get; private set; }
+    public int Goal = -10;
+    public int MinPos = 5;
+
+    public double[] Reset()
+    {
+        Position = 0;
+        return GetState();
+    }
+
+    public (double[] nextState, double reward, bool done) Step(int action)
+    {
+        if (action == 0) Position--; // move left
+        else Position++;             // move right
+
+        double reward = 0;
+        bool done = false;
+
+        if (Position == Goal) { reward = 1; done = true; }
+        else if (Position == MinPos) { reward = -1; done = true; }
+
+        return (GetState(), reward, done);
+    }
+
+    public double[] GetState()
+    {
+        return new double[] { (double)Position };
+    }
+}
+
+public class Program
+{
+    public static void Main(string[] args)
+    {
+        int stateSize = 1;   // position
+        int actionSize = 2;  // left or right
+        DQNAgent agent = new DQNAgent(stateSize, actionSize, hiddenLayers: 2, hiddenNeurons: 16);
+
+        SimpleEnv env = new SimpleEnv();
+        int episodes = 200;
+        int maxSteps = 20;
+
+        for (int e = 0; e < episodes; e++)
+        {
+            double[] state = env.Reset();
+            double totalReward = 0;
+
+            for (int step = 0; step < maxSteps; step++)
+            {
+                // Agent chooses action
+                int action = agent.Act(state);
+
+                // Environment step
+                var (nextState, reward, done) = env.Step(action);
+
+                // Store experience
+                Experience exp = new Experience(state, action, reward, nextState, done);
+                agent.Remember(exp);
+
+                // Train
+                agent.Replay(32);
+
+                totalReward += reward;
+                state = nextState;
+
+                if (done) break;
+            }
+
+            Console.WriteLine($"Episode {e + 1}/{episodes}, Total Reward: {totalReward}");
+        }
+
+        Console.WriteLine("Training finished. Testing greedy policy...");
+
+        // Test without exploration
+        double[] testState = env.Reset();
+        for (int step = 0; step < 10; step++)
+        {
+            int action = agent.Act(testState);
+            var (nextState, reward, done) = env.Step(action);
+            Console.WriteLine($"Step {step}: State={testState[0]}, Action={action}, Next={nextState[0]}, Reward={reward}");
+            testState = nextState;
+            if (done) break;
+        }
+    }
+}
+
 public class DQNAgent
 {
     int stateSize, actionSize;
@@ -86,6 +174,7 @@ public class DQNAgent
         this.actionSize = actionSize;
         model = new NeuralNetwork(stateSize, hiddenLayers, hiddenNeurons, actionSize);
         targetModel = new NeuralNetwork(stateSize, hiddenLayers, hiddenNeurons, actionSize);
+        UpdateTargetModel();
     }
 }
 
@@ -142,44 +231,48 @@ public class NeuralNetwork
         return costs;
     }
 
-    (Matrix<double> yHat, Cache cache) FeedForward(Matrix<double> a0)
+    public (Matrix<double> yHat, Cache cache) FeedForward(Matrix<double> input)
     {
         Cache cache = new Cache();
-        cache.aVals.Add(a0);
-        Matrix<double> z = wVals[0] * a0;
-        z += Broadcast(bDefVals[0], z.ColumnCount);
-        Matrix<double> a = LeakyReLU(z);
+        Matrix<double> a = input.Clone();
         cache.aVals.Add(a);
-        for (int i = 1; i < n.Length - 1; i++)
+        for (int i = 0; i < wVals.Count; i++)
         {
-            z = wVals[i] * a;
-            z += Broadcast(bDefVals[i], z.ColumnCount);
-            a = LeakyReLU(z);
+            Matrix<double> z = wVals[i] * a + Broadcast(bDefVals[i], a.ColumnCount);
+            cache.zVals.Add(z);
+            if (i < wVals.Count - 1) a = LeakyReLU(z);
+            else a = z;
             cache.aVals.Add(a);
         }
-        Matrix<double> yHat = cache.aVals[cache.aVals.Count() - 1];
-        cache.aVals.RemoveAt(cache.aVals.Count() - 1);
-        return (yHat, cache);
+        return (a, cache);
     }
 
     void HandleBackprop(Matrix<double> yHat, Matrix<double> y, int m, Cache cache)
     {
         List<Matrix<double>> dC_dWs = new List<Matrix<double>>();
         List<Matrix<double>> dC_dbs = new List<Matrix<double>>();
-        var (dC_dWL, dC_dbL, dC_dAL) = BackpropFinalLayer(yHat, y, m, cache.aVals[cache.aVals.Count() - 1], wVals[wVals.Count() - 1], costDelta);
-        dC_dWs.Insert(0, dC_dWL);
-        dC_dbs.Insert(0, dC_dbL);
-        for (int i = cache.aVals.Count() - 1; i > 1; i--)
+        int L = wVals.Count;
+        Matrix<double> aL = yHat;
+        Matrix<double> aPrev = cache.aVals[L - 1];
+        Matrix<double> dC_dZ = CostDeriv(aL, y, costDelta, m);
+        Matrix<double> dC_dW = dC_dZ * aPrev.Transpose();
+        Matrix<double> dC_db = CalculateBiasC(dC_dZ, m);
+        dC_dWs.Insert(0, dC_dW);
+        dC_dbs.Insert(0, dC_db);
+        Matrix<double> dC_dA_prev = wVals[L - 1].Transpose() * dC_dZ;
+        for (int l = L - 2; l >= 0; l--)
         {
-            (dC_dWL, dC_dbL, dC_dAL) = BackpropHiddenLayer(dC_dAL, cache.aVals[i - 1], cache.aVals[i], wVals[i - 1], m);
-            dC_dWs.Insert(0, dC_dWL);
-            dC_dbs.Insert(0, dC_dbL);
+            Matrix<double> aPrevHidden = cache.aVals[l];
+            Matrix<double> zHidden = cache.zVals[l];
+            Matrix<double> dZ = dC_dA_prev.PointwiseMultiply(LeakyReLUDeriv(zHidden));
+            Matrix<double> dW = dZ * aPrevHidden.Transpose();
+            Matrix<double> db = CalculateBiasC(dZ, m);
+            dC_dWs.Insert(0, dW);
+            dC_dbs.Insert(0, db);
+            if (l > 0) dC_dA_prev = wVals[l].Transpose() * dZ;
         }
-        (dC_dWL, dC_dbL) = BackpropLayer1(dC_dAL, cache.aVals[1], cache.aVals[0], wVals[0], m);
-        dC_dWs.Insert(0, dC_dWL);
-        dC_dbs.Insert(0, dC_dbL);
         (dC_dWs, dC_dbs) = ClipGradients(dC_dWs, dC_dbs, clipThreshold);
-        for (int i = wVals.Count() - 1; i >= 0; i--)
+        for (int i = 0; i < wVals.Count; i++)
         {
             wVals[i] -= alpha * dC_dWs[i];
             bDefVals[i] -= Broadcast(alpha * dC_dbs[i], bDefVals[i].ColumnCount);
@@ -226,9 +319,9 @@ public class NeuralNetwork
 
     public Matrix<double> ProcessInput(Matrix<double> input)
     {
-        Matrix<double> a0 = input.Clone().Transpose();
-        Matrix<double> output = FeedForward(a0).yHat.Clone();
-        return output;
+        Matrix<double> xT = input.Clone().Transpose();
+        var (yHat, _) = FeedForward(xT);
+        return yHat.Transpose();
     }
 
     public string CreateJsonString()
@@ -240,6 +333,8 @@ public class NeuralNetwork
 
     public NeuralNetwork(int inputNeurons, int hiddenLayers, int hiddenNeurons, int outputNeurons)
     {
+        wVals = new List<Matrix<double>>();
+        bDefVals = new List<Matrix<double>>();
         CreateLayers(inputNeurons, hiddenLayers, hiddenNeurons, outputNeurons);
         CreateDefaultWeights();
     }
@@ -283,43 +378,11 @@ public class NeuralNetwork
         return (dC_dWs, dC_dbs);
     }
 
-    static (Matrix<double> dC_dWL, Matrix<double> dC_dbL, Matrix<double> dC_dAL1) BackpropFinalLayer(Matrix<double> yHat, Matrix<double> y, int m, Matrix<double> aL1, Matrix<double> wL, double costDelta)
+    static Matrix<double> CalculateBiasC(Matrix<double> dC_dZ, int batchSize)
     {
-        Matrix<double> aL2 = yHat;
-        Matrix<double> dC_dZL = CostDeriv(aL2, y, costDelta, m);
-        Matrix<double> dZL_dWL = aL1;
-        Matrix<double> dC_dWL = dC_dZL * dZL_dWL.Transpose();
-        Matrix<double> dC_dbL = CalculateBiasC(dC_dZL, m);
-        Matrix<double> dZL_dAL1 = wL;
-        Matrix<double> dC_dAL1 = wL.Transpose() * dC_dZL;
-        return (dC_dWL, dC_dbL, dC_dAL1);
-    }
-
-    static (Matrix<double> dC_dWL, Matrix<double> dC_dL2, Matrix<double> dC_dAL1) BackpropHiddenLayer(Matrix<double> propagator_dC_dAL2, Matrix<double> aL1, Matrix<double> zL, Matrix<double> wL, double m)
-    {
-        Matrix<double> dC_dZL = propagator_dC_dAL2.PointwiseMultiply(LeakyReLUDeriv(zL));
-        Matrix<double> dZL_dWL = aL1;
-        Matrix<double> dC_dWL = dC_dZL * dZL_dWL.Transpose();
-        Matrix<double> dC_dbL = CalculateBiasC(dC_dZL, m);
-        Matrix<double> dZL_dAL1 = wL;
-        Matrix<double> dC_dAL1 = dZL_dAL1.Transpose() * dC_dZL;
-        return (dC_dWL, dC_dbL, dC_dAL1);
-    }
-
-    static (Matrix<double> dC_dW1, Matrix<double> dC_db1) BackpropLayer1(Matrix<double> propagator_dC_dA1, Matrix<double> z1, Matrix<double> a0, Matrix<double> w1, double m)
-    {
-        Matrix<double> dA1_dZ1 = LeakyReLUDeriv(z1);
-        Matrix<double> dC_dZ1 = propagator_dC_dA1.PointwiseMultiply(dA1_dZ1);
-        Matrix<double> dZ1_dW1 = a0;
-        Matrix<double> dC_dW1 = dC_dZ1 * dZ1_dW1.Transpose();
-        Matrix<double> dC_db1 = CalculateBiasC(dC_dZ1, m);
-        return (dC_dW1, dC_db1);
-    }
-
-    static Matrix<double> CalculateBiasC(Matrix<double> dC_dZ, double m)
-    {
+        // average across columns (examples)
+        Vector<double> sums = dC_dZ.RowSums() / batchSize;
         Matrix<double> result = Matrix<double>.Build.Dense(dC_dZ.RowCount, 1);
-        Vector<double> sums = dC_dZ.ColumnSums() / m;
         for (int i = 0; i < sums.Count; i++) result[i, 0] = sums[i];
         return result;
     }
@@ -327,6 +390,7 @@ public class NeuralNetwork
     double Cost(Matrix<double> yHat, Matrix<double> y, int m)
     {
         Matrix<double> losses = Matrix<double>.Build.Dense(yHat.RowCount, yHat.ColumnCount);
+        y = y.Clone().Transpose();
         for (int i = 0; i < yHat.RowCount; i++)
         {
             for (int j = 0; j < yHat.ColumnCount; j++)
@@ -348,6 +412,7 @@ public class NeuralNetwork
     static Matrix<double> CostDeriv(Matrix<double> aL2, Matrix<double> y, double costDelta, int m)
     {
         Matrix<double> dC_dZL = Matrix<double>.Build.Dense(aL2.RowCount, aL2.ColumnCount);
+        y = y.Clone().Transpose();
         for (int i = 0; i < aL2.RowCount; i++)
         {
             for (int j = 0; j < aL2.ColumnCount; j++)
@@ -462,6 +527,7 @@ public class NeuralNetwork
 public class Cache
 {
     public List<Matrix<double>> aVals = new List<Matrix<double>>();
+    public List<Matrix<double>> zVals = new List<Matrix<double>>();
 }
 
 public class Experience
