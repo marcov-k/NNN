@@ -1,44 +1,254 @@
 ﻿using MathNet.Numerics.Distributions;
 using MathNet.Numerics.LinearAlgebra;
 using System.Text.Json;
+using System.Linq;
+using System.Collections.Generic;
+using System;
 
-List<double> inputs = new List<double>();
-inputs.Add(0.8);
-for (int i = 1; i < 10; i++)
+public class SimpleEnv
 {
-    inputs.Add(i * 2);
+    public int XPosition { get; private set; }
+    public int YPosition { get; private set; }
+    public int XGoal = 8;
+    public int YGoal = -5;
+
+    public double[] Reset()
+    {
+        XPosition = 0;
+        YPosition = 0;
+        return GetState();
+    }
+
+    public (double[] nextState, double reward, bool done) Step(int dx, int dy)
+    {
+        double prevDist = Math.Sqrt(Math.Pow(XGoal - XPosition, 2) + Math.Pow(YGoal - YPosition, 2));
+
+        // Apply movement
+        XPosition += dx;
+        YPosition += dy;
+
+        double dist = Math.Sqrt(Math.Pow(XGoal - XPosition, 2) + Math.Pow(YGoal - YPosition, 2));
+        double deltaDist = prevDist - dist;
+        bool done = false;
+        double reward = 0.0;
+        reward += Math.Clamp(deltaDist, -1.0, 1.0); // Reward for moving toward goal
+        if (dist < 0.3) { reward += 10; done = true; }    // Goal reached
+        if (dx == 0 && dy == 0) { reward -= 0.1; }
+        reward -= 0.3;
+
+        return (GetState(), reward, done);
+    }
+
+    public double[] GetState()
+    {
+        return new double[] { XPosition, YPosition };
+    }
 }
-Matrix<double> x = Matrix<double>.Build.Dense(inputs.Count(), 1, inputs.ToArray());
-List<double> outputs = new List<double>();
-foreach (double input in inputs)
+
+public class Program
 {
-    outputs.Add(Math.Sqrt(input));
+    public static void Main(string[] args)
+    {
+        DQNAgent agent = new DQNAgent();
+        SimpleEnv env = new SimpleEnv();
+
+        int episodes = 500;
+        int maxSteps = 50;
+
+        for (int e = 0; e < episodes; e++)
+        {
+            if (e == Math.Round(episodes * 0.9)) { agent.epsilon = 0.0; }
+            double[] state = env.Reset();
+            double totalReward = 0;
+
+            for (int step = 0; step < maxSteps; step++)
+            {
+                // Get action (integer 0..8)
+                int action = agent.Act(state);
+
+                // Decode to (dx, dy)
+                var (dx, dy) = agent.DecodeAction(action);
+
+                // Step environment
+                var (nextState, reward, done) = env.Step(dx, dy);
+
+                // Remember experience
+                agent.Remember(state, action, reward, nextState, done);
+
+                // Train on replay buffer
+                agent.Replay();
+
+                state = nextState;
+                totalReward += reward;
+
+                if (done) break;
+            }
+
+            Console.WriteLine($"Episode {e + 1}/{episodes}, Total Reward: {totalReward:F2}, Epsilon: {agent.Epsilon:F2}");
+        }
+
+        Console.WriteLine("\nTraining complete. Testing greedy policy...\n");
+
+        // --- Test phase (no exploration) ---
+        double[] testState = env.Reset();
+        double finalReward = 0;
+        Console.WriteLine($"Target State=(X={env.XGoal}, Y={env.YGoal})");
+        for (int step = 0; step < 10; step++)
+        {
+            int action = agent.Act(testState);
+            var (dx, dy) = agent.DecodeAction(action);
+
+            var (nextState, reward, done) = env.Step(dx, dy);
+            finalReward += reward;
+            Console.WriteLine($"Step {step}: State=(X={testState[0]}, Y={testState[1]}), " +
+                              $"Action=(dx={dx}, dy={dy}), Next=(X={nextState[0]}, Y={nextState[1]}), Reward={reward:F2}");
+
+            testState = nextState;
+            if (done) break;
+        }
+        Console.WriteLine("\nTesting finished.");
+        Console.WriteLine("Press any key to close...");
+        Console.ReadKey();
+    }
 }
-Matrix<double> y = Matrix<double>.Build.Dense(outputs.Count(), 1, outputs.ToArray());
-List<double> testVals = new List<double>() { 1, 2, 4, 9, 16, 25 };
-Matrix<double> test = Matrix<double>.Build.Dense(testVals.Count(), 1, testVals.ToArray());
-NeuralNetwork network = new NeuralNetwork(1, 2, 10, 1);
-network.SetTrainingData(x, y);
-network.LogTraining(false);
-Console.WriteLine("Square Root Training Demo:");
-Console.WriteLine();
-Console.WriteLine("Inputs:");
-Console.WriteLine(test);
-Console.WriteLine("Initial Output:");
-Console.WriteLine(network.ProcessInput(test));
-Console.WriteLine("Training Data:");
-Console.WriteLine(x);
-Console.WriteLine("Training...");
-network.Train(null, 0.02);
-Console.WriteLine();
-Console.WriteLine("Trained Output:");
-Console.WriteLine(network.ProcessInput(test));
-Console.WriteLine("Press any key to exit...");
-Console.ReadKey(true);
+
+public class DQNAgent
+{
+    private readonly int stateSize = 2;
+    private readonly int actionSize = 9;
+
+    private double gamma = 0.99;
+    public double epsilon = 1.0;
+    private double epsilonDecay = 0.999;
+    private double epsilonMin = 0.05;
+
+    private int batchSize = 64;
+    private int targetUpdateFreq = 200;
+    private double tau = 0.05;
+    private int maxBufferSize = 10000;
+
+    private int stepCount = 0;
+    private Random random = new Random();
+
+    private NeuralNetwork model;
+    private NeuralNetwork targetModel;
+
+    private List<(double[] state, int action, double reward, double[] nextState, bool done)> replayBuffer
+        = new List<(double[], int, double, double[], bool)>();
+
+    private (int dx, int dy)[] moveMap = new (int, int)[]
+    {
+        (-1,-1), (-1,0), (-1,1),
+        ( 0,-1), ( 0,0), ( 0,1),
+        ( 1,-1), ( 1,0), ( 1,1)
+    };
+
+    public DQNAgent()
+    {
+        model = new NeuralNetwork(inputNeurons: stateSize, hiddenLayers: 1, hiddenNeurons: 14, outputNeurons: actionSize);
+        targetModel = new NeuralNetwork(inputNeurons: stateSize, hiddenLayers: 1, hiddenNeurons: 14, outputNeurons: actionSize);
+        SyncTargetModel();
+    }
+
+    // --- Action selection (epsilon-greedy)
+    public int Act(double[] state)
+    {
+        if (random.NextDouble() < epsilon)
+            return random.Next(actionSize);
+
+        var stateMat = Matrix<double>.Build.Dense(1, state.Length, state);
+        var qMatrix = model.ProcessInput(stateMat);
+        double[] qValues = qMatrix.Row(0).ToArray();
+
+        int bestAction = Array.IndexOf(qValues, qValues.Max());
+        return bestAction;
+    }
+
+    public (int dx, int dy) DecodeAction(int action)
+    {
+        return moveMap[action];
+    }
+
+    // --- Store experience
+    public void Remember(double[] state, int action, double reward, double[] nextState, bool done)
+    {
+        if (replayBuffer.Count >= maxBufferSize) replayBuffer.RemoveAt(0);
+        replayBuffer.Add((state, action, reward, nextState, done));
+    }
+
+    // --- Training via experience replay
+    public void Replay()
+    {
+        if (replayBuffer.Count < batchSize)
+            return;
+
+        // --- Sample random minibatch
+        var batch = replayBuffer.OrderBy(x => random.Next())
+                                .Take(batchSize)
+                                .ToList();
+
+        var inputList = new List<double[]>();
+        var targetList = new List<double[]>();
+
+        foreach (var (state, action, reward, nextState, done) in batch)
+        {
+            // Predict current Q-values
+            var qCurrent = model.ProcessInput(Matrix<double>.Build.Dense(1, state.Length, state))
+                               .Row(0).ToArray();
+
+            // Predict next Q-values using *target network*
+            var qNext = targetModel.ProcessInput(Matrix<double>.Build.Dense(1, nextState.Length, nextState))
+                                   .Row(0).ToArray();
+
+            double qTarget = reward + (done ? 0.0 : gamma * qNext.Max());
+
+            qCurrent[action] = qTarget;
+
+            inputList.Add(state);
+            targetList.Add(qCurrent);
+        }
+
+        var inputMatrix = Matrix<double>.Build.DenseOfRowArrays(inputList);
+        var targetMatrix = Matrix<double>.Build.DenseOfRowArrays(targetList);
+
+        // Train model
+        model.SetTrainingData(inputMatrix, targetMatrix);
+        model.Train(epochs: 2, alpha: 0.0015, clipThreshold: 10);
+
+        // Epsilon decay
+        if (epsilon > epsilonMin)
+            epsilon *= epsilonDecay;
+
+        stepCount++;
+        if (stepCount % targetUpdateFreq == 0)
+            SoftUpdateTarget(tau);
+    }
+
+    private void SoftUpdateTarget(double tau = 0.01)
+    {
+        var (weightsModel, biasesModel) = model.GetWeights();
+        var (weightsTarget, biasesTarget) = targetModel.GetWeights();
+
+        for (int i = 0; i < weightsModel.Count; i++)
+        {
+            weightsTarget[i] = (1 - tau) * weightsTarget[i] + tau * weightsModel[i];
+            biasesTarget[i] = (1 - tau) * biasesTarget[i] + tau * biasesModel[i];
+        }
+        targetModel.SetWeights(weightsTarget, biasesTarget);
+    }
+
+    private void SyncTargetModel()
+    {
+        var (weights, biases) = model.GetWeights();
+        targetModel.SetWeights(weights, biases);
+    }
+
+    public double Epsilon => epsilon;
+}
 
 public class NeuralNetwork
 {
-    int epochs = 1000000;
+    int epochs = 10;
     double alpha = 0.01;
     double clipThreshold = 500;
     Matrix<double>? x;
@@ -49,9 +259,7 @@ public class NeuralNetwork
     int m;
     double reLUAlpha = 0.01;
     double costDelta = 1;
-    double normIn = 0;
-    double normOut = 0;
-    bool logTraining = true;
+    bool logTraining = false;
 
     void CreateLayers(int inputs, int hiddenLayers, int hiddenNodes, int outputs)
     {
@@ -73,20 +281,6 @@ public class NeuralNetwork
         }
     }
 
-    static (double max, Matrix<double> result) NormalizeMatrix(Matrix<double> matrix)
-    {
-        double max = matrix.Enumerate().Max();
-        Matrix<double> result = Matrix<double>.Build.Dense(matrix.RowCount, matrix.ColumnCount);
-        for (int i = 0; i < matrix.RowCount; i++)
-        {
-            for (int j = 0; j < matrix.ColumnCount; j++)
-            {
-                result[i, j] = matrix[i, j] / max;
-            }
-        }
-        return (max, result);
-    }
-
     List<double> TrainNetwork()
     {
         double initialAlpha = alpha;
@@ -105,44 +299,48 @@ public class NeuralNetwork
         return costs;
     }
 
-    (Matrix<double> yHat, Cache cache) FeedForward(Matrix<double> a0)
+    public (Matrix<double> yHat, Cache cache) FeedForward(Matrix<double> input)
     {
         Cache cache = new Cache();
-        cache.aVals.Add(a0);
-        Matrix<double> z = wVals[0] * a0;
-        z += Broadcast(bDefVals[0], z.ColumnCount);
-        Matrix<double> a = LeakyReLU(z);
+        Matrix<double> a = input.Clone();
         cache.aVals.Add(a);
-        for (int i = 1; i < n.Length - 1; i++)
+        for (int i = 0; i < wVals.Count; i++)
         {
-            z = wVals[i] * a;
-            z += Broadcast(bDefVals[i], z.ColumnCount);
-            a = LeakyReLU(z);
+            Matrix<double> z = wVals[i] * a + Broadcast(bDefVals[i], a.ColumnCount);
+            cache.zVals.Add(z);
+            if (i < wVals.Count - 1) a = LeakyReLU(z);
+            else a = z;
             cache.aVals.Add(a);
         }
-        Matrix<double> yHat = cache.aVals[cache.aVals.Count() - 1];
-        cache.aVals.RemoveAt(cache.aVals.Count() - 1);
-        return (yHat, cache);
+        return (a, cache);
     }
 
     void HandleBackprop(Matrix<double> yHat, Matrix<double> y, int m, Cache cache)
     {
         List<Matrix<double>> dC_dWs = new List<Matrix<double>>();
         List<Matrix<double>> dC_dbs = new List<Matrix<double>>();
-        var (dC_dWL, dC_dbL, dC_dAL) = BackpropFinalLayer(yHat, y, m, cache.aVals[cache.aVals.Count() - 1], wVals[wVals.Count() - 1]);
-        dC_dWs.Insert(0, dC_dWL);
-        dC_dbs.Insert(0, dC_dbL);
-        for (int i = cache.aVals.Count() - 1; i > 1; i--)
+        int L = wVals.Count;
+        Matrix<double> aL = yHat;
+        Matrix<double> aPrev = cache.aVals[L - 1];
+        Matrix<double> dC_dZ = CostDeriv(aL, y, costDelta, m);
+        Matrix<double> dC_dW = dC_dZ * aPrev.Transpose();
+        Matrix<double> dC_db = CalculateBiasC(dC_dZ, m);
+        dC_dWs.Insert(0, dC_dW);
+        dC_dbs.Insert(0, dC_db);
+        Matrix<double> dC_dA_prev = wVals[L - 1].Transpose() * dC_dZ;
+        for (int l = L - 2; l >= 0; l--)
         {
-            (dC_dWL, dC_dbL, dC_dAL) = BackpropHiddenLayer(dC_dAL, cache.aVals[i - 1], cache.aVals[i], wVals[i - 1]);
-            dC_dWs.Insert(0, dC_dWL);
-            dC_dbs.Insert(0, dC_dbL);
+            Matrix<double> aPrevHidden = cache.aVals[l];
+            Matrix<double> zHidden = cache.zVals[l];
+            Matrix<double> dZ = dC_dA_prev.PointwiseMultiply(LeakyReLUDeriv(zHidden));
+            Matrix<double> dW = dZ * aPrevHidden.Transpose();
+            Matrix<double> db = CalculateBiasC(dZ, m);
+            dC_dWs.Insert(0, dW);
+            dC_dbs.Insert(0, db);
+            if (l > 0) dC_dA_prev = wVals[l].Transpose() * dZ;
         }
-        (dC_dWL, dC_dbL) = BackpropLayer1(dC_dAL, cache.aVals[1], cache.aVals[0], wVals[0]);
-        dC_dWs.Insert(0, dC_dWL);
-        dC_dbs.Insert(0, dC_dbL);
         (dC_dWs, dC_dbs) = ClipGradients(dC_dWs, dC_dbs, clipThreshold);
-        for (int i = wVals.Count() - 1; i >= 0; i--)
+        for (int i = 0; i < wVals.Count; i++)
         {
             wVals[i] -= alpha * dC_dWs[i];
             bDefVals[i] -= Broadcast(alpha * dC_dbs[i], bDefVals[i].ColumnCount);
@@ -158,23 +356,18 @@ public class NeuralNetwork
     {
         x = inputs.Clone();
         m = x.RowCount;
-        y = outputs.Clone().Transpose();
-        if (normIn == 0)
-        {
-            (normIn, x) = NormalizeMatrix(x);
-        }
-        else
-        {
-            x /= normIn;
-        }
-        if (normOut == 0)
-        {
-            (normOut, y) = NormalizeMatrix(y);
-        }
-        else
-        {
-            y /= normOut;
-        }
+        y = outputs.Clone();
+    }
+
+    public void SetWeights(List<Matrix<double>> weights, List<Matrix<double>> biases)
+    {
+        wVals = weights.ToList();
+        bDefVals = biases.ToList();
+    }
+
+    public (List<Matrix<double>> weights, List<Matrix<double>> biases) GetWeights()
+    {
+        return (wVals.ToList(), bDefVals.ToList());
     }
 
     public void LogTraining(bool logTraining)
@@ -194,22 +387,22 @@ public class NeuralNetwork
 
     public Matrix<double> ProcessInput(Matrix<double> input)
     {
-        Matrix<double> a0 = input.Clone().Transpose();
-        if (normIn != 0) { a0 /= normIn; }
-        Matrix<double> output = FeedForward(a0).yHat.Clone();
-        if (normOut != 0) { output *= normOut; }
-        return output;
+        Matrix<double> xT = input.Clone().Transpose();
+        var (yHat, _) = FeedForward(xT);
+        return yHat.Transpose();
     }
 
     public string CreateJsonString()
     {
-        NNTrainingData training = new NNTrainingData(ToSerialMatrixList(wVals), ToSerialMatrixList(bDefVals), n, normIn, normOut, reLUAlpha);
+        NNTrainingData training = new NNTrainingData(ToSerialMatrixList(wVals), ToSerialMatrixList(bDefVals), n, reLUAlpha);
         string jsonString = JsonSerializer.Serialize(training);
         return jsonString;
     }
 
     public NeuralNetwork(int inputNeurons, int hiddenLayers, int hiddenNeurons, int outputNeurons)
     {
+        wVals = new List<Matrix<double>>();
+        bDefVals = new List<Matrix<double>>();
         CreateLayers(inputNeurons, hiddenLayers, hiddenNeurons, outputNeurons);
         CreateDefaultWeights();
     }
@@ -222,8 +415,6 @@ public class NeuralNetwork
             wVals = ToMatrixList(data.weights.ToList());
             bDefVals = ToMatrixList(data.biases.ToList());
             n = data.n.ToArray();
-            normIn = data.normIn;
-            normOut = data.normOut;
             reLUAlpha = data.reLUAlpha;
         }
     }
@@ -255,55 +446,19 @@ public class NeuralNetwork
         return (dC_dWs, dC_dbs);
     }
 
-    static (Matrix<double> dC_dWL, Matrix<double> dC_dbL, Matrix<double> dC_dAL1) BackpropFinalLayer(Matrix<double> yHat, Matrix<double> y, int m, Matrix<double> aL1, Matrix<double> wL)
+    static Matrix<double> CalculateBiasC(Matrix<double> dC_dZ, int batchSize)
     {
-        Matrix<double> aL2 = yHat;
-        Matrix<double> dC_dZL = (1 / (double)m) * (aL2 - y);
-        Matrix<double> dZL_dWL = aL1;
-        Matrix<double> dC_dWL = dC_dZL * dZL_dWL.Transpose();
-        Matrix<double> dC_dbL = CalculateBiasC(dC_dZL);
-        Matrix<double> dZL_dAL1 = wL;
-        Matrix<double> dC_dAL1 = wL.Transpose() * dC_dZL;
-        return (dC_dWL, dC_dbL, dC_dAL1);
-    }
-
-    static (Matrix<double> dC_dWL, Matrix<double> dC_dL2, Matrix<double> dC_dAL1) BackpropHiddenLayer(Matrix<double> propagator_dC_dAL2, Matrix<double> aL1, Matrix<double> zL, Matrix<double> wL)
-    {
-        Matrix<double> dAL2_dZL = zL.PointwiseMultiply(LeakyReLUDeriv(zL));
-        Matrix<double> dC_dZL = propagator_dC_dAL2.PointwiseMultiply(dAL2_dZL);
-        Matrix<double> dZL_dWL = aL1;
-        Matrix<double> dC_dWL = dC_dZL * dZL_dWL.Transpose();
-        Matrix<double> dC_dbL = CalculateBiasC(dC_dZL);
-        Matrix<double> dZL_dAL1 = wL;
-        Matrix<double> dC_dAL1 = dZL_dAL1.Transpose() * dC_dZL;
-        return (dC_dWL, dC_dbL, dC_dAL1);
-    }
-
-    static (Matrix<double> dC_dW1, Matrix<double> dC_db1) BackpropLayer1(Matrix<double> propagator_dC_dA1, Matrix<double> z1, Matrix<double> a0, Matrix<double> w1)
-    {
-        Matrix<double> dA1_dZ1 = z1.PointwiseMultiply(LeakyReLUDeriv(z1));
-        Matrix<double> dC_dZ1 = propagator_dC_dA1.PointwiseMultiply(dA1_dZ1);
-        Matrix<double> dZ1_dW1 = a0;
-        Matrix<double> dC_dW1 = dC_dZ1 * dZ1_dW1.Transpose();
-        Matrix<double> dC_db1 = CalculateBiasC(dC_dZ1);
-        return (dC_dW1, dC_db1);
-    }
-
-    static Matrix<double> CalculateBiasC(Matrix<double> dC_dZ)
-    {
+        // average across columns (examples)
+        Vector<double> sums = dC_dZ.RowSums() / batchSize;
         Matrix<double> result = Matrix<double>.Build.Dense(dC_dZ.RowCount, 1);
-        Vector<double> sums = dC_dZ.RowSums();
-        for (int i = 0; i < sums.Count; i++)
-        {
-            result[i, 0] = sums[i];
-        }
+        for (int i = 0; i < sums.Count; i++) result[i, 0] = sums[i];
         return result;
     }
 
     double Cost(Matrix<double> yHat, Matrix<double> y, int m)
     {
         Matrix<double> losses = Matrix<double>.Build.Dense(yHat.RowCount, yHat.ColumnCount);
-        double cost = 0;
+        y = y.Clone().Transpose();
         for (int i = 0; i < yHat.RowCount; i++)
         {
             for (int j = 0; j < yHat.ColumnCount; j++)
@@ -318,14 +473,29 @@ public class NeuralNetwork
                 }
             }
         }
-        Vector<double> summedLosses = (1 / (double)m) * losses.RowSums();
-        cost = summedLosses.Sum();
+        double cost = losses.Enumerate().Sum() / m;
         return cost;
+    }
+
+    static Matrix<double> CostDeriv(Matrix<double> aL2, Matrix<double> y, double costDelta, int m)
+    {
+        Matrix<double> dC_dZL = Matrix<double>.Build.Dense(aL2.RowCount, aL2.ColumnCount);
+        y = y.Clone().Transpose();
+        for (int i = 0; i < aL2.RowCount; i++)
+        {
+            for (int j = 0; j < aL2.ColumnCount; j++)
+            {
+                double diff = aL2[i, j] - y[i, j];
+                if (Math.Abs(diff) <= costDelta) dC_dZL[i, j] = diff / m;
+                else dC_dZL[i, j] = costDelta * Math.Sign(diff) / m;
+            }
+        }
+        return dC_dZL.Clone();
     }
 
     static Matrix<double> GenerateMatrix(int rows, int columns, int distribution = 1, double reLUAlpha = 0.01)
     {
-        Normal nd = new Normal(0, 2 / ((1 + Math.Pow(reLUAlpha, 2)) * distribution));
+        Normal nd = new Normal(0, Math.Sqrt(2 / distribution));
         Matrix<double> matrix = Matrix<double>.Build.Dense(rows, columns);
         for (int i = 0; i < rows; i++)
         {
@@ -425,6 +595,18 @@ public class NeuralNetwork
 public class Cache
 {
     public List<Matrix<double>> aVals = new List<Matrix<double>>();
+    public List<Matrix<double>> zVals = new List<Matrix<double>>();
+}
+
+public class Experience
+{
+    public double[] State, NextState;
+    public int[] Action;
+    public double Reward;
+    public bool Done;
+
+    public Experience(double[] state, int[] action, double reward, double[] nextState, bool done)
+        => (State, Action, Reward, NextState, Done) = (state, action, reward, nextState, done);
 }
 
 public class NNTrainingData
@@ -432,17 +614,13 @@ public class NNTrainingData
     public List<SerialMatrix> weights { get; set; }
     public List<SerialMatrix> biases { get; set; }
     public int[] n { get; set; }
-    public double normIn { get; set; }
-    public double normOut { get; set; }
     public double reLUAlpha { get; set; }
 
-    public NNTrainingData(List<SerialMatrix> weights, List<SerialMatrix> biases, int[] n, double normIn, double normOut, double reLUAlpha)
+    public NNTrainingData(List<SerialMatrix> weights, List<SerialMatrix> biases, int[] n, double reLUAlpha)
     {
         this.weights = weights.ToList();
         this.biases = biases.ToList();
         this.n = n.ToArray();
-        this.normIn = normIn;
-        this.normOut = normOut;
         this.reLUAlpha = reLUAlpha;
     }
 }
