@@ -1,36 +1,47 @@
 ﻿using MathNet.Numerics.Distributions;
 using MathNet.Numerics.LinearAlgebra;
 using System.Text.Json;
+using System.Linq;
+using System.Collections.Generic;
+using System;
 
 public class SimpleEnv
 {
-    public int Position { get; private set; }
-    public int Goal = -10;
-    public int MinPos = 5;
+    public int XPosition { get; private set; }
+    public int YPosition { get; private set; }
+    public int XGoal = 8;
+    public int YGoal = -5;
 
     public double[] Reset()
     {
-        Position = 0;
+        XPosition = 0;
+        YPosition = 0;
         return GetState();
     }
 
-    public (double[] nextState, double reward, bool done) Step(int action)
+    public (double[] nextState, double reward, bool done) Step(int dx, int dy)
     {
-        if (action == 0) Position--; // move left
-        else Position++;             // move right
+        double prevDist = Math.Sqrt(Math.Pow(XGoal - XPosition, 2) + Math.Pow(YGoal - YPosition, 2));
 
-        double reward = 0;
+        // Apply movement
+        XPosition += dx;
+        YPosition += dy;
+
+        double dist = Math.Sqrt(Math.Pow(XGoal - XPosition, 2) + Math.Pow(YGoal - YPosition, 2));
+        double deltaDist = prevDist - dist;
         bool done = false;
-
-        if (Position == Goal) { reward = 1; done = true; }
-        else if (Position == MinPos) { reward = -1; done = true; }
+        double reward = 0.0;
+        reward += Math.Clamp(deltaDist, -1.0, 1.0); // Reward for moving toward goal
+        if (dist < 0.3) { reward += 10; done = true; }    // Goal reached
+        if (dx == 0 && dy == 0) { reward -= 0.1; }
+        reward -= 0.3;
 
         return (GetState(), reward, done);
     }
 
     public double[] GetState()
     {
-        return new double[] { (double)Position };
+        return new double[] { XPosition, YPosition };
     }
 }
 
@@ -38,149 +49,206 @@ public class Program
 {
     public static void Main(string[] args)
     {
-        int stateSize = 1;   // position
-        int actionSize = 2;  // left or right
-        DQNAgent agent = new DQNAgent(stateSize, actionSize, hiddenLayers: 2, hiddenNeurons: 16);
-
+        DQNAgent agent = new DQNAgent();
         SimpleEnv env = new SimpleEnv();
-        int episodes = 200;
-        int maxSteps = 20;
+
+        int episodes = 500;
+        int maxSteps = 50;
 
         for (int e = 0; e < episodes; e++)
         {
+            if (e == Math.Round(episodes * 0.9)) { agent.epsilon = 0.0; }
             double[] state = env.Reset();
             double totalReward = 0;
 
             for (int step = 0; step < maxSteps; step++)
             {
-                // Agent chooses action
+                // Get action (integer 0..8)
                 int action = agent.Act(state);
 
-                // Environment step
-                var (nextState, reward, done) = env.Step(action);
+                // Decode to (dx, dy)
+                var (dx, dy) = agent.DecodeAction(action);
 
-                // Store experience
-                Experience exp = new Experience(state, action, reward, nextState, done);
-                agent.Remember(exp);
+                // Step environment
+                var (nextState, reward, done) = env.Step(dx, dy);
 
-                // Train
-                agent.Replay(32);
+                // Remember experience
+                agent.Remember(state, action, reward, nextState, done);
 
-                totalReward += reward;
+                // Train on replay buffer
+                agent.Replay();
+
                 state = nextState;
+                totalReward += reward;
 
                 if (done) break;
             }
 
-            Console.WriteLine($"Episode {e + 1}/{episodes}, Total Reward: {totalReward}");
+            Console.WriteLine($"Episode {e + 1}/{episodes}, Total Reward: {totalReward:F2}, Epsilon: {agent.Epsilon:F2}");
         }
 
-        Console.WriteLine("Training finished. Testing greedy policy...");
+        Console.WriteLine("\nTraining complete. Testing greedy policy...\n");
 
-        // Test without exploration
+        // --- Test phase (no exploration) ---
         double[] testState = env.Reset();
+        double finalReward = 0;
         for (int step = 0; step < 10; step++)
         {
             int action = agent.Act(testState);
-            var (nextState, reward, done) = env.Step(action);
-            Console.WriteLine($"Step {step}: State={testState[0]}, Action={action}, Next={nextState[0]}, Reward={reward}");
+            var (dx, dy) = agent.DecodeAction(action);
+
+            var (nextState, reward, done) = env.Step(dx, dy);
+            finalReward += reward;
+            Console.WriteLine($"Step {step}: State=({testState[0]}, {testState[1]}), " +
+                              $"Action=(dx={dx}, dy={dy}), Next=({nextState[0]}, {nextState[1]}), Reward={reward:F2}");
+
             testState = nextState;
             if (done) break;
         }
+        Console.WriteLine($"Total Reward={finalReward:F2}");
+        Console.WriteLine("\nTesting finished.");
+        Console.WriteLine("Press any key to close...");
+        Console.ReadKey();
     }
 }
 
 public class DQNAgent
 {
-    int stateSize, actionSize;
-    double gamma = 0.95;
-    double epsilon = 1;
-    double epsilonMin = 0.01;
-    double epsilonDecay = 0.995;
-    int updateFreq = 1000;
-    int stepCounter = 0;
-    LinkedList<Experience> memory = new LinkedList<Experience>();
-    NeuralNetwork model, targetModel;
-    Random rand = new Random();
+    private readonly int stateSize = 2;
+    private readonly int actionSize = 9;
 
-    public void Replay(int batchSize)
+    private double gamma = 0.99;
+    public double epsilon = 1.0;
+    private double epsilonDecay = 0.999;
+    private double epsilonMin = 0.05;
+
+    private int batchSize = 64;
+    private int targetUpdateFreq = 200;
+    private double tau = 0.05;
+    private int maxBufferSize = 10000;
+
+    private int stepCount = 0;
+    private Random random = new Random();
+
+    private NeuralNetwork model;
+    private NeuralNetwork targetModel;
+
+    private List<(double[] state, int action, double reward, double[] nextState, bool done)> replayBuffer
+        = new List<(double[], int, double, double[], bool)>();
+
+    private (int dx, int dy)[] moveMap = new (int, int)[]
     {
-        if (memory.Count < batchSize) return;
+        (-1,-1), (-1,0), (-1,1),
+        ( 0,-1), ( 0,0), ( 0,1),
+        ( 1,-1), ( 1,0), ( 1,1)
+    };
 
-        var batchList = memory.ToList();
-        List<Experience> batch = new List<Experience>(batchSize);
-        for (int n = 0; n < batchSize; n++)
-        {
-            int idx = rand.Next(batchList.Count);
-            batch.Add(batchList[idx]);
-        }
-        var states = Matrix<double>.Build.Dense(batchSize, stateSize);
-        var targets = Matrix<double>.Build.Dense(batchSize, actionSize);
-        int i = 0;
-        foreach (var exp in batch)
-        {
-            var target = exp.Reward;
-            if (!exp.Done)
-            {
-                var nextInput = Matrix<double>.Build.Dense(1, exp.NextState.Length, exp.NextState);
-                var nextQOnline = model.ProcessInput(nextInput);
-                int bestNextAction = nextQOnline.Row(0).MaximumIndex();
-                var nextQTarget = targetModel.ProcessInput(nextInput);
-                target += gamma * nextQTarget[0, bestNextAction];
-            }
-            var stateVec = Matrix<double>.Build.Dense(1, exp.State.Length, exp.State);
-            var targetVec = model.ProcessInput(stateVec);
-            targetVec[0, exp.Action] = target;
-            states.SetRow(i, exp.State);
-            targets.SetRow(i, targetVec.Row(0));
-            i++;
-        }
-        model.SetTrainingData(states, targets);
-        model.Train(1, 0.0005);
-        if (epsilon > epsilonMin) epsilon *= epsilonDecay;
+    public DQNAgent()
+    {
+        model = new NeuralNetwork(inputNeurons: stateSize, hiddenLayers: 1, hiddenNeurons: 14, outputNeurons: actionSize);
+        targetModel = new NeuralNetwork(inputNeurons: stateSize, hiddenLayers: 1, hiddenNeurons: 14, outputNeurons: actionSize);
+        SyncTargetModel();
     }
 
+    // --- Action selection (epsilon-greedy)
     public int Act(double[] state)
     {
-        if (rand.NextDouble() <= epsilon) return rand.Next(actionSize);
-        var input = Matrix<double>.Build.Dense(1, state.Length, state);
-        var qVals = model.ProcessInput(input);
-        int bestAction = qVals.Row(0).MaximumIndex();
+        if (random.NextDouble() < epsilon)
+            return random.Next(actionSize);
+
+        var stateMat = Matrix<double>.Build.Dense(1, state.Length, state);
+        var qMatrix = model.ProcessInput(stateMat);
+        double[] qValues = qMatrix.Row(0).ToArray();
+
+        int bestAction = Array.IndexOf(qValues, qValues.Max());
         return bestAction;
     }
 
-    public void UpdateTargetModel()
+    public (int dx, int dy) DecodeAction(int action)
     {
-        var (wOnline, bOnline) = model.GetWeights();
-        targetModel.SetWeights(wOnline, bOnline);
+        return moveMap[action];
     }
 
-    public void Remember(Experience exp)
+    // --- Store experience
+    public void Remember(double[] state, int action, double reward, double[] nextState, bool done)
     {
-        memory.AddLast(exp);
-        stepCounter++;
-        if (memory.Count > 2000) memory.RemoveFirst();
-        if (stepCounter % updateFreq == 0) UpdateTargetModel();
+        if (replayBuffer.Count >= maxBufferSize) replayBuffer.RemoveAt(0);
+        replayBuffer.Add((state, action, reward, nextState, done));
     }
 
-    public NeuralNetwork GetTrainedModel()
+    // --- Training via experience replay
+    public void Replay()
     {
-        return model;
+        if (replayBuffer.Count < batchSize)
+            return;
+
+        // --- Sample random minibatch
+        var batch = replayBuffer.OrderBy(x => random.Next())
+                                .Take(batchSize)
+                                .ToList();
+
+        var inputList = new List<double[]>();
+        var targetList = new List<double[]>();
+
+        foreach (var (state, action, reward, nextState, done) in batch)
+        {
+            // Predict current Q-values
+            var qCurrent = model.ProcessInput(Matrix<double>.Build.Dense(1, state.Length, state))
+                               .Row(0).ToArray();
+
+            // Predict next Q-values using *target network*
+            var qNext = targetModel.ProcessInput(Matrix<double>.Build.Dense(1, nextState.Length, nextState))
+                                   .Row(0).ToArray();
+
+            double qTarget = reward + (done ? 0.0 : gamma * qNext.Max());
+
+            qCurrent[action] = qTarget;
+
+            inputList.Add(state);
+            targetList.Add(qCurrent);
+        }
+
+        var inputMatrix = Matrix<double>.Build.DenseOfRowArrays(inputList);
+        var targetMatrix = Matrix<double>.Build.DenseOfRowArrays(targetList);
+
+        // Train model
+        model.SetTrainingData(inputMatrix, targetMatrix);
+        model.Train(epochs: 2, alpha: 0.0015, clipThreshold: 10);
+
+        // Epsilon decay
+        if (epsilon > epsilonMin)
+            epsilon *= epsilonDecay;
+
+        stepCount++;
+        if (stepCount % targetUpdateFreq == 0)
+            SoftUpdateTarget(tau);
     }
 
-    public DQNAgent(int stateSize, int actionSize, int hiddenLayers, int hiddenNeurons)
+    private void SoftUpdateTarget(double tau = 0.01)
     {
-        this.stateSize = stateSize;
-        this.actionSize = actionSize;
-        model = new NeuralNetwork(stateSize, hiddenLayers, hiddenNeurons, actionSize);
-        targetModel = new NeuralNetwork(stateSize, hiddenLayers, hiddenNeurons, actionSize);
-        UpdateTargetModel();
+        var (weightsModel, biasesModel) = model.GetWeights();
+        var (weightsTarget, biasesTarget) = targetModel.GetWeights();
+
+        for (int i = 0; i < weightsModel.Count; i++)
+        {
+            weightsTarget[i] = (1 - tau) * weightsTarget[i] + tau * weightsModel[i];
+            biasesTarget[i] = (1 - tau) * biasesTarget[i] + tau * biasesModel[i];
+        }
+        targetModel.SetWeights(weightsTarget, biasesTarget);
     }
+
+    private void SyncTargetModel()
+    {
+        var (weights, biases) = model.GetWeights();
+        targetModel.SetWeights(weights, biases);
+    }
+
+    public double Epsilon => epsilon;
 }
 
 public class NeuralNetwork
 {
-    int epochs = 1000000;
+    int epochs = 10;
     double alpha = 0.01;
     double clipThreshold = 500;
     Matrix<double>? x;
@@ -191,7 +259,7 @@ public class NeuralNetwork
     int m;
     double reLUAlpha = 0.01;
     double costDelta = 1;
-    bool logTraining = true;
+    bool logTraining = false;
 
     void CreateLayers(int inputs, int hiddenLayers, int hiddenNodes, int outputs)
     {
@@ -533,11 +601,11 @@ public class Cache
 public class Experience
 {
     public double[] State, NextState;
-    public int Action;
+    public int[] Action;
     public double Reward;
     public bool Done;
 
-    public Experience(double[] state, int action, double reward, double[] nextState, bool done)
+    public Experience(double[] state, int[] action, double reward, double[] nextState, bool done)
         => (State, Action, Reward, NextState, Done) = (state, action, reward, nextState, done);
 }
 
