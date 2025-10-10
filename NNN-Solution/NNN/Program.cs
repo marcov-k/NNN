@@ -92,6 +92,7 @@ public class Program
         // --- Test phase (no exploration) ---
         double[] testState = env.Reset();
         double finalReward = 0;
+        Console.WriteLine($"Target State=(X={env.XGoal}, Y={env.YGoal})");
         for (int step = 0; step < 10; step++)
         {
             int action = agent.Act(testState);
@@ -99,13 +100,12 @@ public class Program
 
             var (nextState, reward, done) = env.Step(dx, dy);
             finalReward += reward;
-            Console.WriteLine($"Step {step}: State=({testState[0]}, {testState[1]}), " +
-                              $"Action=(dx={dx}, dy={dy}), Next=({nextState[0]}, {nextState[1]}), Reward={reward:F2}");
+            Console.WriteLine($"Step {step}: State=(X={testState[0]}, Y={testState[1]}), " +
+                              $"Action=(dx={dx}, dy={dy}), Next=(X={nextState[0]}, Y={nextState[1]}), Reward={reward:F2}");
 
             testState = nextState;
             if (done) break;
         }
-        Console.WriteLine($"Total Reward={finalReward:F2}");
         Console.WriteLine("\nTesting finished.");
         Console.WriteLine("Press any key to close...");
         Console.ReadKey();
