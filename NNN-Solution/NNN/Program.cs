@@ -1,7 +1,7 @@
 ﻿using NNN;
 using NumSharp;
-using NumSharp.Extensions;
-using System.Linq;
+using System.Globalization;
+using CsvHelper;
 
 NeuralNetwork lr = new NeuralNetwork(layers: [new Dense(neurons: 1, activation: new Linear())],
     loss: new MeanSquaredError(), seed: 20190501);
@@ -13,38 +13,42 @@ NeuralNetwork dl = new NeuralNetwork(layers: [new Dense(neurons: 13, activation:
     new Dense(neurons: 13, activation: new Sigmoid()), new Dense(neurons: 1, activation: new Linear())],
     loss: new MeanSquaredError(), seed: 20190501);
 
-var (xTrain, xTest, yTrain, yTest) = LoadBoston();
+var boston = await BostonLoader.LoadAsync();
+var data = Helpers.ToNDArray(boston.Data);
+var target = Helpers.ToNDArray(boston.Target);
+var features = boston.FeatureNames;
+
+data = StandardScale(data);
+
+var (xTrain, xTest, yTrain, yTest) = TrainTestSplit(data, target, testSize: 0.3, seed: 80718);
+yTrain = To2D(yTrain);
+yTest = To2D(yTest);
 
 var trainer = new Trainer(lr, new SGD(lr: 0.01));
 
+Console.WriteLine("Training linear regression model...");
 trainer.Fit(xTrain, yTrain, xTest, yTest, epochs: 50, evalEvery: 10, seed: 20190501);
 Console.WriteLine();
 EvalRegressionModel(lr, xTest, yTest);
+Console.WriteLine();
 
-static (NDArray xTrain, NDArray xTest, NDArray yTrain, NDArray yTest) LoadBoston()
-{
-    double[,] rawData = new double[,]
-    {
-        {0.00632,18.0,2.31,0.0,0.538,6.575,65.2,4.09,1.0,296.0,15.3,396.9,4.98},
-        {0.02731,0.0,7.07,0.0,0.469,6.421,78.9,4.9671,2.0,242.0,17.8,396.9,9.14},
-        {0.02729,0.0,7.07,0.0,0.469,7.185,61.1,4.9671,2.0,242.0,17.8,392.83,4.03},
-        {0.03237,0.0,2.18,0.0,0.458,6.998,45.8,6.0622,3.0,222.0,18.7,394.63,2.94},
-        {0.06905,0.0,2.18,0.0,0.458,7.147,54.2,6.0622,3.0,222.0,18.7,396.9,5.33}
-    };
+trainer = new Trainer(nn, new SGD(lr: 0.01));
 
-    double[] targetData = { 24.0, 21.6, 34.7, 33.4, 36.2 };
+Console.WriteLine("Training neural network model...");
+trainer.Fit(xTrain, yTrain, xTest, yTest, epochs: 50, evalEvery: 10, seed: 20190501);
+Console.WriteLine();
+EvalRegressionModel(nn, xTest, yTest);
+Console.WriteLine();
 
-    var data = np.array(rawData);
-    var target = np.array(targetData);
+trainer = new Trainer(dl, new SGD(lr: 0.01));
 
-    data = StandardScale(data);
-
-    var (xTrain, xTest, yTrain, yTest) = TrainTestSplit(data, target, testSize: 0.3, seed: 80718);
-
-    yTrain = To2D(yTrain);
-    yTest = To2D(yTest);
-    return (xTrain, xTest, yTrain, yTest);
-}
+Console.WriteLine("Training deep learning model...");
+trainer.Fit(xTrain, yTrain, xTest, yTest, epochs: 50, evalEvery: 10, seed: 20190501);
+Console.WriteLine();
+EvalRegressionModel(dl, xTest, yTest);
+Console.WriteLine();
+Console.WriteLine("Press any key to close...");
+Console.ReadKey();
 
 static NDArray To2D(NDArray a, string type = "col")
 {
@@ -56,6 +60,16 @@ static NDArray StandardScale(NDArray data)
 {
     var mean = np.mean(data, axis: 0);
     var std = np.std(data, axis: 0);
+    var stdData = std.Clone();
+    for (int i = 0; i < std.size; i++)
+    {
+        if (stdData[i] == 0)
+        {
+            stdData[i] = 1.0;
+        }
+    }
+    std = stdData;
+    var result = (data - mean) / std;
     return (data - mean) / std;
 }
 
@@ -82,11 +96,11 @@ static void EvalRegressionModel(NeuralNetwork model, NDArray xTest, NDArray yTes
 
     var preds = model.Forward(xTest);
     preds = preds.reshape(-1, 1);
-    var mae = MAE(preds, yTest);
-    var rmse = RMSE(preds, yTest);
-    Console.WriteLine($"Mean aboslute error: {mae:.2f}");
+    var mae = MAE(yTest, preds);
+    var rmse = RMSE(yTest, preds);
+    Console.WriteLine($"Mean absolute error: {mae}");
     Console.WriteLine();
-    Console.WriteLine($"Root mean squared error: {rmse:.2f}");
+    Console.WriteLine($"Root mean squared error: {rmse}");
 }
 
 static double MAE(NDArray yTrue, NDArray yPred)
@@ -105,6 +119,154 @@ static double RMSE(NDArray yTrue, NDArray yPred)
 
 namespace NNN
 {
+    public class Trainer
+    {
+        // Trains a neural network
+
+        protected NeuralNetwork Net { get; set; }
+        protected Optimizer Optim { get; set; }
+        protected double BestLoss { get; set; }
+
+        public void Fit(NDArray xTrain, NDArray yTrain, NDArray xTest, NDArray yTest, int epochs = 100, int evalEvery = 10,
+            int batchSize = 32, int seed = 1, bool restart = true)
+        {
+            // Fits neural network on training data for certain number of epochs
+            // Every "evalEvery" epochs, evaluates neural network on testing data
+
+            np.random.seed(seed);
+
+            if (restart)
+            {
+                foreach (var layer in Net.Layers)
+                {
+                    layer.First = true;
+                }
+            }
+
+            var setupBatch = GenerateSetupBatch(xTrain, yTrain).xBatch;
+            Net.SetupLayers(setupBatch);
+
+            var lastModel = Net.Copy();
+            for (int e = 0; e < epochs; e++)
+            {
+                if ((e + 1) % evalEvery == 0)
+                {
+                    lastModel = Net.Copy();
+                }
+
+                (xTrain, yTrain) = Helpers.PermuteData(xTrain, yTrain);
+
+                var batchGenerator = GenerateBatches(xTrain, yTrain, batchSize);
+
+                foreach (var (xBatch, yBatch) in batchGenerator)
+                {
+                    Net.TrainBatch(xBatch, yBatch);
+                    Optim.Step();
+                }
+
+                if ((e + 1) % evalEvery == 0)
+                {
+                    var testPreds = Net.Forward(xTest);
+                    var loss = Net.Loss.Forward(testPreds, yTest);
+
+                    if (loss < BestLoss)
+                    {
+                        Console.WriteLine($"Validation loss after {e + 1} epochs is {loss}");
+                        BestLoss = loss;
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Loss increased after epoch {e + 1}, final loss was {BestLoss}, using the model from epoch {e + 1 - evalEvery}");
+                        Net = lastModel;
+                        Optim.Net = Net;
+                        break;
+                    }
+                }
+            }
+        }
+
+        public static IEnumerable<(NDArray xBatch, NDArray yBatch)> GenerateBatches(
+            NDArray x, NDArray y, int size = 32)
+        {
+            if (x.shape[0] != y.shape[0]) { throw new IncorrectShapeException(); }
+
+            int n = x.shape[0];
+
+            for (int i = 0; i < n; i += size)
+            {
+                int end = Math.Min(i + size, n);
+
+                NDArray xBatch = x[$"{i}:{end}"];
+                NDArray yBatch = y[$"{i}:{end}"];
+
+                yield return (xBatch, yBatch);
+            }
+        }
+
+        public static (NDArray xBatch, NDArray yBatch) GenerateSetupBatch(
+            NDArray x, NDArray y, int size = 32)
+        {
+            if (x.shape[0] != y.shape[0]) { throw new IncorrectShapeException(); }
+
+            int n = x.shape[0];
+            int end = Math.Min(size, n);
+            NDArray xBatch = x[$"{0}:{end}"];
+            NDArray yBatch = y[$"{0}:{end}"];
+
+            return (xBatch, yBatch);
+        }
+
+        public Trainer(NeuralNetwork net, Optimizer optim)
+        {
+            // Requires neural network and optimzer for training to occur.
+            // Assign neural network as instance variable to the optimizer.
+
+            Net = net;
+            Optim = optim;
+            Optim.Net = net;
+            BestLoss = 1e9;
+        }
+    }
+
+    public class Optimizer
+    {
+        // Base class for neural network optimizer
+
+        protected double LR { get; set; }
+        public NeuralNetwork? Net { get; set; }
+
+        public virtual void Step()
+        {
+            // Step() must be defined for every optimizer
+        }
+
+        public Optimizer(double lr = 0.01)
+        {
+            // Every optimizer must have initial learning rate
+
+            LR = lr;
+        }
+    }
+
+    public class SGD(double lr = 0.01) : Optimizer(lr)
+    {
+        // Stochastic gradient descent optimizer
+
+        public override void Step()
+        {
+            // For each parameter, adjust in appropriate direction,
+            // with magnitude of adjustment based on learning rate
+
+            List<NDArray> newParams = new List<NDArray>();
+
+            foreach (var (param, paramGrad) in Helpers.Zip(Net.CalcParams(), Net.CalcParamGrads()))
+            {
+                newParams.Add(param - LR * paramGrad);
+            }
+            Net.SetParams(newParams);
+        }
+    }
+
     public class NeuralNetwork
     {
         // A neural network consisting of multiple "layers"
@@ -225,154 +387,6 @@ namespace NNN
             {
                 foreach (var layer in Layers) { layer.Seed = Seed; }
             }
-        }
-    }
-
-    public class Trainer
-    {
-        // Trains a neural network
-
-        protected NeuralNetwork Net { get; set; }
-        protected Optimizer Optim { get; set; }
-        protected double BestLoss { get; set; }
-
-        public void Fit(NDArray xTrain, NDArray yTrain, NDArray xTest, NDArray yTest, int epochs = 100, int evalEvery = 10,
-            int batchSize = 32, int seed = 1, bool restart = true)
-        {
-            // Fits neural network on training data for certain number of epochs
-            // Every "evalEvery" epochs, evaluates neural network on testing data
-
-            np.random.seed(seed);
-
-            if (restart)
-            {
-                foreach (var layer in Net.Layers)
-                {
-                    layer.First = true;
-                }
-            }
-
-            var setupBatch = GenerateSetupBatch(xTrain, yTrain).xBatch;
-            Net.SetupLayers(setupBatch);
-            
-            var lastModel = Net.Copy();
-            for (int e = 0; e < epochs; e++)
-            {
-                if ((e + 1) % evalEvery == 0)
-                {
-                    lastModel = Net.Copy();
-                }
-
-                (xTrain, yTrain) = Helpers.PermuteData(xTrain, yTrain);
-
-                var batchGenerator = GenerateBatches(xTrain, yTrain, batchSize);
-
-                foreach (var (xBatch, yBatch) in batchGenerator)
-                {
-                    Net.TrainBatch(xBatch, yBatch);
-                    Optim.Step();
-                }
-
-                if ((e + 1) % evalEvery == 0)
-                {
-                    var testPreds = Net.Forward(xTest);
-                    var loss = Net.Loss.Forward(testPreds, yTest);
-
-                    if (loss < BestLoss)
-                    {
-                        Console.WriteLine($"Validation loss after {e + 1} epochs is {loss:.3f}");
-                        BestLoss = loss;
-                    }
-                    else
-                    {
-                        Console.WriteLine($"Loss increased after epoch {e + 1}, final loss was {BestLoss:.3f}, using the model from epoch {e + 1 - evalEvery}");
-                        Net = lastModel;
-                        Optim.Net = Net;
-                        break;
-                    }
-                }
-            }
-        }
-
-        public static IEnumerable<(NDArray xBatch, NDArray yBatch)> GenerateBatches(
-            NDArray x, NDArray y, int size = 32)
-        {
-            if (x.shape[0] != y.shape[0]) { throw new IncorrectShapeException(); }
-
-            int n = x.shape[0];
-
-            for (int i = 0; i < n; i += size)
-            {
-                int end = Math.Min(i + size, n);
-
-                NDArray xBatch = x[$"{i}:{end}"];
-                NDArray yBatch = y[$"{i}:{end}"];
-
-                yield return (xBatch, yBatch);
-            }
-        }
-
-        public static (NDArray xBatch, NDArray yBatch) GenerateSetupBatch(
-            NDArray x, NDArray y, int size = 32)
-        {
-            if (x.shape[0] != y.shape[0]) { throw new IncorrectShapeException(); }
-
-            int n = x.shape[0];
-            int end = Math.Min(size, n);
-            NDArray xBatch = x[$"{0}:{end}"];
-            NDArray yBatch = y[$"{0}:{end}"];
-
-            return (xBatch, yBatch);
-        }
-
-        public Trainer(NeuralNetwork net, Optimizer optim)
-        {
-            // Requires neural network and optimzer for training to occur.
-            // Assign neural network as instance variable to the optimizer.
-
-            Net = net;
-            Optim = optim;
-            Optim.Net = net;
-            BestLoss = 1e9;
-        }
-    }
-
-    public class Optimizer
-    {
-        // Base class for neural network optimizer
-
-        protected double LR { get; set; }
-        public NeuralNetwork? Net { get; set; }
-
-        public virtual void Step()
-        {
-            // Step() must be defined for every optimizer
-        }
-
-        public Optimizer(double lr = 0.01)
-        {
-            // Every optimizer must have initial learning rate
-
-            LR = lr;
-        }
-    }
-
-    public class SGD(double lr = 0.01) : Optimizer(lr)
-    {
-        // Stochastic gradient descent optimizer
-
-        public override void Step()
-        {
-            // For each parameter, adjust in appropriate direction,
-            // with magnitude of adjustment based on learning rate
-
-            List<NDArray> newParams = new List<NDArray>();
-
-            foreach (var(param, paramGrad) in Helpers.Zip(Net.CalcParams(), Net.CalcParamGrads()))
-            {
-                newParams.Add(param - LR * paramGrad);
-            }
-            Net.SetParams(newParams);
         }
     }
 
@@ -969,5 +983,98 @@ namespace NNN
 
             return np.array(result);
         }
+
+        public static NDArray ToNDArray(double[,] input)
+        {
+            int rows = input.GetLength(0);
+            int cols = input.GetLength(1);
+            double[] flat = new double[rows * cols];
+
+            Buffer.BlockCopy(input, 0, flat, 0, sizeof(double) * rows * cols);
+
+            return np.array(flat, dtype: np.float64).reshape(rows, cols);
+        }
+
+        public static NDArray ToNDArray(double[][] input)
+        {
+            return np.array(input, np.float64);
+        }
+
+        public static NDArray ToNDArray(double[] input)
+        {
+            int cols = input.Length;
+            var result = np.array(input, np.float64);
+            return result;
+        }
+    }
+
+    public class BostonDataset
+    {
+        public double[][]? Data { get; set; }
+        public double[]? Target { get; set; }
+        public string[]? FeatureNames { get; set; }
+    }
+
+    public class BostonLoader
+    {
+        static readonly string Url = "https://raw.githubusercontent.com/selva86/datasets/master/BostonHousing.csv";
+
+        public static async Task<BostonDataset> LoadAsync()
+        {
+            string csvFile = "boston.csv";
+
+            if (!File.Exists(csvFile))
+            {
+                using var client = new HttpClient();
+                var csvData = await client.GetStringAsync(Url);
+                await File.WriteAllTextAsync(csvFile, csvData);
+            }
+
+            using var reader = new StreamReader(csvFile);
+            using var csv = new CsvReader(reader, new CsvHelper.Configuration.CsvConfiguration(CultureInfo.InvariantCulture)
+            {
+                PrepareHeaderForMatch = args => args.Header.ToLowerInvariant()
+            });
+            var records = csv.GetRecords<BostonRow>().ToList();
+
+            var data = records.Select(r => new double[]
+            {
+                r.CRIM, r.ZN, r.INDUS, r.CHAS, r.NOX, r.RM,
+                r.AGE, r.DIS, r.RAD, r.TAX, r.PTRATIO, r.B, r.LSTAT
+            }).ToArray();
+
+            var target = records.Select(r => r.MEDV).ToArray();
+
+            var featureNames = new string[]
+            {
+                "CRIM", "ZN", "INDUS", "CHAS", "NOX", "RM",
+                "AGE", "DIS", "RAD", "TAX", "PTRATIO", "B", "LSTAT"
+            };
+
+            return new BostonDataset
+            {
+                Data = data,
+                Target = target,
+                FeatureNames = featureNames
+            };
+        }
+    }
+
+    public class BostonRow
+    {
+        public double CRIM { get; set; }
+        public double ZN { get; set; }
+        public double INDUS { get; set; }
+        public double CHAS { get; set; }
+        public double NOX { get; set; }
+        public double RM { get; set; }
+        public double AGE { get; set; }
+        public double DIS { get; set; }
+        public double RAD { get; set; }
+        public double TAX { get; set; }
+        public double PTRATIO { get; set; }
+        public double B { get; set; }
+        public double LSTAT { get; set; }
+        public double MEDV { get; set; }
     }
 }
