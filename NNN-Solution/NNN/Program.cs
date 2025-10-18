@@ -1,6 +1,107 @@
-﻿using NumSharp;
+﻿using NNN;
+using NumSharp;
 using NumSharp.Extensions;
 using System.Linq;
+
+NeuralNetwork lr = new NeuralNetwork(layers: [new Dense(neurons: 1, activation: new Linear())],
+    loss: new MeanSquaredError(), seed: 20190501);
+
+NeuralNetwork nn = new NeuralNetwork(layers: [new Dense(neurons: 13, activation: new Sigmoid()),
+    new Dense(neurons: 1, activation: new Linear())], loss: new MeanSquaredError(), seed: 20190501);
+
+NeuralNetwork dl = new NeuralNetwork(layers: [new Dense(neurons: 13, activation: new Sigmoid()),
+    new Dense(neurons: 13, activation: new Sigmoid()), new Dense(neurons: 1, activation: new Linear())],
+    loss: new MeanSquaredError(), seed: 20190501);
+
+var (xTrain, xTest, yTrain, yTest) = LoadBoston();
+
+var trainer = new Trainer(lr, new SGD(lr: 0.01));
+
+trainer.Fit(xTrain, yTrain, xTest, yTest, epochs: 50, evalEvery: 10, seed: 20190501);
+Console.WriteLine();
+EvalRegressionModel(lr, xTest, yTest);
+
+static (NDArray xTrain, NDArray xTest, NDArray yTrain, NDArray yTest) LoadBoston()
+{
+    double[,] rawData = new double[,]
+    {
+        {0.00632,18.0,2.31,0.0,0.538,6.575,65.2,4.09,1.0,296.0,15.3,396.9,4.98},
+        {0.02731,0.0,7.07,0.0,0.469,6.421,78.9,4.9671,2.0,242.0,17.8,396.9,9.14},
+        {0.02729,0.0,7.07,0.0,0.469,7.185,61.1,4.9671,2.0,242.0,17.8,392.83,4.03},
+        {0.03237,0.0,2.18,0.0,0.458,6.998,45.8,6.0622,3.0,222.0,18.7,394.63,2.94},
+        {0.06905,0.0,2.18,0.0,0.458,7.147,54.2,6.0622,3.0,222.0,18.7,396.9,5.33}
+    };
+
+    double[] targetData = { 24.0, 21.6, 34.7, 33.4, 36.2 };
+
+    var data = np.array(rawData);
+    var target = np.array(targetData);
+
+    data = StandardScale(data);
+
+    var (xTrain, xTest, yTrain, yTest) = TrainTestSplit(data, target, testSize: 0.3, seed: 80718);
+
+    yTrain = To2D(yTrain);
+    yTest = To2D(yTest);
+    return (xTrain, xTest, yTrain, yTest);
+}
+
+static NDArray To2D(NDArray a, string type = "col")
+{
+    if (a.ndim != 1) { throw new ArgumentException("Input tesnor must be 1D"); }
+    return type == "col" ? a.reshape(-1, 1) : a.reshape(1, -1);
+}
+
+static NDArray StandardScale(NDArray data)
+{
+    var mean = np.mean(data, axis: 0);
+    var std = np.std(data, axis: 0);
+    return (data - mean) / std;
+}
+
+static (NDArray xTrain, NDArray xTest, NDArray yTrain, NDArray yTest)
+    TrainTestSplit(NDArray x, NDArray y, double testSize = 0.3, int seed = 80718)
+{
+    var rnd = new Random(seed);
+    int n = x.shape[0];
+    var indexes = np.arange(n);
+    indexes = np.random.permutation(indexes);
+    int testCount = (int)(n * testSize);
+    var testIdx = indexes[$":{testCount}"];
+    var trainIdx = indexes[$"{testCount}:"];
+    var xTrain = x[trainIdx];
+    var xTest = x[testIdx];
+    var yTrain = y[trainIdx];
+    var yTest = y[testIdx];
+    return (xTrain, xTest, yTrain, yTest);
+}
+
+static void EvalRegressionModel(NeuralNetwork model, NDArray xTest, NDArray yTest)
+{
+    // Compute MAE and RMSE for neural network
+
+    var preds = model.Forward(xTest);
+    preds = preds.reshape(-1, 1);
+    var mae = MAE(preds, yTest);
+    var rmse = RMSE(preds, yTest);
+    Console.WriteLine($"Mean aboslute error: {mae:.2f}");
+    Console.WriteLine();
+    Console.WriteLine($"Root mean squared error: {rmse:.2f}");
+}
+
+static double MAE(NDArray yTrue, NDArray yPred)
+{
+    // Compute mean absolute error for neural network
+
+    return np.abs(yTrue - yPred).mean();
+}
+
+static double RMSE(NDArray yTrue, NDArray yPred)
+{
+    // Compute root mean squared error for neural network
+
+    return np.sqrt(np.mean(np.power(yTrue - yPred, 2)));
+}
 
 namespace NNN
 {
@@ -96,12 +197,21 @@ namespace NNN
 
         public NeuralNetwork Copy()
         {
-            List<Layer> layersCopy = new List<Layer>();
+            List<Layer> newLayers = new List<Layer>();
             foreach (var layer in Layers)
             {
-                layersCopy.Add(layer.Copy());
+                newLayers.Add(layer.Copy());
             }
-            return new NeuralNetwork(layersCopy, Loss, Seed);
+            Loss newLoss = Loss.Copy();
+            return new NeuralNetwork(newLayers, newLoss, Seed);
+        }
+
+        public void SetupLayers(NDArray input)
+        {
+            foreach (var layer in Layers)
+            {
+                layer.SetupForInput(input);
+            }
         }
 
         public NeuralNetwork(List<Layer> layers, Loss loss, int seed = 1)
@@ -129,8 +239,8 @@ namespace NNN
         public void Fit(NDArray xTrain, NDArray yTrain, NDArray xTest, NDArray yTest, int epochs = 100, int evalEvery = 10,
             int batchSize = 32, int seed = 1, bool restart = true)
         {
-            // Fits neural network on training data for certain number of epochs. Every "evalEvery" epochs, evaluates
-            // neural network on testing data.
+            // Fits neural network on training data for certain number of epochs
+            // Every "evalEvery" epochs, evaluates neural network on testing data
 
             np.random.seed(seed);
 
@@ -142,6 +252,9 @@ namespace NNN
                 }
             }
 
+            var setupBatch = GenerateSetupBatch(xTrain, yTrain).xBatch;
+            Net.SetupLayers(setupBatch);
+            
             var lastModel = Net.Copy();
             for (int e = 0; e < epochs; e++)
             {
@@ -175,6 +288,7 @@ namespace NNN
                         Console.WriteLine($"Loss increased after epoch {e + 1}, final loss was {BestLoss:.3f}, using the model from epoch {e + 1 - evalEvery}");
                         Net = lastModel;
                         Optim.Net = Net;
+                        break;
                     }
                 }
             }
@@ -196,6 +310,19 @@ namespace NNN
 
                 yield return (xBatch, yBatch);
             }
+        }
+
+        public static (NDArray xBatch, NDArray yBatch) GenerateSetupBatch(
+            NDArray x, NDArray y, int size = 32)
+        {
+            if (x.shape[0] != y.shape[0]) { throw new IncorrectShapeException(); }
+
+            int n = x.shape[0];
+            int end = Math.Min(size, n);
+            NDArray xBatch = x[$"{0}:{end}"];
+            NDArray yBatch = y[$"{0}:{end}"];
+
+            return (xBatch, yBatch);
         }
 
         public Trainer(NeuralNetwork net, Optimizer optim)
@@ -268,13 +395,12 @@ namespace NNN
             // Pass input forward through operations
 
             input = input.Clone();
+            Input = input.Clone();
             if (First)
             {
                 SetupLayer(input);
                 First = false;
             }
-
-            Input = input.Clone();
 
             foreach (var operation in Operations)
             {
@@ -304,7 +430,14 @@ namespace NNN
             return InputGrad;
         }
 
-        protected virtual void SetupLayer(int numIn)
+        public virtual void SetupForInput(NDArray input)
+        {
+            input = input.Clone();
+            Input = input.Clone();
+            SetupLayer(input);
+        }
+
+        protected virtual void SetupLayer(NDArray numIn)
         {
             // SetupLayer() must be defined for each layer
 
@@ -358,16 +491,32 @@ namespace NNN
 
         public virtual Layer Copy()
         {
+            List<Operation> newOps = new List<Operation>();
+            foreach (var operation in Operations)
+            {
+                newOps.Add(operation.Copy());
+            }
+            List<NDArray> newParamGrads = new List<NDArray>();
+            foreach (var paramGrad in ParamGrads)
+            {
+                newParamGrads.Add(paramGrad.Clone());
+            }
+            List<NDArray> newParams = new List<NDArray>();
+            foreach (var param in Params)
+            {
+                newParams.Add(param.Clone());
+            }
             return new Layer
             {
                 First = this.First,
                 Input = this.Input,
                 InputGrad = this.InputGrad,
                 Neurons = this.Neurons,
-                Operations = this.Operations.ToList(),
+                Operations = newOps.ToList(),
                 Output = this.Output,
-                ParamGrads = this.ParamGrads.ToList(),
-                Params = this.Params.ToList()
+                ParamGrads = newParamGrads.ToList(),
+                Params = newParams.ToList(),
+                Seed = this.Seed
             };
         }
 
@@ -387,9 +536,9 @@ namespace NNN
 
     public class Dense : Layer
     {
-        public Operation Activation { get; set; }
+        public Operation? Activation { get; set; }
 
-        protected override void SetupLayer(int numIn)
+        protected override void SetupLayer(NDArray numIn)
         {
             // Defines operations of fully connected layer
 
@@ -404,30 +553,34 @@ namespace NNN
             Params.Add(np.random.randn(1, Neurons));
 
             Operations = [new WeightMultiply(Params[0]), new BiasAdd(Params[1]), Activation];
+
+            First = false;
         }
 
         public override Dense Copy()
         {
+            var newLayer = base.Copy();
+            var newActiv = Activation.Copy();
             return new Dense
             {
-                Activation = this.Activation,
-                Input = this.Input,
-                First = this.First,
-                InputGrad = this.InputGrad,
-                Neurons = this.Neurons,
-                Operations = this.Operations.ToList(),
-                Output = this.Output,
-                ParamGrads = this.ParamGrads.ToList(),
-                Params = this.Params.ToList(),
-                Seed = this.Seed
+                Activation = newActiv,
+                Input = newLayer.Input,
+                First = newLayer.First,
+                InputGrad = newLayer.InputGrad,
+                Neurons = newLayer.Neurons,
+                Operations = newLayer.Operations,
+                Output = newLayer.Output,
+                ParamGrads = newLayer.ParamGrads,
+                Params = newLayer.Params,
+                Seed = newLayer.Seed
             };
         }
 
         public Dense() { }
 
-        public Dense(int neurons, Operation activation) : base(neurons)
+        public Dense(int neurons, Operation? activation = null) : base(neurons)
         {
-            Activation = activation;
+            Activation = activation ?? new Sigmoid();
         }
     }
 
@@ -435,9 +588,9 @@ namespace NNN
     {
         // Base class for operations
 
-        protected NDArray? Input { get; set; }
-        protected NDArray? Output { get; set; }
-        protected NDArray? InputGrad { get; set; }
+        public NDArray? Input { get; set; }
+        public NDArray? Output { get; set; }
+        public NDArray? InputGrad { get; set; }
 
         public NDArray Forward(NDArray input)
         {
@@ -481,6 +634,12 @@ namespace NNN
 
             throw new NotImplementedException();
         }
+
+        public virtual Operation Copy()
+        {
+            // Copy() must be separately defined for every subclass
+            return new Operation { Input = this.Input, InputGrad = this.InputGrad, Output = this.Output };
+        }
     }
 
     public class Sigmoid : Operation
@@ -502,6 +661,47 @@ namespace NNN
             InputGrad = sigmoidBackward * outputGrad;
             return InputGrad;
         }
+
+        public override Sigmoid Copy()
+        {
+            var newOp = base.Copy();
+            return new Sigmoid
+            {
+                Input = newOp.Input,
+                InputGrad = newOp.InputGrad,
+                Output = newOp.Output
+            };
+        }
+    }
+
+    public class Linear : Operation
+    {
+        // "Identity" activation function
+
+        protected override NDArray CalcOutput()
+        {
+            // Pass through
+
+            return Input;
+        }
+
+        protected override NDArray CalcInputGrad(NDArray outputGrad)
+        {
+            // Pass through
+
+            return outputGrad;
+        }
+
+        public override Linear Copy()
+        {
+            var newOp = base.Copy();
+            return new Linear
+            {
+                Input = newOp.Input,
+                InputGrad = newOp.InputGrad,
+                Output = newOp.Output
+            };
+        }
     }
 
     public class ParamOperation : Operation
@@ -515,7 +715,7 @@ namespace NNN
         {
             // Calculate input gradient and parameter gradient from output gradient
 
-            Helpers.AssertSameShape(Input, outputGrad);
+            Helpers.AssertSameShape(Output, outputGrad);
 
             InputGrad = CalcInputGrad(outputGrad);
             ParamGrad = CalcParamGrad(outputGrad);
@@ -536,6 +736,19 @@ namespace NNN
             // CalcParamGrad() must be defined for each subclass
 
             throw new NotImplementedException();
+        }
+
+        public override ParamOperation Copy()
+        {
+            var newOp = base.Copy();
+            NDArray newParam = Param.Clone();
+            return new ParamOperation(newParam)
+            {
+                Input = newOp.Input,
+                InputGrad = newOp.InputGrad,
+                Output = newOp.Output,
+                ParamGrad = this.ParamGrad
+            };
         }
 
         public ParamOperation(NDArray param)
@@ -568,6 +781,18 @@ namespace NNN
 
             return np.dot(np.transpose(Input, [1, 0]), outputGrad);
         }
+
+        public override WeightMultiply Copy()
+        {
+            var newParamOp = base.Copy();
+            return new WeightMultiply(newParamOp.Param)
+            {
+                Input = newParamOp.Input,
+                InputGrad = newParamOp.InputGrad,
+                Output = newParamOp.Output,
+                ParamGrad = newParamOp.ParamGrad
+            };
+        }
     }
 
     public class BiasAdd : ParamOperation
@@ -593,12 +818,24 @@ namespace NNN
             // Compute parameter gradient
 
             ParamGrad = np.ones_like(Param) * outputGrad;
-            return np.sum(ParamGrad, axis: 0).reshape(1, ParamGrad.shape[1]);
+            return Helpers.SumAlongX0(ParamGrad).reshape(1, ParamGrad.shape[1]);
         }
 
         public BiasAdd(NDArray param) : base(param)
         {
             Helpers.AssertEqualInt(param.shape[0], 1);
+        }
+
+        public override BiasAdd Copy()
+        {
+            var newParamOp = base.Copy();
+            return new BiasAdd(newParamOp.Param)
+            {
+                Input = newParamOp.Input,
+                InputGrad = newParamOp.InputGrad,
+                Output = newParamOp.Output,
+                ParamGrad = newParamOp.ParamGrad
+            };
         }
     }
 
@@ -606,9 +843,9 @@ namespace NNN
     {
         // "Loss" of a neural network
 
-        protected NDArray? Prediction { get; set; }
-        protected NDArray? Target { get; set; }
-        protected NDArray? InputGrad { get; set; }
+        public NDArray? Prediction { get; set; }
+        public NDArray? Target { get; set; }
+        public NDArray? InputGrad { get; set; }
 
         public double Forward(NDArray prediction, NDArray target)
         {
@@ -634,7 +871,7 @@ namespace NNN
             return InputGrad;
         }
 
-        protected virtual float CalcOutput()
+        protected virtual double CalcOutput()
         {
             // CalcOutput() must be defined for each subclass
 
@@ -647,15 +884,24 @@ namespace NNN
 
             throw new NotImplementedException();
         }
+
+        public virtual Loss Copy()
+        {
+            return new Loss { Prediction = this.Prediction, Target = this.Target, InputGrad = this.InputGrad };
+        }
     }
 
     public class MeanSquaredError : Loss
     {
-        protected override float CalcOutput()
+        protected override double CalcOutput()
         {
             // Compute per-observation squared error loss
-
-            var loss = np.sum(np.power(Prediction - Target, 2)) / Prediction.shape[0];
+            var diff = Prediction - Target;
+            var pow = np.power(diff, 2);
+            var sum = pow.Data<double>().Sum();
+            var denom = Prediction.shape[0];
+            var doubleDenom = (double)denom;
+            var loss = sum / doubleDenom;
             return loss;
         }
 
@@ -664,6 +910,17 @@ namespace NNN
             // Compute loss gradient with respect to input
 
             return 2.0 * (Prediction - Target) / Prediction.shape[0];
+        }
+
+        public override MeanSquaredError Copy()
+        {
+            var newLoss = base.Copy();
+            return new MeanSquaredError
+            {
+                InputGrad = newLoss.InputGrad,
+                Prediction = newLoss.Prediction,
+                Target = newLoss.Target
+            };
         }
     }
 
@@ -693,6 +950,24 @@ namespace NNN
         {
             var perm = np.random.permutation(x.shape[0]);
             return (x[perm], y[perm]);
+        }
+
+        public static NDArray SumAlongX0(NDArray input)
+        {
+            var inputData = input.Data<double>().ToArray();
+            int nRows = input.shape[0];
+            int nCols = input.shape[1];
+            var result = new double[nCols];
+
+            for (int r = 0; r < nRows; r++)
+            {
+                for (int c = 0; c < nCols; c++)
+                {
+                    result[c] += inputData[r * nCols + c];
+                }
+            }
+
+            return np.array(result);
         }
     }
 }
