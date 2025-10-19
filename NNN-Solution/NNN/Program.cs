@@ -2,6 +2,7 @@
 using NumSharp;
 using System.Globalization;
 using CsvHelper;
+using TorchSharp;
 
 NeuralNetwork lr = new NeuralNetwork(layers: [new Dense(neurons: 1, activation: new Linear())],
     loss: new MeanSquaredError(), seed: 20190501);
