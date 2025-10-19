@@ -9,8 +9,15 @@ NeuralNetwork lr = new NeuralNetwork(layers: [new Dense(neurons: 1, activation: 
 NeuralNetwork nn = new NeuralNetwork(layers: [new Dense(neurons: 13, activation: new Sigmoid()),
     new Dense(neurons: 1, activation: new Linear())], loss: new MeanSquaredError(), seed: 20190501);
 
+NeuralNetwork nnT = new NeuralNetwork(layers: [new Dense(neurons: 13, activation: new Tanh()),
+    new Dense(neurons: 1, activation: new Linear())], loss: new MeanSquaredError(), seed: 20190501);
+
 NeuralNetwork dl = new NeuralNetwork(layers: [new Dense(neurons: 13, activation: new Sigmoid()),
     new Dense(neurons: 13, activation: new Sigmoid()), new Dense(neurons: 1, activation: new Linear())],
+    loss: new MeanSquaredError(), seed: 20190501);
+
+NeuralNetwork dlT = new NeuralNetwork(layers: [new Dense(neurons: 13, activation: new Tanh()),
+    new Dense(neurons: 13, activation: new Tanh()), new Dense(neurons: 1, activation: new Linear())],
     loss: new MeanSquaredError(), seed: 20190501);
 
 var boston = await BostonLoader.LoadAsync();
@@ -34,19 +41,36 @@ Console.WriteLine();
 
 trainer = new Trainer(nn, new SGD(lr: 0.01));
 
-Console.WriteLine("Training neural network model...");
+Console.WriteLine("Training neural network model with sigmoid activation...");
 trainer.Fit(xTrain, yTrain, xTest, yTest, epochs: 50, evalEvery: 10, seed: 20190501);
 Console.WriteLine();
 EvalRegressionModel(nn, xTest, yTest);
 Console.WriteLine();
 
+trainer = new Trainer(nnT, new SGD(lr: 0.01));
+
+Console.WriteLine("Training neural network model with tanh activation...");
+trainer.Fit(xTrain, yTrain, xTest, yTest, epochs: 50, evalEvery: 10, seed: 20190501);
+Console.WriteLine();
+EvalRegressionModel(nnT, xTest, yTest);
+Console.WriteLine();
+
 trainer = new Trainer(dl, new SGD(lr: 0.01));
 
-Console.WriteLine("Training deep learning model...");
+Console.WriteLine("Training deep learning model with sigmoid activation...");
 trainer.Fit(xTrain, yTrain, xTest, yTest, epochs: 50, evalEvery: 10, seed: 20190501);
 Console.WriteLine();
 EvalRegressionModel(dl, xTest, yTest);
 Console.WriteLine();
+
+trainer = new Trainer(dlT, new SGD(lr: 0.01));
+
+Console.WriteLine("Training deep learning model with tanh activation...");
+trainer.Fit(xTrain, yTrain, xTest, yTest, epochs: 50, evalEvery: 10, seed: 20190501);
+Console.WriteLine();
+EvalRegressionModel(dlT, xTest, yTest);
+Console.WriteLine();
+
 Console.WriteLine("Press any key to close...");
 Console.ReadKey();
 
@@ -718,6 +742,59 @@ namespace NNN
         }
     }
 
+    public class Tanh : Operation
+    {
+        // Hyperbolic tangent activation function
+
+        protected override NDArray CalcOutput()
+        {
+            return np.tanh(Input);
+        }
+
+        protected override NDArray CalcInputGrad(NDArray outputGrad)
+        {
+            return outputGrad * (1 - Output * Output);
+        }
+
+        public override Tanh Copy()
+        {
+            var newOp = base.Copy();
+            return new Tanh
+            {
+                Input = newOp.Input,
+                InputGrad = newOp.InputGrad,
+                Output = newOp.Output
+            };
+        }
+    }
+
+    public class ReLU : Operation
+    {
+        // Rectified linear unit activation function
+
+        protected override NDArray CalcOutput()
+        {
+            return np.clip(Input, 0, null);
+        }
+
+        protected override NDArray CalcInputGrad(NDArray outputGrad)
+        {
+            var mask = Output >= 0;
+            return outputGrad * mask;
+        }
+
+        public override ReLU Copy()
+        {
+            var newOp = base.Copy();
+            return new ReLU
+            {
+                Input = newOp.Input,
+                InputGrad = newOp.InputGrad,
+                Output = newOp.Output
+            };
+        }
+    }
+
     public class ParamOperation : Operation
     {
         // An Operation with parameters
@@ -907,6 +984,8 @@ namespace NNN
 
     public class MeanSquaredError : Loss
     {
+        protected bool Normalize { get; set; }
+
         protected override double CalcOutput()
         {
             // Compute per-observation squared error loss
@@ -933,8 +1012,14 @@ namespace NNN
             {
                 InputGrad = newLoss.InputGrad,
                 Prediction = newLoss.Prediction,
-                Target = newLoss.Target
+                Target = newLoss.Target,
+                Normalize = this.Normalize
             };
+        }
+
+        public MeanSquaredError(bool normalize = false) : base()
+        {
+            Normalize = normalize;
         }
     }
 
