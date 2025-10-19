@@ -2,6 +2,7 @@
 using NumSharp;
 using System.Globalization;
 using CsvHelper;
+using System.Text.Json;
 
 NeuralNetwork lr = new NeuralNetwork(layers: [new Dense(neurons: 1, activation: new Linear())],
     loss: new MeanSquaredError(), seed: 20190501);
@@ -69,6 +70,18 @@ Console.WriteLine("Training deep learning model with tanh activation...");
 trainer.Fit(xTrain, yTrain, xTest, yTest, epochs: 50, evalEvery: 10, seed: 20190501);
 Console.WriteLine();
 EvalRegressionModel(dlT, xTest, yTest);
+Console.WriteLine();
+
+Console.WriteLine("Serializing deep learning model with tanh activation as a Json string...");
+string dlTJson = dlT.CreateJsonString();
+Console.WriteLine();
+Console.WriteLine(dlTJson);
+Console.WriteLine();
+
+Console.WriteLine("Building new neural network from Json string...");
+NeuralNetwork dlTNew = new NeuralNetwork(dlTJson);
+Console.WriteLine();
+EvalRegressionModel(dlTNew, xTest, yTest);
 Console.WriteLine();
 
 Console.WriteLine("Press any key to close...");
@@ -400,6 +413,19 @@ namespace NNN
             }
         }
 
+        public string CreateJsonString()
+        {
+            var layers = new List<LayerData>();
+            foreach (var layer in Layers)
+            {
+                var data = layer.CreateLayerData();
+                layers.Add(data);
+            }
+            var networkData = new NNData(layers, Loss.GetType().Name, Seed);
+            string jsonString = JsonSerializer.Serialize(networkData);
+            return jsonString;
+        }
+
         public NeuralNetwork(List<Layer> layers, Loss loss, int seed = 1)
         {
             // Neural networks need layers and a loss
@@ -410,6 +436,26 @@ namespace NNN
             if (seed != default)
             {
                 foreach (var layer in Layers) { layer.Seed = Seed; }
+            }
+        }
+
+        public NeuralNetwork(string jsonString)
+        {
+            // Build neural network from json string
+
+            if (jsonString == null) { throw new ArgumentNullException(); }
+            NNData data = JsonSerializer.Deserialize<NNData>(jsonString);
+            Seed = data.Seed;
+            Type lossType = Type.GetType(data.Loss);
+            dynamic loss = Activator.CreateInstance(lossType);
+            Loss = loss;
+            Layers = new List<Layer>();
+            foreach (var layerData in data.Layers)
+            {
+                Type layerType = Type.GetType(layerData.LayerType);
+                dynamic layer = Activator.CreateInstance(layerType);
+                layer.BuildFromLayerData(layerData);
+                Layers.Add(layer);
             }
         }
     }
@@ -558,17 +604,56 @@ namespace NNN
             };
         }
 
-        public Layer() { }
-
-        public Layer(int neurons)
+        public virtual LayerData CreateLayerData()
         {
-            // Number of "neurons" roughly corresponds to "breadth" of layer
+            // CreateLayerData() must be defined for each subclass
 
-            Neurons = neurons;
+            var ops = new List<string>();
+            foreach (var op in Operations)
+            {
+                ops.Add(op.GetType().Name);
+            }
+            var layerParamsNDArray = CalcParams();
+            var layerParams = Helpers.NDArrayList2JagArrayList(layerParamsNDArray);
+            var data = new LayerData(GetType().Name, ops, layerParams, First, Neurons, Seed);
+            return data;
+        }
+
+        public virtual void BuildFromLayerData(LayerData data)
+        {
+            // BuildFromLayerData() must be defined for each subclass
+
+            Neurons = data.Neurons;
+            First = data.First;
+            Seed = data.Seed;
+            Params = new List<NDArray>();
+            Operations = new List<Operation>();
+            foreach (var param in data.Params)
+            {
+                Params.Add(Helpers.ToNDArray(param));
+            }
+            foreach (var opName in data.Operations)
+            {
+                Type type = Type.GetType(opName);
+                dynamic op = Activator.CreateInstance(type);
+                Operations.Add(op);
+            }
+            SetParams(Params);
+        }
+
+        public Layer()
+        {
             First = true;
             Params = new List<NDArray>();
             ParamGrads = new List<NDArray>();
             Operations = new List<Operation>();
+        }
+
+        public Layer(int neurons) : this()
+        {
+            // Number of "neurons" roughly corresponds to "breadth" of layer
+
+            Neurons = neurons;
         }
     }
 
@@ -612,6 +697,21 @@ namespace NNN
                 Params = newLayer.Params,
                 Seed = newLayer.Seed
             };
+        }
+
+        public override LayerData CreateLayerData()
+        {
+            var data = base.CreateLayerData();
+            data.Activation += Activation.GetType().Name;
+            return data;
+        }
+
+        public override void BuildFromLayerData(LayerData data)
+        {
+            base.BuildFromLayerData(data);
+            Type activType = Type.GetType(data.Activation);
+            dynamic activ = Activator.CreateInstance(activType);
+            Activation = activ;
         }
 
         public Dense() { }
@@ -842,13 +942,15 @@ namespace NNN
             };
         }
 
+        public ParamOperation() { }
+
         public ParamOperation(NDArray param)
         {
             Param = param.Clone();
         }
     }
 
-    public class WeightMultiply(NDArray param) : ParamOperation(param)
+    public class WeightMultiply : ParamOperation
     {
         // Weight multiplication operation for a neural network
 
@@ -884,6 +986,13 @@ namespace NNN
                 ParamGrad = newParamOp.ParamGrad
             };
         }
+
+        public WeightMultiply() { }
+
+        public WeightMultiply(NDArray param)
+        {
+            Param = param.Clone();
+        }
     }
 
     public class BiasAdd : ParamOperation
@@ -912,11 +1021,6 @@ namespace NNN
             return Helpers.SumAlongX0(ParamGrad).reshape(1, ParamGrad.shape[1]);
         }
 
-        public BiasAdd(NDArray param) : base(param)
-        {
-            Helpers.AssertEqualInt(param.shape[0], 1);
-        }
-
         public override BiasAdd Copy()
         {
             var newParamOp = base.Copy();
@@ -927,6 +1031,13 @@ namespace NNN
                 Output = newParamOp.Output,
                 ParamGrad = newParamOp.ParamGrad
             };
+        }
+
+        public BiasAdd() { }
+
+        public BiasAdd(NDArray param) : base(param)
+        {
+            Helpers.AssertEqualInt(param.shape[0], 1);
         }
     }
 
@@ -984,8 +1095,6 @@ namespace NNN
 
     public class MeanSquaredError : Loss
     {
-        protected bool Normalize { get; set; }
-
         protected override double CalcOutput()
         {
             // Compute per-observation squared error loss
@@ -1013,13 +1122,7 @@ namespace NNN
                 InputGrad = newLoss.InputGrad,
                 Prediction = newLoss.Prediction,
                 Target = newLoss.Target,
-                Normalize = this.Normalize
             };
-        }
-
-        public MeanSquaredError(bool normalize = false) : base()
-        {
-            Normalize = normalize;
         }
     }
 
@@ -1090,6 +1193,76 @@ namespace NNN
             int cols = input.Length;
             var result = np.array(input, np.float64);
             return result;
+        }
+
+        public static List<double[][]> NDArrayList2JagArrayList(List<NDArray> input)
+        {
+            var output = new List<double[][]>();
+            foreach (var array in input)
+            {
+                output.Add(NDArray2JagArray(array));
+            }
+            return output;
+        }
+
+        public static double[][] NDArray2JagArray(NDArray input)
+        {
+            int rows = input.shape[0];
+            int cols = input.shape[1];
+            double[][] output = new double[rows][];
+            for (int i = 0; i < rows; i++)
+            {
+                output[i] = new double[cols];
+                for (int j = 0; j < cols; j++)
+                {
+                    output[i][j] = input[i, j];
+                }
+            }
+            return output;
+        }
+    }
+
+    public class NNData
+    {
+        public List<LayerData> Layers { get; set; }
+        public string Loss { get; set; }
+        public int Seed { get; set; }
+
+        public NNData() { }
+
+        public NNData(List<LayerData> layers, string loss, int seed)
+        {
+            Layers = layers.ToList();
+            Loss = $"NNN.{loss}";
+            Seed = seed;
+        }
+    }
+
+    public class LayerData
+    {
+        public string LayerType { get; set; }
+        public List<string> Operations { get; set; }
+        public List<double[][]> Params { get; set; }
+        public bool First { get; set; }
+        public int Neurons { get; set; }
+        public int Seed { get; set; }
+        public string Activation { get; set; } = "NNN.";
+
+        public LayerData() { }
+
+        public LayerData(string layerType, List<string> operations, List<double[][]> layerParams, bool first, int neurons, int seed, string activation = "")
+        {
+            LayerType = $"NNN.{layerType}";
+            Operations = new List<string>();
+            foreach (var op in operations)
+            {
+                Operations.Add($"NNN.{op}");
+            }
+            Params = layerParams.ToList();
+            First = first;
+            Neurons = neurons;
+            Seed = seed;
+            Activation = $"NNN.{activation}";
         }
     }
 
