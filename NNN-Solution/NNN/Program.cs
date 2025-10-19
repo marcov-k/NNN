@@ -17,10 +17,6 @@ NeuralNetwork dl = new NeuralNetwork(layers: [new Dense(neurons: 13, activation:
     new Dense(neurons: 13, activation: new Sigmoid()), new Dense(neurons: 1, activation: new Linear())],
     loss: new MeanSquaredError(), seed: 20190501);
 
-NeuralNetwork dlT = new NeuralNetwork(layers: [new Dense(neurons: 13, activation: new Tanh()),
-    new Dense(neurons: 13, activation: new Tanh()), new Dense(neurons: 1, activation: new Linear())],
-    loss: new MeanSquaredError(), seed: 20190501);
-
 var boston = await BostonLoader.LoadAsync();
 var data = Helpers.ToNDArray(boston.Data);
 var target = Helpers.ToNDArray(boston.Target);
@@ -34,8 +30,10 @@ yTest = To2D(yTest);
 
 var trainer = new Trainer(lr, new SGD(lr: 0.01));
 
+Console.WriteLine("Using the Boston housing dataset to train neural networks...\n");
+
 Console.WriteLine("Training linear regression model...");
-trainer.Fit(xTrain, yTrain, xTest, yTest, epochs: 50, evalEvery: 10, seed: 20190501);
+trainer.Fit(xTrain, yTrain, xTest, yTest, epochs: 100, evalEvery: 10, seed: 20190501);
 Console.WriteLine();
 EvalRegressionModel(lr, xTest, yTest);
 Console.WriteLine();
@@ -43,7 +41,7 @@ Console.WriteLine();
 trainer = new Trainer(nn, new SGD(lr: 0.01));
 
 Console.WriteLine("Training neural network model with sigmoid activation...");
-trainer.Fit(xTrain, yTrain, xTest, yTest, epochs: 50, evalEvery: 10, seed: 20190501);
+trainer.Fit(xTrain, yTrain, xTest, yTest, epochs: 100, evalEvery: 10, seed: 20190501);
 Console.WriteLine();
 EvalRegressionModel(nn, xTest, yTest);
 Console.WriteLine();
@@ -51,7 +49,7 @@ Console.WriteLine();
 trainer = new Trainer(nnT, new SGD(lr: 0.01));
 
 Console.WriteLine("Training neural network model with tanh activation...");
-trainer.Fit(xTrain, yTrain, xTest, yTest, epochs: 50, evalEvery: 10, seed: 20190501);
+trainer.Fit(xTrain, yTrain, xTest, yTest, epochs: 100, evalEvery: 10, seed: 20190501);
 Console.WriteLine();
 EvalRegressionModel(nnT, xTest, yTest);
 Console.WriteLine();
@@ -59,29 +57,20 @@ Console.WriteLine();
 trainer = new Trainer(dl, new SGD(lr: 0.01));
 
 Console.WriteLine("Training deep learning model with sigmoid activation...");
-trainer.Fit(xTrain, yTrain, xTest, yTest, epochs: 50, evalEvery: 10, seed: 20190501);
-Console.WriteLine();
+trainer.Fit(xTrain, yTrain, xTest, yTest, epochs: 100, evalEvery: 10, seed: 20190501);
+Console.WriteLine($"\nPredicted Values:\n\n{dl.Forward(xTest)}\n\nTrue Values:\n\n{yTest}\n");
 EvalRegressionModel(dl, xTest, yTest);
 Console.WriteLine();
 
-trainer = new Trainer(dlT, new SGD(lr: 0.01));
-
-Console.WriteLine("Training deep learning model with tanh activation...");
-trainer.Fit(xTrain, yTrain, xTest, yTest, epochs: 50, evalEvery: 10, seed: 20190501);
-Console.WriteLine();
-EvalRegressionModel(dlT, xTest, yTest);
-Console.WriteLine();
-
-Console.WriteLine("Serializing deep learning model with tanh activation as a Json string...");
-string dlTJson = dlT.CreateJsonString();
-Console.WriteLine();
-Console.WriteLine(dlTJson);
-Console.WriteLine();
+Console.WriteLine("Serializing deep learning model with sigmoid activation as a Json string...");
+string dlJson = dl.CreateJsonString();
+Console.WriteLine($"\n{dlJson}\n");
 
 Console.WriteLine("Building new neural network from Json string...");
-NeuralNetwork dlTNew = new NeuralNetwork(dlTJson);
-Console.WriteLine();
-EvalRegressionModel(dlTNew, xTest, yTest);
+NeuralNetwork dlNew = new NeuralNetwork(dlJson);
+Console.WriteLine($"\nThe following predictions will be identical to the previous predictions if the neural network has been reconstructed correctly" +
+    $"\n\nPredicted Values:\n\n{dlNew.Forward(xTest)}\n");
+EvalRegressionModel(dlNew, xTest, yTest);
 Console.WriteLine();
 
 Console.WriteLine("Press any key to close...");
@@ -89,7 +78,7 @@ Console.ReadKey();
 
 static NDArray To2D(NDArray a, string type = "col")
 {
-    if (a.ndim != 1) { throw new ArgumentException("Input tesnor must be 1D"); }
+    if (a.ndim != 1) { throw new ArgumentException("Input tensor must be 1D"); }
     return type == "col" ? a.reshape(-1, 1) : a.reshape(1, -1);
 }
 
