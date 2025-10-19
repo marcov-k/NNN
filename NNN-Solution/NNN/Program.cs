@@ -1,648 +1,1165 @@
-﻿using MathNet.Numerics.Distributions;
-using MathNet.Numerics.LinearAlgebra;
-using System.Text.Json;
-using System.Linq;
-using System.Collections.Generic;
-using System;
+﻿using NNN;
+using NumSharp;
+using System.Globalization;
+using CsvHelper;
 
-public class SimpleEnv
+NeuralNetwork lr = new NeuralNetwork(layers: [new Dense(neurons: 1, activation: new Linear())],
+    loss: new MeanSquaredError(), seed: 20190501);
+
+NeuralNetwork nn = new NeuralNetwork(layers: [new Dense(neurons: 13, activation: new Sigmoid()),
+    new Dense(neurons: 1, activation: new Linear())], loss: new MeanSquaredError(), seed: 20190501);
+
+NeuralNetwork nnT = new NeuralNetwork(layers: [new Dense(neurons: 13, activation: new Tanh()),
+    new Dense(neurons: 1, activation: new Linear())], loss: new MeanSquaredError(), seed: 20190501);
+
+NeuralNetwork dl = new NeuralNetwork(layers: [new Dense(neurons: 13, activation: new Sigmoid()),
+    new Dense(neurons: 13, activation: new Sigmoid()), new Dense(neurons: 1, activation: new Linear())],
+    loss: new MeanSquaredError(), seed: 20190501);
+
+NeuralNetwork dlT = new NeuralNetwork(layers: [new Dense(neurons: 13, activation: new Tanh()),
+    new Dense(neurons: 13, activation: new Tanh()), new Dense(neurons: 1, activation: new Linear())],
+    loss: new MeanSquaredError(), seed: 20190501);
+
+var boston = await BostonLoader.LoadAsync();
+var data = Helpers.ToNDArray(boston.Data);
+var target = Helpers.ToNDArray(boston.Target);
+var features = boston.FeatureNames;
+
+data = StandardScale(data);
+
+var (xTrain, xTest, yTrain, yTest) = TrainTestSplit(data, target, testSize: 0.3, seed: 80718);
+yTrain = To2D(yTrain);
+yTest = To2D(yTest);
+
+var trainer = new Trainer(lr, new SGD(lr: 0.01));
+
+Console.WriteLine("Training linear regression model...");
+trainer.Fit(xTrain, yTrain, xTest, yTest, epochs: 50, evalEvery: 10, seed: 20190501);
+Console.WriteLine();
+EvalRegressionModel(lr, xTest, yTest);
+Console.WriteLine();
+
+trainer = new Trainer(nn, new SGD(lr: 0.01));
+
+Console.WriteLine("Training neural network model with sigmoid activation...");
+trainer.Fit(xTrain, yTrain, xTest, yTest, epochs: 50, evalEvery: 10, seed: 20190501);
+Console.WriteLine();
+EvalRegressionModel(nn, xTest, yTest);
+Console.WriteLine();
+
+trainer = new Trainer(nnT, new SGD(lr: 0.01));
+
+Console.WriteLine("Training neural network model with tanh activation...");
+trainer.Fit(xTrain, yTrain, xTest, yTest, epochs: 50, evalEvery: 10, seed: 20190501);
+Console.WriteLine();
+EvalRegressionModel(nnT, xTest, yTest);
+Console.WriteLine();
+
+trainer = new Trainer(dl, new SGD(lr: 0.01));
+
+Console.WriteLine("Training deep learning model with sigmoid activation...");
+trainer.Fit(xTrain, yTrain, xTest, yTest, epochs: 50, evalEvery: 10, seed: 20190501);
+Console.WriteLine();
+EvalRegressionModel(dl, xTest, yTest);
+Console.WriteLine();
+
+trainer = new Trainer(dlT, new SGD(lr: 0.01));
+
+Console.WriteLine("Training deep learning model with tanh activation...");
+trainer.Fit(xTrain, yTrain, xTest, yTest, epochs: 50, evalEvery: 10, seed: 20190501);
+Console.WriteLine();
+EvalRegressionModel(dlT, xTest, yTest);
+Console.WriteLine();
+
+Console.WriteLine("Press any key to close...");
+Console.ReadKey();
+
+static NDArray To2D(NDArray a, string type = "col")
 {
-    public int XPosition { get; private set; }
-    public int YPosition { get; private set; }
-    public int XGoal = 8;
-    public int YGoal = -5;
-
-    public double[] Reset()
-    {
-        XPosition = 0;
-        YPosition = 0;
-        return GetState();
-    }
-
-    public (double[] nextState, double reward, bool done) Step(int dx, int dy)
-    {
-        double prevDist = Math.Sqrt(Math.Pow(XGoal - XPosition, 2) + Math.Pow(YGoal - YPosition, 2));
-
-        // Apply movement
-        XPosition += dx;
-        YPosition += dy;
-
-        double dist = Math.Sqrt(Math.Pow(XGoal - XPosition, 2) + Math.Pow(YGoal - YPosition, 2));
-        double deltaDist = prevDist - dist;
-        bool done = false;
-        double reward = 0.0;
-        reward += Math.Clamp(deltaDist, -1.0, 1.0); // Reward for moving toward goal
-        if (dist < 0.3) { reward += 10; done = true; }    // Goal reached
-        if (dx == 0 && dy == 0) { reward -= 0.1; }
-        reward -= 0.3;
-
-        return (GetState(), reward, done);
-    }
-
-    public double[] GetState()
-    {
-        return new double[] { XPosition, YPosition };
-    }
+    if (a.ndim != 1) { throw new ArgumentException("Input tesnor must be 1D"); }
+    return type == "col" ? a.reshape(-1, 1) : a.reshape(1, -1);
 }
 
-public class Program
+static NDArray StandardScale(NDArray data)
 {
-    public static void Main(string[] args)
+    var mean = np.mean(data, axis: 0);
+    var std = np.std(data, axis: 0);
+    var stdData = std.Clone();
+    for (int i = 0; i < std.size; i++)
     {
-        DQNAgent agent = new DQNAgent();
-        SimpleEnv env = new SimpleEnv();
-
-        int episodes = 500;
-        int maxSteps = 50;
-
-        for (int e = 0; e < episodes; e++)
+        if (stdData[i] == 0)
         {
-            if (e == Math.Round(episodes * 0.9)) { agent.epsilon = 0.0; }
-            double[] state = env.Reset();
-            double totalReward = 0;
-
-            for (int step = 0; step < maxSteps; step++)
-            {
-                // Get action (integer 0..8)
-                int action = agent.Act(state);
-
-                // Decode to (dx, dy)
-                var (dx, dy) = agent.DecodeAction(action);
-
-                // Step environment
-                var (nextState, reward, done) = env.Step(dx, dy);
-
-                // Remember experience
-                agent.Remember(state, action, reward, nextState, done);
-
-                // Train on replay buffer
-                agent.Replay();
-
-                state = nextState;
-                totalReward += reward;
-
-                if (done) break;
-            }
-
-            Console.WriteLine($"Episode {e + 1}/{episodes}, Total Reward: {totalReward:F2}, Epsilon: {agent.Epsilon:F2}");
+            stdData[i] = 1.0;
         }
-
-        Console.WriteLine("\nTraining complete. Testing greedy policy...\n");
-
-        // --- Test phase (no exploration) ---
-        double[] testState = env.Reset();
-        double finalReward = 0;
-        Console.WriteLine($"Target State=(X={env.XGoal}, Y={env.YGoal})");
-        for (int step = 0; step < 10; step++)
-        {
-            int action = agent.Act(testState);
-            var (dx, dy) = agent.DecodeAction(action);
-
-            var (nextState, reward, done) = env.Step(dx, dy);
-            finalReward += reward;
-            Console.WriteLine($"Step {step}: State=(X={testState[0]}, Y={testState[1]}), " +
-                              $"Action=(dx={dx}, dy={dy}), Next=(X={nextState[0]}, Y={nextState[1]}), Reward={reward:F2}");
-
-            testState = nextState;
-            if (done) break;
-        }
-        Console.WriteLine("\nTesting finished.");
-        Console.WriteLine("Press any key to close...");
-        Console.ReadKey();
     }
+    std = stdData;
+    var result = (data - mean) / std;
+    return (data - mean) / std;
 }
 
-public class DQNAgent
+static (NDArray xTrain, NDArray xTest, NDArray yTrain, NDArray yTest)
+    TrainTestSplit(NDArray x, NDArray y, double testSize = 0.3, int seed = 80718)
 {
-    private readonly int stateSize = 2;
-    private readonly int actionSize = 9;
-
-    private double gamma = 0.99;
-    public double epsilon = 1.0;
-    private double epsilonDecay = 0.999;
-    private double epsilonMin = 0.05;
-
-    private int batchSize = 64;
-    private int targetUpdateFreq = 200;
-    private double tau = 0.05;
-    private int maxBufferSize = 10000;
-
-    private int stepCount = 0;
-    private Random random = new Random();
-
-    private NeuralNetwork model;
-    private NeuralNetwork targetModel;
-
-    private List<(double[] state, int action, double reward, double[] nextState, bool done)> replayBuffer
-        = new List<(double[], int, double, double[], bool)>();
-
-    private (int dx, int dy)[] moveMap = new (int, int)[]
-    {
-        (-1,-1), (-1,0), (-1,1),
-        ( 0,-1), ( 0,0), ( 0,1),
-        ( 1,-1), ( 1,0), ( 1,1)
-    };
-
-    public DQNAgent()
-    {
-        model = new NeuralNetwork(inputNeurons: stateSize, hiddenLayers: 1, hiddenNeurons: 14, outputNeurons: actionSize);
-        targetModel = new NeuralNetwork(inputNeurons: stateSize, hiddenLayers: 1, hiddenNeurons: 14, outputNeurons: actionSize);
-        SyncTargetModel();
-    }
-
-    // --- Action selection (epsilon-greedy)
-    public int Act(double[] state)
-    {
-        if (random.NextDouble() < epsilon)
-            return random.Next(actionSize);
-
-        var stateMat = Matrix<double>.Build.Dense(1, state.Length, state);
-        var qMatrix = model.ProcessInput(stateMat);
-        double[] qValues = qMatrix.Row(0).ToArray();
-
-        int bestAction = Array.IndexOf(qValues, qValues.Max());
-        return bestAction;
-    }
-
-    public (int dx, int dy) DecodeAction(int action)
-    {
-        return moveMap[action];
-    }
-
-    // --- Store experience
-    public void Remember(double[] state, int action, double reward, double[] nextState, bool done)
-    {
-        if (replayBuffer.Count >= maxBufferSize) replayBuffer.RemoveAt(0);
-        replayBuffer.Add((state, action, reward, nextState, done));
-    }
-
-    // --- Training via experience replay
-    public void Replay()
-    {
-        if (replayBuffer.Count < batchSize)
-            return;
-
-        // --- Sample random minibatch
-        var batch = replayBuffer.OrderBy(x => random.Next())
-                                .Take(batchSize)
-                                .ToList();
-
-        var inputList = new List<double[]>();
-        var targetList = new List<double[]>();
-
-        foreach (var (state, action, reward, nextState, done) in batch)
-        {
-            // Predict current Q-values
-            var qCurrent = model.ProcessInput(Matrix<double>.Build.Dense(1, state.Length, state))
-                               .Row(0).ToArray();
-
-            // Predict next Q-values using *target network*
-            var qNext = targetModel.ProcessInput(Matrix<double>.Build.Dense(1, nextState.Length, nextState))
-                                   .Row(0).ToArray();
-
-            double qTarget = reward + (done ? 0.0 : gamma * qNext.Max());
-
-            qCurrent[action] = qTarget;
-
-            inputList.Add(state);
-            targetList.Add(qCurrent);
-        }
-
-        var inputMatrix = Matrix<double>.Build.DenseOfRowArrays(inputList);
-        var targetMatrix = Matrix<double>.Build.DenseOfRowArrays(targetList);
-
-        // Train model
-        model.SetTrainingData(inputMatrix, targetMatrix);
-        model.Train(epochs: 2, alpha: 0.0015, clipThreshold: 10);
-
-        // Epsilon decay
-        if (epsilon > epsilonMin)
-            epsilon *= epsilonDecay;
-
-        stepCount++;
-        if (stepCount % targetUpdateFreq == 0)
-            SoftUpdateTarget(tau);
-    }
-
-    private void SoftUpdateTarget(double tau = 0.01)
-    {
-        var (weightsModel, biasesModel) = model.GetWeights();
-        var (weightsTarget, biasesTarget) = targetModel.GetWeights();
-
-        for (int i = 0; i < weightsModel.Count; i++)
-        {
-            weightsTarget[i] = (1 - tau) * weightsTarget[i] + tau * weightsModel[i];
-            biasesTarget[i] = (1 - tau) * biasesTarget[i] + tau * biasesModel[i];
-        }
-        targetModel.SetWeights(weightsTarget, biasesTarget);
-    }
-
-    private void SyncTargetModel()
-    {
-        var (weights, biases) = model.GetWeights();
-        targetModel.SetWeights(weights, biases);
-    }
-
-    public double Epsilon => epsilon;
+    var rnd = new Random(seed);
+    int n = x.shape[0];
+    var indexes = np.arange(n);
+    indexes = np.random.permutation(indexes);
+    int testCount = (int)(n * testSize);
+    var testIdx = indexes[$":{testCount}"];
+    var trainIdx = indexes[$"{testCount}:"];
+    var xTrain = x[trainIdx];
+    var xTest = x[testIdx];
+    var yTrain = y[trainIdx];
+    var yTest = y[testIdx];
+    return (xTrain, xTest, yTrain, yTest);
 }
 
-public class NeuralNetwork
+static void EvalRegressionModel(NeuralNetwork model, NDArray xTest, NDArray yTest)
 {
-    int epochs = 10;
-    double alpha = 0.01;
-    double clipThreshold = 500;
-    Matrix<double>? x;
-    int[]? n;
-    List<Matrix<double>> wVals = new List<Matrix<double>>();
-    List<Matrix<double>> bDefVals = new List<Matrix<double>>();
-    Matrix<double>? y;
-    int m;
-    double reLUAlpha = 0.01;
-    double costDelta = 1;
-    bool logTraining = false;
+    // Compute MAE and RMSE for neural network
 
-    void CreateLayers(int inputs, int hiddenLayers, int hiddenNodes, int outputs)
+    var preds = model.Forward(xTest);
+    preds = preds.reshape(-1, 1);
+    var mae = MAE(yTest, preds);
+    var rmse = RMSE(yTest, preds);
+    Console.WriteLine($"Mean absolute error: {mae}");
+    Console.WriteLine();
+    Console.WriteLine($"Root mean squared error: {rmse}");
+}
+
+static double MAE(NDArray yTrue, NDArray yPred)
+{
+    // Compute mean absolute error for neural network
+
+    return np.abs(yTrue - yPred).mean();
+}
+
+static double RMSE(NDArray yTrue, NDArray yPred)
+{
+    // Compute root mean squared error for neural network
+
+    return np.sqrt(np.mean(np.power(yTrue - yPred, 2)));
+}
+
+namespace NNN
+{
+    public class Trainer
     {
-        n = new int[hiddenLayers + 2];
-        n[0] = inputs;
-        for (int i = 1; i < n.Length - 1; i++)
+        // Trains a neural network
+
+        protected NeuralNetwork Net { get; set; }
+        protected Optimizer Optim { get; set; }
+        protected double BestLoss { get; set; }
+
+        public void Fit(NDArray xTrain, NDArray yTrain, NDArray xTest, NDArray yTest, int epochs = 100, int evalEvery = 10,
+            int batchSize = 32, int seed = 1, bool restart = true)
         {
-            n[i] = hiddenNodes;
-        }
-        n[n.Length - 1] = outputs;
-    }
+            // Fits neural network on training data for certain number of epochs
+            // Every "evalEvery" epochs, evaluates neural network on testing data
 
-    void CreateDefaultWeights()
-    {
-        for (int i = 1; i < n.Length; i++)
-        {
-            wVals.Add(GenerateMatrix(n[i], n[i - 1], n[i - 1], reLUAlpha));
-            bDefVals.Add(GenerateMatrix(n[i], 1, n[i - 1], reLUAlpha));
-        }
-    }
+            np.random.seed(seed);
 
-    List<double> TrainNetwork()
-    {
-        double initialAlpha = alpha;
-        Matrix<double> a0 = x.Transpose();
-        List<double> costs = new List<double>();
-        for (int i = 0; i < epochs; i++)
-        {
-            var (yHat, cache) = FeedForward(a0);
-            double error = Cost(yHat, y, m);
-            costs.Add(error);
-            HandleBackprop(yHat, y, m, cache);
-            if (logTraining && i % 100 == 0) { Console.WriteLine($"Epoch {i}: Cost = {error}"); }
-            if (i == Math.Round(epochs * 0.8)) { alpha *= 0.5; }
-        }
-        alpha = initialAlpha;
-        return costs;
-    }
-
-    public (Matrix<double> yHat, Cache cache) FeedForward(Matrix<double> input)
-    {
-        Cache cache = new Cache();
-        Matrix<double> a = input.Clone();
-        cache.aVals.Add(a);
-        for (int i = 0; i < wVals.Count; i++)
-        {
-            Matrix<double> z = wVals[i] * a + Broadcast(bDefVals[i], a.ColumnCount);
-            cache.zVals.Add(z);
-            if (i < wVals.Count - 1) a = LeakyReLU(z);
-            else a = z;
-            cache.aVals.Add(a);
-        }
-        return (a, cache);
-    }
-
-    void HandleBackprop(Matrix<double> yHat, Matrix<double> y, int m, Cache cache)
-    {
-        List<Matrix<double>> dC_dWs = new List<Matrix<double>>();
-        List<Matrix<double>> dC_dbs = new List<Matrix<double>>();
-        int L = wVals.Count;
-        Matrix<double> aL = yHat;
-        Matrix<double> aPrev = cache.aVals[L - 1];
-        Matrix<double> dC_dZ = CostDeriv(aL, y, costDelta, m);
-        Matrix<double> dC_dW = dC_dZ * aPrev.Transpose();
-        Matrix<double> dC_db = CalculateBiasC(dC_dZ, m);
-        dC_dWs.Insert(0, dC_dW);
-        dC_dbs.Insert(0, dC_db);
-        Matrix<double> dC_dA_prev = wVals[L - 1].Transpose() * dC_dZ;
-        for (int l = L - 2; l >= 0; l--)
-        {
-            Matrix<double> aPrevHidden = cache.aVals[l];
-            Matrix<double> zHidden = cache.zVals[l];
-            Matrix<double> dZ = dC_dA_prev.PointwiseMultiply(LeakyReLUDeriv(zHidden));
-            Matrix<double> dW = dZ * aPrevHidden.Transpose();
-            Matrix<double> db = CalculateBiasC(dZ, m);
-            dC_dWs.Insert(0, dW);
-            dC_dbs.Insert(0, db);
-            if (l > 0) dC_dA_prev = wVals[l].Transpose() * dZ;
-        }
-        (dC_dWs, dC_dbs) = ClipGradients(dC_dWs, dC_dbs, clipThreshold);
-        for (int i = 0; i < wVals.Count; i++)
-        {
-            wVals[i] -= alpha * dC_dWs[i];
-            bDefVals[i] -= Broadcast(alpha * dC_dbs[i], bDefVals[i].ColumnCount);
-        }
-    }
-
-    public void GenerateNewWeights()
-    {
-        CreateDefaultWeights();
-    }
-
-    public void SetTrainingData(Matrix<double> inputs, Matrix<double> outputs)
-    {
-        x = inputs.Clone();
-        m = x.RowCount;
-        y = outputs.Clone();
-    }
-
-    public void SetWeights(List<Matrix<double>> weights, List<Matrix<double>> biases)
-    {
-        wVals = weights.ToList();
-        bDefVals = biases.ToList();
-    }
-
-    public (List<Matrix<double>> weights, List<Matrix<double>> biases) GetWeights()
-    {
-        return (wVals.ToList(), bDefVals.ToList());
-    }
-
-    public void LogTraining(bool logTraining)
-    {
-        this.logTraining = logTraining;
-    }
-
-    public List<double> Train(int? epochs = null, double? alpha = null, double? clipThreshold = null, double? costDelta = null)
-    {
-        this.epochs = epochs ?? this.epochs;
-        this.alpha = alpha ?? this.alpha;
-        this.clipThreshold = clipThreshold ?? this.clipThreshold;
-        this.costDelta = costDelta ?? this.costDelta;
-        List<double> costs = TrainNetwork();
-        return costs.ToList();
-    }
-
-    public Matrix<double> ProcessInput(Matrix<double> input)
-    {
-        Matrix<double> xT = input.Clone().Transpose();
-        var (yHat, _) = FeedForward(xT);
-        return yHat.Transpose();
-    }
-
-    public string CreateJsonString()
-    {
-        NNTrainingData training = new NNTrainingData(ToSerialMatrixList(wVals), ToSerialMatrixList(bDefVals), n, reLUAlpha);
-        string jsonString = JsonSerializer.Serialize(training);
-        return jsonString;
-    }
-
-    public NeuralNetwork(int inputNeurons, int hiddenLayers, int hiddenNeurons, int outputNeurons)
-    {
-        wVals = new List<Matrix<double>>();
-        bDefVals = new List<Matrix<double>>();
-        CreateLayers(inputNeurons, hiddenLayers, hiddenNeurons, outputNeurons);
-        CreateDefaultWeights();
-    }
-
-    public NeuralNetwork(string jsonString)
-    {
-        NNTrainingData data = JsonSerializer.Deserialize<NNTrainingData>(jsonString);
-        if (data != null)
-        {
-            wVals = ToMatrixList(data.weights.ToList());
-            bDefVals = ToMatrixList(data.biases.ToList());
-            n = data.n.ToArray();
-            reLUAlpha = data.reLUAlpha;
-        }
-    }
-
-    static (List<Matrix<double>> dC_dWs, List<Matrix<double>> dC_dbs) ClipGradients(List<Matrix<double>> inputdC_dWs, List<Matrix<double>> inputdC_dbs, double clipThreshold = 500)
-    {
-        List<Matrix<double>> dC_dWs = new List<Matrix<double>>();
-        List<Matrix<double>> dC_dbs = new List<Matrix<double>>();
-        foreach (Matrix<double> gradient in inputdC_dWs)
-        {
-            Matrix<double> newGradient = gradient.Clone();
-            double norm = newGradient.FrobeniusNorm();
-            if (norm > clipThreshold)
+            if (restart)
             {
-                newGradient *= clipThreshold / norm;
-            }
-            dC_dWs.Add(newGradient);
-        }
-        foreach (Matrix<double> gradient in inputdC_dbs)
-        {
-            Matrix<double> newGradient = gradient.Clone();
-            double norm = newGradient.FrobeniusNorm();
-            if (norm > clipThreshold)
-            {
-                newGradient *= clipThreshold / norm;
-            }
-            dC_dbs.Add(newGradient);
-        }
-        return (dC_dWs, dC_dbs);
-    }
-
-    static Matrix<double> CalculateBiasC(Matrix<double> dC_dZ, int batchSize)
-    {
-        // average across columns (examples)
-        Vector<double> sums = dC_dZ.RowSums() / batchSize;
-        Matrix<double> result = Matrix<double>.Build.Dense(dC_dZ.RowCount, 1);
-        for (int i = 0; i < sums.Count; i++) result[i, 0] = sums[i];
-        return result;
-    }
-
-    double Cost(Matrix<double> yHat, Matrix<double> y, int m)
-    {
-        Matrix<double> losses = Matrix<double>.Build.Dense(yHat.RowCount, yHat.ColumnCount);
-        y = y.Clone().Transpose();
-        for (int i = 0; i < yHat.RowCount; i++)
-        {
-            for (int j = 0; j < yHat.ColumnCount; j++)
-            {
-                if (Math.Abs(yHat[i, j] - y[i, j]) < costDelta)
+                foreach (var layer in Net.Layers)
                 {
-                    losses[i, j] = 0.5 * Math.Pow(yHat[i, j] - y[i, j], 2);
+                    layer.First = true;
                 }
-                else
+            }
+
+            var setupBatch = GenerateSetupBatch(xTrain, yTrain).xBatch;
+            Net.SetupLayers(setupBatch);
+
+            var lastModel = Net.Copy();
+            for (int e = 0; e < epochs; e++)
+            {
+                if ((e + 1) % evalEvery == 0)
                 {
-                    losses[i, j] = costDelta * (Math.Abs(yHat[i, j] - y[i, j]) - 0.5 * costDelta);
+                    lastModel = Net.Copy();
+                }
+
+                (xTrain, yTrain) = Helpers.PermuteData(xTrain, yTrain);
+
+                var batchGenerator = GenerateBatches(xTrain, yTrain, batchSize);
+
+                foreach (var (xBatch, yBatch) in batchGenerator)
+                {
+                    Net.TrainBatch(xBatch, yBatch);
+                    Optim.Step();
+                }
+
+                if ((e + 1) % evalEvery == 0)
+                {
+                    var testPreds = Net.Forward(xTest);
+                    var loss = Net.Loss.Forward(testPreds, yTest);
+
+                    if (loss < BestLoss)
+                    {
+                        Console.WriteLine($"Validation loss after {e + 1} epochs is {loss}");
+                        BestLoss = loss;
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Loss increased after epoch {e + 1}, final loss was {BestLoss}, using the model from epoch {e + 1 - evalEvery}");
+                        Net = lastModel;
+                        Optim.Net = Net;
+                        break;
+                    }
                 }
             }
         }
-        double cost = losses.Enumerate().Sum() / m;
-        return cost;
-    }
 
-    static Matrix<double> CostDeriv(Matrix<double> aL2, Matrix<double> y, double costDelta, int m)
-    {
-        Matrix<double> dC_dZL = Matrix<double>.Build.Dense(aL2.RowCount, aL2.ColumnCount);
-        y = y.Clone().Transpose();
-        for (int i = 0; i < aL2.RowCount; i++)
+        public static IEnumerable<(NDArray xBatch, NDArray yBatch)> GenerateBatches(
+            NDArray x, NDArray y, int size = 32)
         {
-            for (int j = 0; j < aL2.ColumnCount; j++)
+            if (x.shape[0] != y.shape[0]) { throw new IncorrectShapeException(); }
+
+            int n = x.shape[0];
+
+            for (int i = 0; i < n; i += size)
             {
-                double diff = aL2[i, j] - y[i, j];
-                if (Math.Abs(diff) <= costDelta) dC_dZL[i, j] = diff / m;
-                else dC_dZL[i, j] = costDelta * Math.Sign(diff) / m;
+                int end = Math.Min(i + size, n);
+
+                NDArray xBatch = x[$"{i}:{end}"];
+                NDArray yBatch = y[$"{i}:{end}"];
+
+                yield return (xBatch, yBatch);
             }
         }
-        return dC_dZL.Clone();
+
+        public static (NDArray xBatch, NDArray yBatch) GenerateSetupBatch(
+            NDArray x, NDArray y, int size = 32)
+        {
+            if (x.shape[0] != y.shape[0]) { throw new IncorrectShapeException(); }
+
+            int n = x.shape[0];
+            int end = Math.Min(size, n);
+            NDArray xBatch = x[$"{0}:{end}"];
+            NDArray yBatch = y[$"{0}:{end}"];
+
+            return (xBatch, yBatch);
+        }
+
+        public Trainer(NeuralNetwork net, Optimizer optim)
+        {
+            // Requires neural network and optimzer for training to occur.
+            // Assign neural network as instance variable to the optimizer.
+
+            Net = net;
+            Optim = optim;
+            Optim.Net = net;
+            BestLoss = 1e9;
+        }
     }
 
-    static Matrix<double> GenerateMatrix(int rows, int columns, int distribution = 1, double reLUAlpha = 0.01)
+    public class Optimizer
     {
-        Normal nd = new Normal(0, Math.Sqrt(2 / distribution));
-        Matrix<double> matrix = Matrix<double>.Build.Dense(rows, columns);
-        for (int i = 0; i < rows; i++)
+        // Base class for neural network optimizer
+
+        protected double LR { get; set; }
+        public NeuralNetwork? Net { get; set; }
+
+        public virtual void Step()
         {
-            for (int j = 0; j < columns; j++)
+            // Step() must be defined for every optimizer
+        }
+
+        public Optimizer(double lr = 0.01)
+        {
+            // Every optimizer must have initial learning rate
+
+            LR = lr;
+        }
+    }
+
+    public class SGD(double lr = 0.01) : Optimizer(lr)
+    {
+        // Stochastic gradient descent optimizer
+
+        public override void Step()
+        {
+            // For each parameter, adjust in appropriate direction,
+            // with magnitude of adjustment based on learning rate
+
+            List<NDArray> newParams = new List<NDArray>();
+
+            foreach (var (param, paramGrad) in Helpers.Zip(Net.CalcParams(), Net.CalcParamGrads()))
             {
-                double value = nd.Sample();
-                matrix[i, j] = value;
+                newParams.Add(param - LR * paramGrad);
+            }
+            Net.SetParams(newParams);
+        }
+    }
+
+    public class NeuralNetwork
+    {
+        // A neural network consisting of multiple "layers"
+
+        public List<Layer> Layers { get; set; }
+        public Loss Loss { get; set; }
+        public int Seed { get; set; }
+
+        public NDArray Forward(NDArray xBatch)
+        {
+            // Pass data forward through layers
+
+            var xOut = xBatch.Clone();
+            foreach (var layer in Layers)
+            {
+                xOut = layer.Forward(xOut);
+            }
+
+            return xOut;
+        }
+
+        public void Backward(NDArray lossGrad)
+        {
+            // Pass data backward through layers
+
+            var grad = lossGrad;
+            var revLayers = Layers.ToList();
+            revLayers.Reverse();
+            foreach (var layer in revLayers)
+            {
+                grad = layer.Backward(grad);
             }
         }
-        return matrix;
+
+        public double TrainBatch(NDArray xBatch, NDArray yBatch)
+        {
+            // Pass data forward through layers
+            // Compute loss
+            // Pass data backward through layers
+
+            xBatch = xBatch.Clone();
+            yBatch = yBatch.Clone();
+
+            var predictions = Forward(xBatch);
+            var loss = Loss.Forward(predictions, yBatch);
+            var lossGrad = Loss.Backward();
+            Backward(lossGrad);
+
+            return loss;
+        }
+
+        public List<NDArray> CalcParams()
+        {
+            // Get parameters for network
+
+            List<NDArray> netParams = new List<NDArray>();
+
+            foreach (var layer in Layers)
+            {
+                netParams.AddRange(layer.CalcParams());
+            }
+            return netParams.ToList();
+        }
+
+        public void SetParams(List<NDArray> newParams)
+        {
+            newParams = newParams.ToList();
+            List<NDArray> layerParams = new List<NDArray>();
+            for (int i = 0; i < Layers.Count; i++)
+            {
+                layerParams.Clear();
+                layerParams.AddRange(newParams.GetRange(0, Layers[i].Params.Count));
+                Layers[i].SetParams(layerParams);
+                newParams.RemoveRange(0, Layers[i].Params.Count);
+            }
+        }
+
+        public List<NDArray> CalcParamGrads()
+        {
+            // Get gradient of loss with respect to parameters for network
+
+            List<NDArray> netParamGrads = new List<NDArray>();
+
+            foreach (var layer in Layers)
+            {
+                netParamGrads.AddRange(layer.CalcParamGrads());
+            }
+            return netParamGrads.ToList();
+        }
+
+        public NeuralNetwork Copy()
+        {
+            List<Layer> newLayers = new List<Layer>();
+            foreach (var layer in Layers)
+            {
+                newLayers.Add(layer.Copy());
+            }
+            Loss newLoss = Loss.Copy();
+            return new NeuralNetwork(newLayers, newLoss, Seed);
+        }
+
+        public void SetupLayers(NDArray input)
+        {
+            foreach (var layer in Layers)
+            {
+                layer.SetupForInput(input);
+            }
+        }
+
+        public NeuralNetwork(List<Layer> layers, Loss loss, int seed = 1)
+        {
+            // Neural networks need layers and a loss
+
+            Layers = layers.ToList();
+            Loss = loss;
+            Seed = seed;
+            if (seed != default)
+            {
+                foreach (var layer in Layers) { layer.Seed = Seed; }
+            }
+        }
     }
 
-    static Matrix<double> LeakyReLU(Matrix<double> matrix, double reLUAlpha = 0.01)
+    public class Layer
     {
-        Matrix<double> result = Matrix<double>.Build.Dense(matrix.RowCount, matrix.ColumnCount);
-        for (int i = 0; i < matrix.RowCount; i++)
+        // A "layer" of neurons for a neural network
+
+        public int Neurons { get; set; } = 0;
+        public bool First { get; set; } = true;
+        public List<NDArray>? Params { get; set; }
+        public List<NDArray>? ParamGrads { get; set; }
+        public List<Operation>? Operations { get; set; }
+        public NDArray? Input { get; set; }
+        public NDArray? Output { get; set; }
+        public NDArray? InputGrad { get; set; }
+        public int Seed { get; set; } = 1;
+
+        public NDArray Forward(NDArray input)
         {
-            for (int j = 0; j < matrix.ColumnCount; j++)
+            // Pass input forward through operations
+
+            input = input.Clone();
+            Input = input.Clone();
+            if (First)
             {
-                result[i, j] = matrix[i, j];
-                if (result[i, j] < 0)
+                SetupLayer(input);
+                First = false;
+            }
+
+            foreach (var operation in Operations)
+            {
+                input = operation.Forward(input);
+            }
+            Output = input;
+
+            return Output;
+        }
+
+        public NDArray Backward(NDArray outputGrad)
+        {
+            // Send output gradient backward through operations
+
+            Helpers.AssertSameShape(Output, outputGrad);
+
+            outputGrad = outputGrad.Clone();
+            var revOps = Operations.ToList();
+            revOps.Reverse();
+            foreach (var operation in revOps)
+            {
+                outputGrad = operation.Backward(outputGrad);
+            }
+
+            InputGrad = outputGrad.Clone();
+            CalcParamGrads();
+            return InputGrad;
+        }
+
+        public virtual void SetupForInput(NDArray input)
+        {
+            input = input.Clone();
+            Input = input.Clone();
+            SetupLayer(input);
+        }
+
+        protected virtual void SetupLayer(NDArray numIn)
+        {
+            // SetupLayer() must be defined for each layer
+
+            throw new NotImplementedException();
+        }
+
+        public List<NDArray> CalcParamGrads()
+        {
+            // Extracts ParamGrads from layer's operations
+
+            ParamGrads = new List<NDArray>();
+            foreach (var operation in Operations)
+            {
+                if (operation is ParamOperation)
                 {
-                    result[i, j] *= reLUAlpha;
+                    var paramOp = operation as ParamOperation;
+                    ParamGrads.Add(paramOp.ParamGrad);
+                }
+            }
+            return ParamGrads.ToList();
+        }
+
+        public List<NDArray> CalcParams()
+        {
+            // Extracts Params from layer's operations
+
+            Params = new List<NDArray>();
+            foreach (var operation in Operations)
+            {
+                if (operation is ParamOperation)
+                {
+                    var paramOp = operation as ParamOperation;
+                    Params.Add(paramOp.Param);
+                }
+            }
+            return Params.ToList();
+        }
+
+        public void SetParams(List<NDArray> newParams)
+        {
+            int index = 0;
+            foreach (var operation in Operations)
+            {
+                if (operation is ParamOperation)
+                {
+                    operation.SetParams(newParams[index]);
+                    index++;
                 }
             }
         }
-        return result;
+
+        public virtual Layer Copy()
+        {
+            List<Operation> newOps = new List<Operation>();
+            foreach (var operation in Operations)
+            {
+                newOps.Add(operation.Copy());
+            }
+            List<NDArray> newParamGrads = new List<NDArray>();
+            foreach (var paramGrad in ParamGrads)
+            {
+                newParamGrads.Add(paramGrad.Clone());
+            }
+            List<NDArray> newParams = new List<NDArray>();
+            foreach (var param in Params)
+            {
+                newParams.Add(param.Clone());
+            }
+            return new Layer
+            {
+                First = this.First,
+                Input = this.Input,
+                InputGrad = this.InputGrad,
+                Neurons = this.Neurons,
+                Operations = newOps.ToList(),
+                Output = this.Output,
+                ParamGrads = newParamGrads.ToList(),
+                Params = newParams.ToList(),
+                Seed = this.Seed
+            };
+        }
+
+        public Layer() { }
+
+        public Layer(int neurons)
+        {
+            // Number of "neurons" roughly corresponds to "breadth" of layer
+
+            Neurons = neurons;
+            First = true;
+            Params = new List<NDArray>();
+            ParamGrads = new List<NDArray>();
+            Operations = new List<Operation>();
+        }
     }
 
-    static Matrix<double> LeakyReLUDeriv(Matrix<double> matrix, double reLUAlpha = 0.01)
+    public class Dense : Layer
     {
-        Matrix<double> result = Matrix<double>.Build.Dense(matrix.RowCount, matrix.ColumnCount);
-        for (int i = 0; i < matrix.RowCount; i++)
+        public Operation? Activation { get; set; }
+
+        protected override void SetupLayer(NDArray numIn)
         {
-            for (int j = 0; j < matrix.ColumnCount; j++)
+            // Defines operations of fully connected layer
+
+            if (Seed != default) { np.random.seed(Seed); }
+
+            Params = new List<NDArray>();
+
+            // weights
+            Params.Add(np.random.randn(Input.shape[1], Neurons));
+
+            // bias
+            Params.Add(np.random.randn(1, Neurons));
+
+            Operations = [new WeightMultiply(Params[0]), new BiasAdd(Params[1]), Activation];
+
+            First = false;
+        }
+
+        public override Dense Copy()
+        {
+            var newLayer = base.Copy();
+            var newActiv = Activation.Copy();
+            return new Dense
             {
-                if (matrix[i, j] < 0)
+                Activation = newActiv,
+                Input = newLayer.Input,
+                First = newLayer.First,
+                InputGrad = newLayer.InputGrad,
+                Neurons = newLayer.Neurons,
+                Operations = newLayer.Operations,
+                Output = newLayer.Output,
+                ParamGrads = newLayer.ParamGrads,
+                Params = newLayer.Params,
+                Seed = newLayer.Seed
+            };
+        }
+
+        public Dense() { }
+
+        public Dense(int neurons, Operation? activation = null) : base(neurons)
+        {
+            Activation = activation ?? new Sigmoid();
+        }
+    }
+
+    public class Operation
+    {
+        // Base class for operations
+
+        public NDArray? Input { get; set; }
+        public NDArray? Output { get; set; }
+        public NDArray? InputGrad { get; set; }
+
+        public NDArray Forward(NDArray input)
+        {
+            // Send input forward through operation
+
+            Input = input;
+            Output = CalcOutput();
+            return Output;
+        }
+
+        public virtual NDArray Backward(NDArray outputGrad)
+        {
+            // Calculate input gradient from output gradient
+
+            Helpers.AssertSameShape(Output, outputGrad);
+
+            InputGrad = CalcInputGrad(outputGrad);
+
+            Helpers.AssertSameShape(Input, InputGrad);
+
+            return InputGrad;
+        }
+
+        public virtual void SetParams(NDArray newParams)
+        {
+            // SetParams() must be defined only for the ParamOperation subclass
+
+            throw new NotImplementedException();
+        }
+
+        protected virtual NDArray CalcOutput()
+        {
+            // CalcOutput() must be defined for each operation
+
+            throw new NotImplementedException();
+        }
+
+        protected virtual NDArray CalcInputGrad(NDArray outputGrad)
+        {
+            // CalcInputGrad() must be defined for each operation
+
+            throw new NotImplementedException();
+        }
+
+        public virtual Operation Copy()
+        {
+            // Copy() must be separately defined for every subclass
+            return new Operation { Input = this.Input, InputGrad = this.InputGrad, Output = this.Output };
+        }
+    }
+
+    public class Sigmoid : Operation
+    {
+        // Sigmoid activation function
+
+        protected override NDArray CalcOutput()
+        {
+            // Compute output
+
+            return 1.0 / (1.0 + np.exp(-1.0 * Input));
+        }
+
+        protected override NDArray CalcInputGrad(NDArray outputGrad)
+        {
+            // Compute input gradient
+
+            var sigmoidBackward = Output * (1.0 - Output);
+            InputGrad = sigmoidBackward * outputGrad;
+            return InputGrad;
+        }
+
+        public override Sigmoid Copy()
+        {
+            var newOp = base.Copy();
+            return new Sigmoid
+            {
+                Input = newOp.Input,
+                InputGrad = newOp.InputGrad,
+                Output = newOp.Output
+            };
+        }
+    }
+
+    public class Linear : Operation
+    {
+        // "Identity" activation function
+
+        protected override NDArray CalcOutput()
+        {
+            // Pass through
+
+            return Input;
+        }
+
+        protected override NDArray CalcInputGrad(NDArray outputGrad)
+        {
+            // Pass through
+
+            return outputGrad;
+        }
+
+        public override Linear Copy()
+        {
+            var newOp = base.Copy();
+            return new Linear
+            {
+                Input = newOp.Input,
+                InputGrad = newOp.InputGrad,
+                Output = newOp.Output
+            };
+        }
+    }
+
+    public class Tanh : Operation
+    {
+        // Hyperbolic tangent activation function
+
+        protected override NDArray CalcOutput()
+        {
+            return np.tanh(Input);
+        }
+
+        protected override NDArray CalcInputGrad(NDArray outputGrad)
+        {
+            return outputGrad * (1 - Output * Output);
+        }
+
+        public override Tanh Copy()
+        {
+            var newOp = base.Copy();
+            return new Tanh
+            {
+                Input = newOp.Input,
+                InputGrad = newOp.InputGrad,
+                Output = newOp.Output
+            };
+        }
+    }
+
+    public class ReLU : Operation
+    {
+        // Rectified linear unit activation function
+
+        protected override NDArray CalcOutput()
+        {
+            return np.clip(Input, 0, null);
+        }
+
+        protected override NDArray CalcInputGrad(NDArray outputGrad)
+        {
+            var mask = Output >= 0;
+            return outputGrad * mask;
+        }
+
+        public override ReLU Copy()
+        {
+            var newOp = base.Copy();
+            return new ReLU
+            {
+                Input = newOp.Input,
+                InputGrad = newOp.InputGrad,
+                Output = newOp.Output
+            };
+        }
+    }
+
+    public class ParamOperation : Operation
+    {
+        // An Operation with parameters
+
+        public NDArray Param { get; protected set; }
+        public NDArray? ParamGrad { get; protected set; }
+
+        public override NDArray Backward(NDArray outputGrad)
+        {
+            // Calculate input gradient and parameter gradient from output gradient
+
+            Helpers.AssertSameShape(Output, outputGrad);
+
+            InputGrad = CalcInputGrad(outputGrad);
+            ParamGrad = CalcParamGrad(outputGrad);
+
+            Helpers.AssertSameShape(Input, InputGrad);
+            Helpers.AssertSameShape(Param, ParamGrad);
+
+            return InputGrad;
+        }
+
+        public override void SetParams(NDArray newParams)
+        {
+            Param = newParams.Clone();
+        }
+
+        protected virtual NDArray CalcParamGrad(NDArray outputGrad)
+        {
+            // CalcParamGrad() must be defined for each subclass
+
+            throw new NotImplementedException();
+        }
+
+        public override ParamOperation Copy()
+        {
+            var newOp = base.Copy();
+            NDArray newParam = Param.Clone();
+            return new ParamOperation(newParam)
+            {
+                Input = newOp.Input,
+                InputGrad = newOp.InputGrad,
+                Output = newOp.Output,
+                ParamGrad = this.ParamGrad
+            };
+        }
+
+        public ParamOperation(NDArray param)
+        {
+            Param = param.Clone();
+        }
+    }
+
+    public class WeightMultiply(NDArray param) : ParamOperation(param)
+    {
+        // Weight multiplication operation for a neural network
+
+        protected override NDArray CalcOutput()
+        {
+            // Compute output
+
+            return np.dot(Input, Param);
+        }
+
+        protected override NDArray CalcInputGrad(NDArray outputGrad)
+        {
+            // Compute input gradient
+
+            return np.dot(outputGrad, np.transpose(Param, [1, 0]));
+        }
+
+        protected override NDArray CalcParamGrad(NDArray outputGrad)
+        {
+            // Compute parameter gradient
+
+            return np.dot(np.transpose(Input, [1, 0]), outputGrad);
+        }
+
+        public override WeightMultiply Copy()
+        {
+            var newParamOp = base.Copy();
+            return new WeightMultiply(newParamOp.Param)
+            {
+                Input = newParamOp.Input,
+                InputGrad = newParamOp.InputGrad,
+                Output = newParamOp.Output,
+                ParamGrad = newParamOp.ParamGrad
+            };
+        }
+    }
+
+    public class BiasAdd : ParamOperation
+    {
+        // Perform bias addition
+
+        protected override NDArray CalcOutput()
+        {
+            // Compute output
+
+            return Input + Param;
+        }
+
+        protected override NDArray CalcInputGrad(NDArray outputGrad)
+        {
+            // Compute input gradient
+
+            return np.ones_like(Input) * outputGrad;
+        }
+
+        protected override NDArray CalcParamGrad(NDArray outputGrad)
+        {
+            // Compute parameter gradient
+
+            ParamGrad = np.ones_like(Param) * outputGrad;
+            return Helpers.SumAlongX0(ParamGrad).reshape(1, ParamGrad.shape[1]);
+        }
+
+        public BiasAdd(NDArray param) : base(param)
+        {
+            Helpers.AssertEqualInt(param.shape[0], 1);
+        }
+
+        public override BiasAdd Copy()
+        {
+            var newParamOp = base.Copy();
+            return new BiasAdd(newParamOp.Param)
+            {
+                Input = newParamOp.Input,
+                InputGrad = newParamOp.InputGrad,
+                Output = newParamOp.Output,
+                ParamGrad = newParamOp.ParamGrad
+            };
+        }
+    }
+
+    public class Loss
+    {
+        // "Loss" of a neural network
+
+        public NDArray? Prediction { get; set; }
+        public NDArray? Target { get; set; }
+        public NDArray? InputGrad { get; set; }
+
+        public double Forward(NDArray prediction, NDArray target)
+        {
+            // Compute actual loss value
+
+            Helpers.AssertSameShape(prediction, target);
+
+            Prediction = prediction.Clone();
+            Target = target.Clone();
+
+            var lossValue = CalcOutput();
+            return lossValue;
+        }
+
+        public NDArray Backward()
+        {
+            // Computes gradient loss value with respect to input to loss function
+
+            InputGrad = CalcInputGrad();
+
+            Helpers.AssertSameShape(Prediction, InputGrad);
+
+            return InputGrad;
+        }
+
+        protected virtual double CalcOutput()
+        {
+            // CalcOutput() must be defined for each subclass
+
+            throw new NotImplementedException();
+        }
+
+        protected virtual NDArray CalcInputGrad()
+        {
+            // CalcInputGrad() must be defined for each subclass
+
+            throw new NotImplementedException();
+        }
+
+        public virtual Loss Copy()
+        {
+            return new Loss { Prediction = this.Prediction, Target = this.Target, InputGrad = this.InputGrad };
+        }
+    }
+
+    public class MeanSquaredError : Loss
+    {
+        protected bool Normalize { get; set; }
+
+        protected override double CalcOutput()
+        {
+            // Compute per-observation squared error loss
+            var diff = Prediction - Target;
+            var pow = np.power(diff, 2);
+            var sum = pow.Data<double>().Sum();
+            var denom = Prediction.shape[0];
+            var doubleDenom = (double)denom;
+            var loss = sum / doubleDenom;
+            return loss;
+        }
+
+        protected override NDArray CalcInputGrad()
+        {
+            // Compute loss gradient with respect to input
+
+            return 2.0 * (Prediction - Target) / Prediction.shape[0];
+        }
+
+        public override MeanSquaredError Copy()
+        {
+            var newLoss = base.Copy();
+            return new MeanSquaredError
+            {
+                InputGrad = newLoss.InputGrad,
+                Prediction = newLoss.Prediction,
+                Target = newLoss.Target,
+                Normalize = this.Normalize
+            };
+        }
+
+        public MeanSquaredError(bool normalize = false) : base()
+        {
+            Normalize = normalize;
+        }
+    }
+
+    public static class Helpers
+    {
+        public static void AssertSameShape(NDArray arr1, NDArray arr2)
+        {
+            if (arr1.Shape != arr2.Shape) { throw new IncorrectShapeException(); }
+        }
+
+        public static void AssertEqualInt(int num1, int num2)
+        {
+            if (num1 != num2) { throw new IncorrectShapeException(); }
+        }
+
+        public static IEnumerable<(T1, T2)> Zip<T1, T2>(this IEnumerable<T1> t1, IEnumerable<T2> t2)
+        {
+            using var t1e = t1.GetEnumerator();
+            using var t2e = t2.GetEnumerator();
+            while (t1e.MoveNext() && t2e.MoveNext())
+            {
+                yield return (t1e.Current, t2e.Current);
+            }
+        }
+
+        public static (NDArray x, NDArray y) PermuteData(NDArray x, NDArray y)
+        {
+            var perm = np.random.permutation(x.shape[0]);
+            return (x[perm], y[perm]);
+        }
+
+        public static NDArray SumAlongX0(NDArray input)
+        {
+            var inputData = input.Data<double>().ToArray();
+            int nRows = input.shape[0];
+            int nCols = input.shape[1];
+            var result = new double[nCols];
+
+            for (int r = 0; r < nRows; r++)
+            {
+                for (int c = 0; c < nCols; c++)
                 {
-                    result[i, j] = reLUAlpha;
-                }
-                else
-                {
-                    result[i, j] = 1;
+                    result[c] += inputData[r * nCols + c];
                 }
             }
+
+            return np.array(result);
         }
-        return result;
+
+        public static NDArray ToNDArray(double[,] input)
+        {
+            int rows = input.GetLength(0);
+            int cols = input.GetLength(1);
+            double[] flat = new double[rows * cols];
+
+            Buffer.BlockCopy(input, 0, flat, 0, sizeof(double) * rows * cols);
+
+            return np.array(flat, dtype: np.float64).reshape(rows, cols);
+        }
+
+        public static NDArray ToNDArray(double[][] input)
+        {
+            return np.array(input, np.float64);
+        }
+
+        public static NDArray ToNDArray(double[] input)
+        {
+            int cols = input.Length;
+            var result = np.array(input, np.float64);
+            return result;
+        }
     }
 
-    static Matrix<double> Broadcast(Matrix<double> input, int columns)
+    public class BostonDataset
     {
-        Matrix<double> result = Matrix<double>.Build.Dense(input.RowCount, columns);
-        for (int i = 0; i < input.RowCount; i++)
+        public double[][]? Data { get; set; }
+        public double[]? Target { get; set; }
+        public string[]? FeatureNames { get; set; }
+    }
+
+    public class BostonLoader
+    {
+        static readonly string Url = "https://raw.githubusercontent.com/selva86/datasets/master/BostonHousing.csv";
+
+        public static async Task<BostonDataset> LoadAsync()
         {
-            for (int j = 0; j < columns; j++)
+            string csvFile = "boston.csv";
+
+            if (!File.Exists(csvFile))
             {
-                result[i, j] = input[i, 0];
+                using var client = new HttpClient();
+                var csvData = await client.GetStringAsync(Url);
+                await File.WriteAllTextAsync(csvFile, csvData);
             }
-        }
-        return result;
-    }
 
-    static List<SerialMatrix> ToSerialMatrixList(List<Matrix<double>> input)
-    {
-        List<SerialMatrix> output = new List<SerialMatrix>();
-        foreach (Matrix<double> matrix in input.ToList())
-        {
-            output.Add(new SerialMatrix(matrix));
-        }
-        return output.ToList();
-    }
-
-    static List<Matrix<double>> ToMatrixList(List<SerialMatrix> input)
-    {
-        List<Matrix<double>> output = new List<Matrix<double>>();
-        foreach (SerialMatrix matrix in input.ToList())
-        {
-            output.Add(Matrix<double>.Build.Dense(matrix.Rows, matrix.Columns, matrix.Data));
-        }
-        return output.ToList();
-    }
-
-    public static void WriteMatrix<T>(Matrix<T> matrix) where T : struct, IEquatable<T>, IFormattable
-    {
-        for (int i = 0; i < matrix.RowCount; i++)
-        {
-            string line = "";
-            for (int j = 0; j < matrix.ColumnCount; j++)
+            using var reader = new StreamReader(csvFile);
+            using var csv = new CsvReader(reader, new CsvHelper.Configuration.CsvConfiguration(CultureInfo.InvariantCulture)
             {
-                line += $"{matrix[i, j]} ";
-            }
-            Console.WriteLine(line);
+                PrepareHeaderForMatch = args => args.Header.ToLowerInvariant()
+            });
+            var records = csv.GetRecords<BostonRow>().ToList();
+
+            var data = records.Select(r => new double[]
+            {
+                r.CRIM, r.ZN, r.INDUS, r.CHAS, r.NOX, r.RM,
+                r.AGE, r.DIS, r.RAD, r.TAX, r.PTRATIO, r.B, r.LSTAT
+            }).ToArray();
+
+            var target = records.Select(r => r.MEDV).ToArray();
+
+            var featureNames = new string[]
+            {
+                "CRIM", "ZN", "INDUS", "CHAS", "NOX", "RM",
+                "AGE", "DIS", "RAD", "TAX", "PTRATIO", "B", "LSTAT"
+            };
+
+            return new BostonDataset
+            {
+                Data = data,
+                Target = target,
+                FeatureNames = featureNames
+            };
         }
     }
-}
 
-public class Cache
-{
-    public List<Matrix<double>> aVals = new List<Matrix<double>>();
-    public List<Matrix<double>> zVals = new List<Matrix<double>>();
-}
-
-public class Experience
-{
-    public double[] State, NextState;
-    public int[] Action;
-    public double Reward;
-    public bool Done;
-
-    public Experience(double[] state, int[] action, double reward, double[] nextState, bool done)
-        => (State, Action, Reward, NextState, Done) = (state, action, reward, nextState, done);
-}
-
-public class NNTrainingData
-{
-    public List<SerialMatrix> weights { get; set; }
-    public List<SerialMatrix> biases { get; set; }
-    public int[] n { get; set; }
-    public double reLUAlpha { get; set; }
-
-    public NNTrainingData(List<SerialMatrix> weights, List<SerialMatrix> biases, int[] n, double reLUAlpha)
+    public class BostonRow
     {
-        this.weights = weights.ToList();
-        this.biases = biases.ToList();
-        this.n = n.ToArray();
-        this.reLUAlpha = reLUAlpha;
-    }
-}
-
-public class SerialMatrix
-{
-    public int Rows { get; set; }
-    public int Columns { get; set; }
-    public double[]? Data { get; set; }
-
-    public SerialMatrix() { }
-
-    public SerialMatrix(Matrix<double> matrix)
-    {
-        Rows = matrix.RowCount;
-        Columns = matrix.ColumnCount;
-        Data = matrix.ToColumnMajorArray();
-    }
-
-    public Matrix<double> ToMatrix()
-    {
-        Matrix<double> matrix = Matrix<double>.Build.Dense(Rows, Columns, Data);
-        return matrix.Clone();
+        public double CRIM { get; set; }
+        public double ZN { get; set; }
+        public double INDUS { get; set; }
+        public double CHAS { get; set; }
+        public double NOX { get; set; }
+        public double RM { get; set; }
+        public double AGE { get; set; }
+        public double DIS { get; set; }
+        public double RAD { get; set; }
+        public double TAX { get; set; }
+        public double PTRATIO { get; set; }
+        public double B { get; set; }
+        public double LSTAT { get; set; }
+        public double MEDV { get; set; }
     }
 }
