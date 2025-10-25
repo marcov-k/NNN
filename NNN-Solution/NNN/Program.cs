@@ -4,100 +4,33 @@ using System.Globalization;
 using CsvHelper;
 using System.Text.Json;
 
-NeuralNetwork lr = new NeuralNetwork(layers: [new Dense(neurons: 1, activation: new Linear())],
-    loss: new MeanSquaredError(), seed: 20190501);
-
-NeuralNetwork nn = new NeuralNetwork(layers: [new Dense(neurons: 13, activation: new Sigmoid()),
+NeuralNetwork net = new NeuralNetwork(layers: [new Dense(neurons: 13, activation: new Tanh()),
+    new Dense(neurons: 13, activation: new Tanh()),
     new Dense(neurons: 1, activation: new Linear())], loss: new MeanSquaredError(), seed: 20190501);
-
-NeuralNetwork nnT = new NeuralNetwork(layers: [new Dense(neurons: 13, activation: new Tanh()),
-    new Dense(neurons: 1, activation: new Linear())], loss: new MeanSquaredError(), seed: 20190501);
-
-NeuralNetwork dl = new NeuralNetwork(layers: [new Dense(neurons: 13, activation: new Sigmoid()),
-    new Dense(neurons: 13, activation: new Sigmoid()), new Dense(neurons: 1, activation: new Linear())],
-    loss: new MeanSquaredError(), seed: 20190501);
 
 var boston = await BostonLoader.LoadAsync();
 var data = Helpers.ToNDArray(boston.Data);
 var target = Helpers.ToNDArray(boston.Target);
 var features = boston.FeatureNames;
 
-data = StandardScale(data);
+data = Helpers.StandardScale(data);
 
 var (xTrain, xTest, yTrain, yTest) = TrainTestSplit(data, target, testSize: 0.3, seed: 80718);
-yTrain = To2D(yTrain);
-yTest = To2D(yTest);
+yTrain = Helpers.To2D(yTrain);
+yTest = Helpers.To2D(yTest);
 
-var trainer = new Trainer(lr, new SGD(lr: 0.01));
+var trainer = new Trainer(net, new SGDMomentum(lr: 0.03, finalLR: 0.0, decayType: "linear", momentum: 0.9));
 
 Console.WriteLine("Using the Boston housing dataset to train neural networks...\n");
 
-Console.WriteLine("Training linear regression model...");
-trainer.Fit(xTrain, yTrain, xTest, yTest, epochs: 100, evalEvery: 10, seed: 20190501);
-Console.WriteLine();
-EvalRegressionModel(lr, xTest, yTest);
-Console.WriteLine();
-
-trainer = new Trainer(nn, new SGD(lr: 0.01));
-
-Console.WriteLine("Training neural network model with sigmoid activation...");
-trainer.Fit(xTrain, yTrain, xTest, yTest, epochs: 100, evalEvery: 10, seed: 20190501);
-Console.WriteLine();
-EvalRegressionModel(nn, xTest, yTest);
-Console.WriteLine();
-
-trainer = new Trainer(nnT, new SGD(lr: 0.01));
-
-Console.WriteLine("Training neural network model with tanh activation...");
-trainer.Fit(xTrain, yTrain, xTest, yTest, epochs: 100, evalEvery: 10, seed: 20190501);
-Console.WriteLine();
-EvalRegressionModel(nnT, xTest, yTest);
-Console.WriteLine();
-
-trainer = new Trainer(dl, new SGD(lr: 0.01));
-
-Console.WriteLine("Training deep learning model with sigmoid activation...");
-trainer.Fit(xTrain, yTrain, xTest, yTest, epochs: 100, evalEvery: 10, seed: 20190501);
-Console.WriteLine($"\nPredicted Values:\n\n{dl.Forward(xTest)}\n\nTrue Values:\n\n{yTest}\n");
-EvalRegressionModel(dl, xTest, yTest);
-Console.WriteLine();
-
-Console.WriteLine("Serializing deep learning model with sigmoid activation as a Json string...");
-string dlJson = dl.CreateJsonString();
-Console.WriteLine($"\n{dlJson}\n");
-
-Console.WriteLine("Building new neural network from Json string...");
-NeuralNetwork dlNew = new NeuralNetwork(dlJson);
-Console.WriteLine($"\nThe following predictions will be identical to the previous predictions if the neural network has been reconstructed correctly" +
-    $"\n\nPredicted Values:\n\n{dlNew.Forward(xTest)}\n");
-EvalRegressionModel(dlNew, xTest, yTest);
+Console.WriteLine("Training neural network...");
+trainer.Fit(xTrain, yTrain, xTest, yTest, epochs: 400, evalEvery: 40, batchSize: 32, seed: 20190501, restart: true, earlyStopping: true);
+Console.WriteLine($"\nPredicted Values:\n\n{net.Forward(xTest)}\n\nTrue Values:\n\n{yTest}\n");
+EvalRegressionModel(net, xTest, yTest);
 Console.WriteLine();
 
 Console.WriteLine("Press any key to close...");
 Console.ReadKey();
-
-static NDArray To2D(NDArray a, string type = "col")
-{
-    if (a.ndim != 1) { throw new ArgumentException("Input tensor must be 1D"); }
-    return type == "col" ? a.reshape(-1, 1) : a.reshape(1, -1);
-}
-
-static NDArray StandardScale(NDArray data)
-{
-    var mean = np.mean(data, axis: 0);
-    var std = np.std(data, axis: 0);
-    var stdData = std.Clone();
-    for (int i = 0; i < std.size; i++)
-    {
-        if (stdData[i] == 0)
-        {
-            stdData[i] = 1.0;
-        }
-    }
-    std = stdData;
-    var result = (data - mean) / std;
-    return (data - mean) / std;
-}
 
 static (NDArray xTrain, NDArray xTest, NDArray yTrain, NDArray yTest)
     TrainTestSplit(NDArray x, NDArray y, double testSize = 0.3, int seed = 80718)
@@ -154,12 +87,14 @@ namespace NNN
         protected double BestLoss { get; set; }
 
         public void Fit(NDArray xTrain, NDArray yTrain, NDArray xTest, NDArray yTest, int epochs = 100, int evalEvery = 10,
-            int batchSize = 32, int seed = 1, bool restart = true)
+            int batchSize = 32, int seed = 1, bool restart = true, bool earlyStopping = true)
         {
             // Fits neural network on training data for certain number of epochs
             // Every "evalEvery" epochs, evaluates neural network on testing data
 
             np.random.seed(seed);
+            Optim.MaxEpochs = epochs;
+            Optim.SetupDecay();
 
             if (restart)
             {
@@ -167,9 +102,10 @@ namespace NNN
                 {
                     layer.First = true;
                 }
+                BestLoss = 1e9;
             }
 
-            var setupBatch = GenerateSetupBatch(xTrain, yTrain).xBatch;
+            var setupBatch = Helpers.GenerateSetupBatch(xTrain, yTrain).xBatch;
             Net.SetupLayers(setupBatch);
 
             var lastModel = Net.Copy();
@@ -182,7 +118,7 @@ namespace NNN
 
                 (xTrain, yTrain) = Helpers.PermuteData(xTrain, yTrain);
 
-                var batchGenerator = GenerateBatches(xTrain, yTrain, batchSize);
+                var batchGenerator = Helpers.GenerateBatches(xTrain, yTrain, batchSize);
 
                 foreach (var (xBatch, yBatch) in batchGenerator)
                 {
@@ -195,51 +131,28 @@ namespace NNN
                     var testPreds = Net.Forward(xTest);
                     var loss = Net.Loss.Forward(testPreds, yTest);
 
-                    if (loss < BestLoss)
+                    if (earlyStopping)
                     {
-                        Console.WriteLine($"Validation loss after {e + 1} epochs is {loss}");
-                        BestLoss = loss;
+                        if (loss < BestLoss)
+                        {
+                            Console.WriteLine($"Validation loss after {e + 1} epochs is {loss}");
+                            BestLoss = loss;
+                        }
+                        else
+                        {
+                            Console.WriteLine($"Loss increased after epoch {e + 1}, final loss was {BestLoss}, using the model from epoch {e + 1 - evalEvery}");
+                            Net = lastModel;
+                            Optim.Net = Net;
+                            break;
+                        }
                     }
                     else
                     {
-                        Console.WriteLine($"Loss increased after epoch {e + 1}, final loss was {BestLoss}, using the model from epoch {e + 1 - evalEvery}");
-                        Net = lastModel;
-                        Optim.Net = Net;
-                        break;
+                        Console.WriteLine($"Validation loss after {e + 1} epochs is {loss}");
                     }
                 }
+                Optim.DecayLR();
             }
-        }
-
-        public static IEnumerable<(NDArray xBatch, NDArray yBatch)> GenerateBatches(
-            NDArray x, NDArray y, int size = 32)
-        {
-            if (x.shape[0] != y.shape[0]) { throw new IncorrectShapeException(); }
-
-            int n = x.shape[0];
-
-            for (int i = 0; i < n; i += size)
-            {
-                int end = Math.Min(i + size, n);
-
-                NDArray xBatch = x[$"{i}:{end}"];
-                NDArray yBatch = y[$"{i}:{end}"];
-
-                yield return (xBatch, yBatch);
-            }
-        }
-
-        public static (NDArray xBatch, NDArray yBatch) GenerateSetupBatch(
-            NDArray x, NDArray y, int size = 32)
-        {
-            if (x.shape[0] != y.shape[0]) { throw new IncorrectShapeException(); }
-
-            int n = x.shape[0];
-            int end = Math.Min(size, n);
-            NDArray xBatch = x[$"{0}:{end}"];
-            NDArray yBatch = y[$"{0}:{end}"];
-
-            return (xBatch, yBatch);
         }
 
         public Trainer(NeuralNetwork net, Optimizer optim)
@@ -259,37 +172,208 @@ namespace NNN
         // Base class for neural network optimizer
 
         protected double LR { get; set; }
+        protected double FinalLR { get; set; }
+        protected string? DecayType { get; set; }
+        protected bool First { get; set; }
+        protected double DecayPerEpoch { get; set; }
+        public double MaxEpochs { get; set; }
         public NeuralNetwork? Net { get; set; }
+
+        public void SetupDecay()
+        {
+            switch (DecayType)
+            {
+                case "exponential":
+                    DecayPerEpoch = np.power(FinalLR / LR, 1.0 / (MaxEpochs - 1));
+                    break;
+                case "linear":
+                    DecayPerEpoch = (LR - FinalLR) / (MaxEpochs - 1);
+                    break;
+                default:
+                    return;
+            }
+        }
+
+        public void DecayLR()
+        {
+            switch (DecayType)
+            {
+                case "exponential":
+                    LR *= DecayPerEpoch;
+                    break;
+                case "linear":
+                    LR -= DecayPerEpoch;
+                    break;
+                default:
+                    return;
+            }
+        }
 
         public virtual void Step()
         {
-            // Step() must be defined for every optimizer
+            var newParams = new List<NDArray>();
+            foreach (var (param, paramGrad) in Helpers.Zip(Net.CalcParams(), Net.CalcParamGrads()))
+            {
+                var inputDict = new Dictionary<string, NDArray>() { { "param", param }, { "grad", paramGrad } };
+                var newParam = UpdateRule(inputDict);
+                newParams.Add(newParam);
+            }
+            Net.SetParams(newParams);
         }
 
-        public Optimizer(double lr = 0.01)
+        protected virtual NDArray UpdateRule(Dictionary<string, NDArray> args)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Optimizer(double lr = 0.01, double finalLR = 0.0, string? decayType = null)
         {
             // Every optimizer must have initial learning rate
 
             LR = lr;
+            FinalLR = finalLR;
+            DecayType = decayType;
+            First = true;
         }
     }
 
-    public class SGD(double lr = 0.01) : Optimizer(lr)
+    public class SGD : Optimizer
     {
         // Stochastic gradient descent optimizer
 
+        protected override NDArray UpdateRule(Dictionary<string, NDArray> args)
+        {
+            var update = LR * args["grad"];
+            return args["param"] - update;
+        }
+
+        public SGD(double lr = 0.01, double finalLR = 0.0, string? decayType = null) : base(lr, finalLR, decayType) { }
+    }
+
+    public class SGDMomentum : Optimizer
+    {
+        protected double Momentum { get; set; }
+        protected List<NDArray> Velocities { get; set; }
+
         public override void Step()
         {
-            // For each parameter, adjust in appropriate direction,
-            // with magnitude of adjustment based on learning rate
-
-            List<NDArray> newParams = new List<NDArray>();
-
-            foreach (var (param, paramGrad) in Helpers.Zip(Net.CalcParams(), Net.CalcParamGrads()))
+            if (First)
             {
-                newParams.Add(param - LR * paramGrad);
+                Velocities = new List<NDArray>();
+                foreach (var param in Net.CalcParams())
+                {
+                    Velocities.Add(np.zeros_like(param));
+                }
+                First = false;
+            }
+
+            var newParams = new List<NDArray>();
+            foreach (var (param, paramGrad, velocity) in Helpers.Zip(Net.CalcParams(), Net.CalcParamGrads(), Velocities))
+            {
+                var inputDict = new Dictionary<string, NDArray>() { { "param", param }, { "grad", paramGrad }, { "velocity", velocity } };
+                var newParam = UpdateRule(inputDict);
+                newParams.Add(newParam);
             }
             Net.SetParams(newParams);
+        }
+
+        protected override NDArray UpdateRule(Dictionary<string, NDArray> args)
+        {
+            // Update velocity
+
+            var velocity = args["velocity"] * Momentum;
+            velocity += LR * args["grad"];
+
+            // Use velocity to update parameters
+
+            args["param"] -= args["velocity"];
+            var param = args["param"] - velocity;
+            return param;
+        }
+
+        public SGDMomentum(double lr = 0.01, double finalLR = 0.0, string? decayType = null, double momentum = 0.9) : base(lr, finalLR, decayType)
+        {
+            Momentum = momentum;
+            Velocities = new List<NDArray>();
+        }
+    }
+
+    public class AdaGrad : Optimizer
+    {
+        protected double Eps { get; set; }
+        protected List<NDArray> SumSquares { get; set; }
+
+        public override void Step()
+        {
+            if (First)
+            {
+                SumSquares = new List<NDArray>();
+                foreach (var param in Net.CalcParams())
+                {
+                    SumSquares.Add(np.zeros_like(param));
+                }
+                First = false;
+            }
+
+            var newParams = new List<NDArray>();
+            foreach (var (param, paramGrad, sumSquare) in Helpers.Zip(Net.CalcParams(), Net.CalcParamGrads(), SumSquares))
+            {
+                var inputDict = new Dictionary<string, NDArray>() { { "param", param }, { "grad", paramGrad }, { "sumSquare", sumSquare } };
+                var newParam = UpdateRule(inputDict);
+                newParams.Add(newParam);
+            }
+            Net.SetParams(newParams);
+        }
+
+        protected override NDArray UpdateRule(Dictionary<string, NDArray> args)
+        {
+            // Update sum of squares
+
+            var sumSquare = args["sumSquare"] + Eps + np.power(args["grad"], 2);
+
+            // Scale learning rate by sum of squares
+
+            LR = np.divide(LR, np.sqrt(sumSquare));
+
+            // Use to update parameters
+
+            var param = args["param"] - LR * args["grad"];
+
+            return param;
+        }
+
+        public AdaGrad(double lr = 0.01, double finalLR = 0.0) : base(lr, finalLR)
+        {
+            Eps = 1e-7;
+            SumSquares = new List<NDArray>();
+        }
+    }
+
+    public class RegularizedSGD : Optimizer
+    {
+        protected double Alpha { get; set; }
+
+        public override void Step()
+        {
+            var newParams = new List<NDArray>();
+            foreach (var (param, paramGrad) in Helpers.Zip(Net.CalcParams(), Net.CalcParamGrads()))
+            {
+                var inputDict = new Dictionary<string, NDArray>() { { "param", param }, { "grad", paramGrad } };
+                var newParam = UpdateRule(inputDict);
+                newParams.Add(newParam);
+            }
+            Net.SetParams(newParams);
+        }
+
+        protected override NDArray UpdateRule(Dictionary<string, NDArray> args)
+        {
+            var param = args["param"] - (LR * args["grad"] + Alpha * args["param"]);
+            return param;
+        }
+
+        public RegularizedSGD(double lr = 0.01, double alpha = 0.1) : base(lr)
+        {
+            Alpha = alpha;
         }
     }
 
@@ -396,9 +480,11 @@ namespace NNN
 
         public void SetupLayers(NDArray input)
         {
+            input = input.Clone();
             foreach (var layer in Layers)
             {
                 layer.SetupForInput(input);
+                input = layer.Forward(input);
             }
         }
 
@@ -410,7 +496,14 @@ namespace NNN
                 var data = layer.CreateLayerData();
                 layers.Add(data);
             }
-            var networkData = new NNData(layers, Loss.GetType().Name, Seed);
+            double? eps = null;
+            if (Loss is SoftmaxCrossEntropy)
+            {
+                var softmax = Loss as SoftmaxCrossEntropy;
+                eps = softmax.Eps;
+            }
+            var lossData = new LossData(Loss.GetType().Name, eps);
+            var networkData = new NNData(layers, lossData, Seed);
             string jsonString = JsonSerializer.Serialize(networkData);
             return jsonString;
         }
@@ -435,8 +528,9 @@ namespace NNN
             if (jsonString == null) { throw new ArgumentNullException(); }
             NNData data = JsonSerializer.Deserialize<NNData>(jsonString);
             Seed = data.Seed;
-            Type lossType = Type.GetType(data.Loss);
+            Type lossType = Type.GetType(data.Loss.LossType);
             dynamic loss = Activator.CreateInstance(lossType);
+            loss.BuildFromLossData(data.Loss);
             Loss = loss;
             Layers = new List<Layer>();
             foreach (var layerData in data.Layers)
@@ -1080,6 +1174,10 @@ namespace NNN
         {
             return new Loss { Prediction = this.Prediction, Target = this.Target, InputGrad = this.InputGrad };
         }
+
+        public virtual void BuildFromLossData(LossData data) { }
+
+        public Loss() { }
     }
 
     public class MeanSquaredError : Loss
@@ -1115,6 +1213,56 @@ namespace NNN
         }
     }
 
+    public class SoftmaxCrossEntropy : Loss
+    {
+        public double Eps { get; set; }
+        public bool SingleClass { get; set; }
+        public NDArray SoftmaxPreds { get; set; }
+
+        protected override double CalcOutput()
+        {
+            if (Target.shape[1] == 0) { SingleClass = true; }
+
+            if (SingleClass)
+            {
+                (Prediction, Target) = (Helpers.Normalize(Prediction), Helpers.Normalize(Target));
+            }
+
+            SoftmaxPreds = Helpers.Softmax(Prediction, axis: 1);
+            SoftmaxPreds = np.clip(SoftmaxPreds, Eps, 1 - Eps);
+
+            var loss = -1.0 * Target * np.log(SoftmaxPreds) - (1.0 - Target) * np.log(1.0 - SoftmaxPreds);
+
+            return np.sum(loss) / Prediction.shape[0];
+        }
+
+        protected override NDArray CalcInputGrad()
+        {
+            if (SingleClass)
+            {
+                return Helpers.Unnormalize(SoftmaxPreds - Target);
+            }
+            else
+            {
+                return (SoftmaxPreds - Target) / Prediction.shape[0];
+            }
+        }
+
+        public override void BuildFromLossData(LossData data)
+        {
+            base.BuildFromLossData(data);
+            Eps = data.Eps.Value;
+        }
+
+        public SoftmaxCrossEntropy() { }
+
+        public SoftmaxCrossEntropy(double eps = 1e-9)
+        {
+            Eps = eps;
+            SingleClass = false;
+        }
+    }
+
     public static class Helpers
     {
         public static void AssertSameShape(NDArray arr1, NDArray arr2)
@@ -1134,6 +1282,17 @@ namespace NNN
             while (t1e.MoveNext() && t2e.MoveNext())
             {
                 yield return (t1e.Current, t2e.Current);
+            }
+        }
+
+        public static IEnumerable<(T1, T2, T3)> Zip<T1, T2, T3>(this IEnumerable<T1> t1, IEnumerable<T2> t2, IEnumerable<T3> t3)
+        {
+            using var t1e = t1.GetEnumerator();
+            using var t2e = t2.GetEnumerator();
+            using var t3e = t3.GetEnumerator();
+            while (t1e.MoveNext() && t2e.MoveNext() && t3e.MoveNext())
+            {
+                yield return (t1e.Current, t2e.Current, t3e.Current);
             }
         }
 
@@ -1209,20 +1368,105 @@ namespace NNN
             }
             return output;
         }
+
+        public static NDArray To2D(NDArray a, string type = "col")
+        {
+            if (a.ndim != 1) { throw new ArgumentException("Input tensor must be 1D"); }
+            return type == "col" ? a.reshape(-1, 1) : a.reshape(1, -1);
+        }
+
+        public static NDArray Normalize(NDArray a)
+        {
+            var other = 1 - a;
+            return np.concatenate([a, other], axis: 1);
+        }
+
+        public static NDArray Unnormalize(NDArray a)
+        {
+            return a[np.newaxis, 0];
+        }
+
+        public static IEnumerable<(NDArray xBatch, NDArray yBatch)> GenerateBatches(
+    NDArray x, NDArray y, int size = 32)
+        {
+            if (x.shape[0] != y.shape[0]) { throw new IncorrectShapeException(); }
+
+            int n = x.shape[0];
+
+            for (int i = 0; i < n; i += size)
+            {
+                int end = Math.Min(i + size, n);
+
+                NDArray xBatch = x[$"{i}:{end}"];
+                NDArray yBatch = y[$"{i}:{end}"];
+
+                yield return (xBatch, yBatch);
+            }
+        }
+
+        public static (NDArray xBatch, NDArray yBatch) GenerateSetupBatch(
+            NDArray x, NDArray y, int size = 32)
+        {
+            if (x.shape[0] != y.shape[0]) { throw new IncorrectShapeException(); }
+
+            int n = x.shape[0];
+            int end = Math.Min(size, n);
+            NDArray xBatch = x[$"{0}:{end}"];
+            NDArray yBatch = y[$"{0}:{end}"];
+
+            return (xBatch, yBatch);
+        }
+
+        public static NDArray Softmax(NDArray x, int axis = 0)
+        {
+            return np.exp(x - LogSumExp(x, axis: axis, keepDims: true));
+        }
+
+        public static NDArray LogSumExp(NDArray x, int axis = 0, bool keepDims = false)
+        {
+            double max = x.max(axis: axis, keepdims: true);
+            var shift = x - max;
+            var expon = np.exp(shift);
+            var sum = expon.sum(axis: axis, keepdims: true);
+            var log = np.log(sum);
+            var result = max + log;
+            if (!keepDims)
+            {
+                result = np.squeeze(result, axis: axis);
+            }
+            return result;
+        }
+
+        public static NDArray StandardScale(NDArray data)
+        {
+            var mean = np.mean(data, axis: 0);
+            var std = np.std(data, axis: 0);
+            var stdData = std.Clone();
+            for (int i = 0; i < std.size; i++)
+            {
+                if (stdData[i] == 0)
+                {
+                    stdData[i] = 1.0;
+                }
+            }
+            std = stdData;
+            var result = (data - mean) / std;
+            return (data - mean) / std;
+        }
     }
 
     public class NNData
     {
         public List<LayerData> Layers { get; set; }
-        public string Loss { get; set; }
+        public LossData Loss { get; set; }
         public int Seed { get; set; }
 
         public NNData() { }
 
-        public NNData(List<LayerData> layers, string loss, int seed)
+        public NNData(List<LayerData> layers, LossData loss, int seed)
         {
             Layers = layers.ToList();
-            Loss = $"NNN.{loss}";
+            Loss = loss;
             Seed = seed;
         }
     }
@@ -1252,6 +1496,20 @@ namespace NNN
             Neurons = neurons;
             Seed = seed;
             Activation = $"NNN.{activation}";
+        }
+    }
+
+    public class LossData
+    {
+        public string LossType { get; set; }
+        public double? Eps { get; set; }
+
+        public LossData() { }
+
+        public LossData(string lossType, double? eps)
+        {
+            LossType = $"NNN.{lossType}";
+            Eps = eps;
         }
     }
 
