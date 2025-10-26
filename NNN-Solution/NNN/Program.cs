@@ -3,77 +3,88 @@ using NumSharp;
 using System.Globalization;
 using CsvHelper;
 using System.Text.Json;
+using Python.Runtime;
+using System.Threading.Tasks;
+using System.Diagnostics;
 
-NeuralNetwork net = new NeuralNetwork(layers: [new Dense(neurons: 13, activation: new Tanh()),
-    new Dense(neurons: 13, activation: new Tanh()),
-    new Dense(neurons: 1, activation: new Linear())], loss: new MeanSquaredError(), seed: 20190501);
+var mnistData = await MNISTLoader.LoadMNIST();
 
-var boston = await BostonLoader.LoadAsync();
-var data = Helpers.ToNDArray(boston.Data);
-var target = Helpers.ToNDArray(boston.Target);
-var features = boston.FeatureNames;
+var (xTrain, yTrain, xTest, yTest) = (np.array(mnistData.XTrain, np.float64), np.array(mnistData.YTrain, np.float64),
+    np.array(mnistData.XTest, np.float64), np.array(mnistData.YTest, np.float64));
 
-data = Helpers.StandardScale(data);
+int randomSeed = 190119;
 
-var (xTrain, xTest, yTrain, yTest) = TrainTestSplit(data, target, testSize: 0.3, seed: 80718);
-yTrain = Helpers.To2D(yTrain);
-yTest = Helpers.To2D(yTest);
+xTrain = xTrain.reshape(-1, 28 * 28);
+xTest = xTest.reshape(-1, 28 * 28);
 
-var trainer = new Trainer(net, new SGDMomentum(lr: 0.03, finalLR: 0.0, decayType: "linear", momentum: 0.9));
+(xTrain, xTest) = (xTrain - np.mean(xTrain), xTest - np.mean(xTest));
+(xTrain, xTest) = (xTrain / np.std(xTrain), xTest / np.std(xTest));
 
-Console.WriteLine("Using the Boston housing dataset to train neural networks...\n");
-
-Console.WriteLine("Training neural network...");
-trainer.Fit(xTrain, yTrain, xTest, yTest, epochs: 400, evalEvery: 40, batchSize: 32, seed: 20190501, restart: true, earlyStopping: true);
-Console.WriteLine($"\nPredicted Values:\n\n{net.Forward(xTest)}\n\nTrue Values:\n\n{yTest}\n");
-EvalRegressionModel(net, xTest, yTest);
-Console.WriteLine();
-
-Console.WriteLine("Press any key to close...");
-Console.ReadKey();
-
-static (NDArray xTrain, NDArray xTest, NDArray yTrain, NDArray yTest)
-    TrainTestSplit(NDArray x, NDArray y, double testSize = 0.3, int seed = 80718)
+Stopwatch stopwatch = new Stopwatch();
+stopwatch.Start();
+var numTrainLabels = yTrain.shape[0];
+var trainLabels = np.zeros((numTrainLabels, 10));
+int trainTaskCount = 12;
+List<Task> labelsTasks = new List<Task>();
+for (int i = 0; i < trainTaskCount; i++)
 {
-    var rnd = new Random(seed);
-    int n = x.shape[0];
-    var indexes = np.arange(n);
-    indexes = np.random.permutation(indexes);
-    int testCount = (int)(n * testSize);
-    var testIdx = indexes[$":{testCount}"];
-    var trainIdx = indexes[$"{testCount}:"];
-    var xTrain = x[trainIdx];
-    var xTest = x[testIdx];
-    var yTrain = y[trainIdx];
-    var yTest = y[testIdx];
-    return (xTrain, xTest, yTrain, yTest);
+    int index = i;
+    Task labelsTask = Task.Run(() =>
+    {
+        Console.WriteLine("Start train task...");
+        int start = (int)Math.Round((double)(index * (numTrainLabels / trainTaskCount)));
+        int end = (int)Math.Round((double)((index + 1) * (numTrainLabels / trainTaskCount)));
+        for (int j = start; j < end; j++)
+        {
+            trainLabels[j][yTrain[j]] = 1;
+        }
+        Console.WriteLine($"Finish train task, processed labels from {start} to {end - 1}");
+    });
+    labelsTasks.Add(labelsTask);
 }
 
-static void EvalRegressionModel(NeuralNetwork model, NDArray xTest, NDArray yTest)
+var numTestLabels = yTest.shape[0];
+var testLabels = np.zeros((numTestLabels, 10));
+int testTaskCount = (int)Math.Round(trainTaskCount / 6.0);
+if (testTaskCount < 1) { testTaskCount = 1; }
+for (int i = 0; i < testTaskCount; i++)
 {
-    // Compute MAE and RMSE for neural network
-
-    var preds = model.Forward(xTest);
-    preds = preds.reshape(-1, 1);
-    var mae = MAE(yTest, preds);
-    var rmse = RMSE(yTest, preds);
-    Console.WriteLine($"Mean absolute error: {mae}");
-    Console.WriteLine();
-    Console.WriteLine($"Root mean squared error: {rmse}");
+    int index = i;
+    Task labelsTask = Task.Run(() =>
+    {
+        Console.WriteLine("Start test task...");
+        int start = (int)Math.Round((double)(index * (numTestLabels / testTaskCount)));
+        int end = (int)Math.Round((double)((index + 1) * (numTestLabels / testTaskCount)));
+        for (int j = start; j < end; j++)
+        {
+            testLabels[j][yTest[j]] = 1;
+        }
+        Console.WriteLine($"Finish test task, processed labels from {start} to {end - 1}");
+    });
+    labelsTasks.Add(labelsTask);
 }
 
-static double MAE(NDArray yTrue, NDArray yPred)
+await Task.WhenAll(labelsTasks);
+labelsTasks.Clear();
+stopwatch.Stop();
+Console.WriteLine($"Tasks took a total of {stopwatch.ElapsedMilliseconds / 1000} seconds to complete...");
+
+NeuralNetwork model = new NeuralNetwork(layers: [new Dense(neurons: 89, activation: new Sigmoid()),
+    new Dense(neurons: 10, activation: new Linear())], loss: new MeanSquaredError(), seed: randomSeed);
+
+Trainer trainer = new Trainer(model, new SGD(lr: 0.01));
+
+await Task.Run(async() =>
 {
-    // Compute mean absolute error for neural network
+    await trainer.Fit(xTrain, trainLabels, xTest, testLabels, epochs: 50, evalEvery: 5, batchSize: 60, seed: randomSeed);
+});
 
-    return np.abs(yTrue - yPred).mean();
-}
+CalcAccuracyModel(model, xTest, testLabels);
 
-static double RMSE(NDArray yTrue, NDArray yPred)
+static void CalcAccuracyModel(NeuralNetwork model, NDArray testSet, NDArray yTest)
 {
-    // Compute root mean squared error for neural network
-
-    return np.sqrt(np.mean(np.power(yTrue - yPred, 2)));
+    double accuracy = np.sum(np.array_equal(np.argmax(model.Forward(testSet), axis: 1), yTest)) * 100.0 / testSet.shape[0];
+    Console.WriteLine($"The model validation accuracy is: {accuracy.ToString("F2")}%");
 }
 
 namespace NNN
@@ -86,12 +97,11 @@ namespace NNN
         protected Optimizer Optim { get; set; }
         protected double BestLoss { get; set; }
 
-        public void Fit(NDArray xTrain, NDArray yTrain, NDArray xTest, NDArray yTest, int epochs = 100, int evalEvery = 10,
+        public async Task Fit(NDArray xTrain, NDArray yTrain, NDArray xTest, NDArray yTest, int epochs = 100, int evalEvery = 10,
             int batchSize = 32, int seed = 1, bool restart = true, bool earlyStopping = true)
         {
             // Fits neural network on training data for certain number of epochs
             // Every "evalEvery" epochs, evaluates neural network on testing data
-
             np.random.seed(seed);
             Optim.MaxEpochs = epochs;
             Optim.SetupDecay();
@@ -120,10 +130,13 @@ namespace NNN
 
                 var batchGenerator = Helpers.GenerateBatches(xTrain, yTrain, batchSize);
 
+                int i = 1;
                 foreach (var (xBatch, yBatch) in batchGenerator)
                 {
                     Net.TrainBatch(xBatch, yBatch);
                     Optim.Step();
+                    Console.WriteLine($"Batch {i}/{batchGenerator.Count()} finished...");
+                    i++;
                 }
 
                 if ((e + 1) % evalEvery == 0)
@@ -713,7 +726,7 @@ namespace NNN
             Operations = new List<Operation>();
             foreach (var param in data.Params)
             {
-                Params.Add(Helpers.ToNDArray(param));
+                Params.Add(np.array(param, np.float64));
             }
             foreach (var opName in data.Operations)
             {
@@ -1331,18 +1344,6 @@ namespace NNN
             return np.array(flat, dtype: np.float64).reshape(rows, cols);
         }
 
-        public static NDArray ToNDArray(double[][] input)
-        {
-            return np.array(input, np.float64);
-        }
-
-        public static NDArray ToNDArray(double[] input)
-        {
-            int cols = input.Length;
-            var result = np.array(input, np.float64);
-            return result;
-        }
-
         public static List<double[][]> NDArrayList2JagArrayList(List<NDArray> input)
         {
             var output = new List<double[][]>();
@@ -1364,6 +1365,27 @@ namespace NNN
                 for (int j = 0; j < cols; j++)
                 {
                     output[i][j] = input[i, j];
+                }
+            }
+            return output;
+        }
+
+        public static double[][][] NDArray2JagArray3D(NDArray input)
+        {
+            int dim1 = input.shape[0];
+            int dim2 = input.shape[1];
+            int dim3 = input.shape[2];
+            double[][][] output = new double[dim1][][];
+            for (int i = 0; i < dim1; i++)
+            {
+                output[i] = new double[dim2][];
+                for (int j = 0; j < dim2; j++)
+                {
+                    output[i][j] = new double[dim3];
+                    for (int k = 0; k < dim3; k++)
+                    {
+                        output[i][j][k] = input[i, j, k];
+                    }
                 }
             }
             return output;
@@ -1452,6 +1474,20 @@ namespace NNN
             std = stdData;
             var result = (data - mean) / std;
             return (data - mean) / std;
+        }
+
+        public static NDArray PyObjectToNDArray(PyObject pyObj)
+        {
+            using (Py.GIL())
+            {
+                dynamic np = Py.Import("numpy");
+                dynamic npArr = np.array(pyObj, dtype: np.float64);
+                int[] dims = ((PyObject)npArr.shape).As<int[]>();
+                double[] flatData = npArr.ravel().As<double[]>();
+                var nd = new NDArray(flatData, dims);
+
+                return nd;
+            }
         }
     }
 
@@ -1581,5 +1617,67 @@ namespace NNN
         public double B { get; set; }
         public double LSTAT { get; set; }
         public double MEDV { get; set; }
+    }
+
+    public class MNISTLoader
+    {
+        public static async Task<MNISTData> LoadMNIST()
+        {
+            string jsonFile = "MNIST.json";
+            MNISTData mnistData;
+            if (!File.Exists(jsonFile))
+            {
+                using (Py.GIL())
+                {
+                    string pythonDLL = @"C:\Users\paren\AppData\Local\Programs\Python\Python38\python38.dll";
+                    Runtime.PythonDLL = pythonDLL;
+                    PythonEngine.PythonPath += @";C:\Users\paren\AppData\Local\Programs\Python\Python38\Lib\site-packages";
+                    PythonEngine.Initialize();
+
+                    Console.WriteLine("Downloading MNIST dataset...");
+                    var (xTrain, yTrain, xTest, yTest) = (np.zeros(), np.zeros(), np.zeros(), np.zeros());
+                    dynamic mnist = Py.Import("keras.datasets.mnist");
+                    dynamic data = mnist.load_data();
+
+                    dynamic train = data[0];
+                    dynamic test = data[1];
+
+                    Console.WriteLine("Download finished, converting MNIST data...");
+                    // Convert Python NumPy arrays to NumSharp NDArrays
+                    xTrain = Helpers.PyObjectToNDArray(train[0]);
+                    yTrain = Helpers.PyObjectToNDArray(train[1]);
+                    xTest = Helpers.PyObjectToNDArray(test[0]);
+                    yTest = Helpers.PyObjectToNDArray(test[1]);
+                    Console.WriteLine("Conversion finished, saving JSON file...");
+                    var (jagXTrain, jagYTrain, jagXTest, jagYTest) = (Helpers.NDArray2JagArray3D(xTrain), yTrain.ToArray<double>(),
+                        Helpers.NDArray2JagArray3D(xTest), yTest.ToArray<double>());
+                    MNISTData saveData = new MNISTData(jagXTrain, jagYTrain, jagXTest, jagYTest);
+                    string jsonString = JsonSerializer.Serialize(saveData);
+                    File.WriteAllText(jsonFile, jsonString);
+                    Console.WriteLine("JSON file saved...");
+                }
+            }
+            Console.WriteLine("Reading JSON file...");
+            string json = File.ReadAllText(jsonFile);
+            mnistData = JsonSerializer.Deserialize<MNISTData>(json);
+            Console.WriteLine("Reading finished...");
+            return mnistData;
+        }
+    }
+
+    public class MNISTData
+    {
+        public double[][][] XTrain { get; set; }
+        public double[] YTrain { get; set; }
+        public double[][][] XTest { get; set; }
+        public double[] YTest { get; set; }
+        public MNISTData() { }
+        public MNISTData(double[][][] xTrain, double[] yTrain, double[][][] xTest, double[] yTest)
+        {
+            XTrain = xTrain.ToArray();
+            YTrain = yTrain.ToArray();
+            XTest = xTest.ToArray();
+            YTest = yTest.ToArray();
+        }
     }
 }
