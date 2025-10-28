@@ -1,11 +1,14 @@
-﻿using NNN;
+﻿using CsvHelper;
+using ILGPU;
+using ILGPU.Runtime;
+using NNN;
 using NumSharp;
-using System.Globalization;
-using CsvHelper;
-using System.Text.Json;
 using Python.Runtime;
-using System.Threading.Tasks;
 using System.Diagnostics;
+using System.Globalization;
+using System.Text.Json;
+
+bool useGPU = false;
 
 var mnistData = await MNISTLoader.LoadMNIST();
 
@@ -26,6 +29,7 @@ var numTrainLabels = yTrain.shape[0];
 var trainLabels = np.zeros((numTrainLabels, 10));
 int trainTaskCount = 12;
 List<Task> labelsTasks = new List<Task>();
+Console.WriteLine();
 for (int i = 0; i < trainTaskCount; i++)
 {
     int index = i;
@@ -67,24 +71,134 @@ for (int i = 0; i < testTaskCount; i++)
 await Task.WhenAll(labelsTasks);
 labelsTasks.Clear();
 stopwatch.Stop();
-Console.WriteLine($"Tasks took a total of {stopwatch.ElapsedMilliseconds / 1000} seconds to complete...");
+Console.WriteLine($"\nTasks took a total of {stopwatch.ElapsedMilliseconds / 1000.0} seconds to complete...\n");
 
-NeuralNetwork model = new NeuralNetwork(layers: [new Dense(neurons: 89, activation: new Sigmoid()),
-    new Dense(neurons: 10, activation: new Linear())], loss: new MeanSquaredError(), seed: randomSeed);
-
-Trainer trainer = new Trainer(model, new SGD(lr: 0.01));
-
-await Task.Run(async() =>
+string input = GetYNInput("Load neural network data from JSON file? y/n");
+bool loadFromJson = false;
+string json = "";
+if (input == "y")
 {
-    await trainer.Fit(xTrain, trainLabels, xTest, testLabels, epochs: 50, evalEvery: 5, batchSize: 60, seed: randomSeed);
-});
+    bool fileFound = false;
+    while (!fileFound)
+    {
+        Console.WriteLine("\nEnter file name (without extension):");
+        input = Console.ReadLine() + ".json";
+        if (File.Exists(input))
+        {
+            json = File.ReadAllText(input);
+            loadFromJson = true;
+            fileFound = true;
+        }
+        else
+        {
+            Console.WriteLine("\nFile not found...");
+            input = GetYNInput("Load from different file? y/n");
+            if (input == "n")
+            {
+                break;
+            }
+        }
+    }
+}
 
-CalcAccuracyModel(model, xTest, testLabels);
-
-static void CalcAccuracyModel(NeuralNetwork model, NDArray testSet, NDArray yTest)
+NeuralNetwork model;
+Optimizer optim = new SGD(lr: 0.01);
+Trainer trainer;
+if (loadFromJson)
 {
-    double accuracy = np.sum(np.array_equal(np.argmax(model.Forward(testSet), axis: 1), yTest)) * 100.0 / testSet.shape[0];
-    Console.WriteLine($"The model validation accuracy is: {accuracy.ToString("F2")}%");
+    model = new NeuralNetwork(json);
+    trainer = new Trainer(model, optim);
+}
+else
+{
+    Console.WriteLine("\nTraining new neural network...\n");
+    model = new NeuralNetwork(layers: [new Dense(neurons: 89, activation: new Tanh()),
+    new Dense(neurons: 10, activation: new Sigmoid())], loss: new MeanSquaredError(), seed: randomSeed);
+
+    trainer = new Trainer(model, optim);
+
+    await Task.Run(async () =>
+    {
+        await trainer.Fit(xTrain, trainLabels, xTest, testLabels, epochs: 2,
+            evalEvery: 1, batchSize: 60, seed: randomSeed, useGPU: useGPU);
+    });
+}
+
+CalcAccuracyModel(model, xTest, testLabels, useGPU);
+
+input = GetYNInput("\nTrain network further? y/n");
+while (input == "y")
+{
+    await Task.Run(async () =>
+    {
+        await trainer.Fit(xTrain, yTrain, xTest, yTest, epochs: 2,
+            evalEvery: 1, batchSize: 60, seed: randomSeed, restart: false, useGPU: useGPU);
+    });
+    CalcAccuracyModel(model, xTest, testLabels, useGPU);
+    input = GetYNInput("\nTrain network further? y/n");
+}
+
+input = GetYNInput("\nSave network to JSON file? y/n");
+if (input == "y")
+{
+    json = model.CreateJsonString();
+    Console.WriteLine("Enter file name (without extension):");
+    string fileName = Console.ReadLine() + ".json";
+    bool exists = File.Exists(fileName);
+    while (exists)
+    {
+        input = GetYNInput($"File already exists. Overwrite {fileName}? y/n");
+        if (input == "y")
+        {
+            File.WriteAllText(fileName, json);
+            Console.WriteLine($"Network saved to {fileName}");
+            break;
+        }
+        else
+        {
+            input = GetYNInput("Abort saving? y/n");
+            if (input == "y") { break; }
+
+            Console.WriteLine("Enter file name (without extension):");
+            fileName = Console.ReadLine() + ".json";
+            exists = File.Exists(fileName);
+        }
+    }
+    if (!exists)
+    {
+        File.WriteAllText(fileName, json);
+        Console.WriteLine($"Network saved to {fileName}");
+    }
+}
+
+Console.WriteLine($"\nPress any key to close...");
+Console.ReadKey();
+
+static string GetYNInput(string prompt)
+{
+    // Helper function for getting valid y/n inputs from the user
+
+    Console.WriteLine($"\n{prompt}");
+    string input = Console.ReadLine();
+    while (input != "y" && input != "n")
+    {
+        Console.WriteLine("Invalid input.");
+        Console.WriteLine($"\n{prompt}");
+        input = Console.ReadLine();
+    }
+    return input;
+}
+
+static void CalcAccuracyModel(NeuralNetwork model, NDArray testSet, NDArray yTest, bool useGPU = false)
+{
+    Console.WriteLine("\nDetermining model accuracy...");
+    NDArray predictions = model.Forward(testSet, useGPU);
+    NDArray predictedLabels = np.argmax(predictions, axis: 1);
+    NDArray yTestLabels = np.argmax(yTest, axis: 1);
+    int[] mask = (predictedLabels == yTestLabels).ToArray<bool>().Select(x => x ? 1 : 0).ToArray();
+    double correct = mask.Sum();
+    double accuracy = correct * 100.0 / testSet.Shape[0];
+    Console.WriteLine($"\nThe model validation accuracy is: {accuracy:F2}%");
 }
 
 namespace NNN
@@ -98,7 +212,7 @@ namespace NNN
         protected double BestLoss { get; set; }
 
         public async Task Fit(NDArray xTrain, NDArray yTrain, NDArray xTest, NDArray yTest, int epochs = 100, int evalEvery = 10,
-            int batchSize = 32, int seed = 1, bool restart = true, bool earlyStopping = true)
+            int batchSize = 32, int seed = 1, bool restart = true, bool earlyStopping = true, bool useGPU = false)
         {
             // Fits neural network on training data for certain number of epochs
             // Every "evalEvery" epochs, evaluates neural network on testing data
@@ -112,7 +226,7 @@ namespace NNN
                 {
                     layer.First = true;
                 }
-                BestLoss = 1e9;
+                BestLoss = double.MaxValue;
             }
 
             var setupBatch = Helpers.GenerateSetupBatch(xTrain, yTrain).xBatch;
@@ -130,18 +244,23 @@ namespace NNN
 
                 var batchGenerator = Helpers.GenerateBatches(xTrain, yTrain, batchSize);
 
+                Stopwatch stopwatch = new Stopwatch();
                 int i = 1;
                 foreach (var (xBatch, yBatch) in batchGenerator)
                 {
-                    Net.TrainBatch(xBatch, yBatch);
+                    stopwatch.Start();
+                    Net.TrainBatch(xBatch, yBatch, useGPU);
                     Optim.Step();
+                    stopwatch.Stop();
                     Console.WriteLine($"Batch {i}/{batchGenerator.Count()} finished...");
+                    Console.WriteLine($"Batch took {stopwatch.ElapsedMilliseconds / 1000.0} seconds...");
+                    stopwatch.Reset();
                     i++;
                 }
 
                 if ((e + 1) % evalEvery == 0)
                 {
-                    var testPreds = Net.Forward(xTest);
+                    var testPreds = Net.Forward(xTest, useGPU);
                     var loss = Net.Loss.Forward(testPreds, yTest);
 
                     if (earlyStopping)
@@ -398,20 +517,20 @@ namespace NNN
         public Loss Loss { get; set; }
         public int Seed { get; set; }
 
-        public NDArray Forward(NDArray xBatch)
+        public NDArray Forward(NDArray xBatch, bool useGPU = false)
         {
             // Pass data forward through layers
 
             var xOut = xBatch.Clone();
             foreach (var layer in Layers)
             {
-                xOut = layer.Forward(xOut);
+                xOut = layer.Forward(xOut, useGPU);
             }
 
             return xOut;
         }
 
-        public void Backward(NDArray lossGrad)
+        public void Backward(NDArray lossGrad, bool useGPU = false)
         {
             // Pass data backward through layers
 
@@ -420,11 +539,11 @@ namespace NNN
             revLayers.Reverse();
             foreach (var layer in revLayers)
             {
-                grad = layer.Backward(grad);
+                grad = layer.Backward(grad, useGPU);
             }
         }
 
-        public double TrainBatch(NDArray xBatch, NDArray yBatch)
+        public double TrainBatch(NDArray xBatch, NDArray yBatch, bool useGPU = false)
         {
             // Pass data forward through layers
             // Compute loss
@@ -433,10 +552,10 @@ namespace NNN
             xBatch = xBatch.Clone();
             yBatch = yBatch.Clone();
 
-            var predictions = Forward(xBatch);
+            var predictions = Forward(xBatch, useGPU);
             var loss = Loss.Forward(predictions, yBatch);
             var lossGrad = Loss.Backward();
-            Backward(lossGrad);
+            Backward(lossGrad, useGPU);
 
             return loss;
         }
@@ -570,7 +689,7 @@ namespace NNN
         public NDArray? InputGrad { get; set; }
         public int Seed { get; set; } = 1;
 
-        public NDArray Forward(NDArray input)
+        public NDArray Forward(NDArray input, bool useGPU = false)
         {
             // Pass input forward through operations
 
@@ -584,14 +703,14 @@ namespace NNN
 
             foreach (var operation in Operations)
             {
-                input = operation.Forward(input);
+                input = operation.Forward(input, useGPU);
             }
             Output = input;
 
             return Output;
         }
 
-        public NDArray Backward(NDArray outputGrad)
+        public NDArray Backward(NDArray outputGrad, bool useGPU = false)
         {
             // Send output gradient backward through operations
 
@@ -602,7 +721,7 @@ namespace NNN
             revOps.Reverse();
             foreach (var operation in revOps)
             {
-                outputGrad = operation.Backward(outputGrad);
+                outputGrad = operation.Backward(outputGrad, useGPU);
             }
 
             InputGrad = outputGrad.Clone();
@@ -826,22 +945,22 @@ namespace NNN
         public NDArray? Output { get; set; }
         public NDArray? InputGrad { get; set; }
 
-        public NDArray Forward(NDArray input)
+        public NDArray Forward(NDArray input, bool useGPU = false)
         {
             // Send input forward through operation
 
             Input = input;
-            Output = CalcOutput();
+            Output = CalcOutput(useGPU);
             return Output;
         }
 
-        public virtual NDArray Backward(NDArray outputGrad)
+        public virtual NDArray Backward(NDArray outputGrad, bool useGPU = false)
         {
             // Calculate input gradient from output gradient
 
             Helpers.AssertSameShape(Output, outputGrad);
 
-            InputGrad = CalcInputGrad(outputGrad);
+            InputGrad = CalcInputGrad(outputGrad, useGPU);
 
             Helpers.AssertSameShape(Input, InputGrad);
 
@@ -855,14 +974,14 @@ namespace NNN
             throw new NotImplementedException();
         }
 
-        protected virtual NDArray CalcOutput()
+        protected virtual NDArray CalcOutput(bool useGPU = false)
         {
             // CalcOutput() must be defined for each operation
 
             throw new NotImplementedException();
         }
 
-        protected virtual NDArray CalcInputGrad(NDArray outputGrad)
+        protected virtual NDArray CalcInputGrad(NDArray outputGrad, bool useGPU = false)
         {
             // CalcInputGrad() must be defined for each operation
 
@@ -880,19 +999,28 @@ namespace NNN
     {
         // Sigmoid activation function
 
-        protected override NDArray CalcOutput()
+        protected override NDArray CalcOutput(bool useGPU = false)
         {
             // Compute output
 
             return 1.0 / (1.0 + np.exp(-1.0 * Input));
         }
 
-        protected override NDArray CalcInputGrad(NDArray outputGrad)
+        protected override NDArray CalcInputGrad(NDArray outputGrad, bool useGPU = false)
         {
             // Compute input gradient
 
-            var sigmoidBackward = Output * (1.0 - Output);
-            InputGrad = sigmoidBackward * outputGrad;
+            NDArray sigmoidBackward;
+            if (useGPU)
+            {
+                sigmoidBackward = GPUNDArrayOps.PointwiseMultiply(Output, 1.0 - Output);
+                InputGrad = GPUNDArrayOps.PointwiseMultiply(sigmoidBackward, outputGrad);
+            }
+            else
+            {
+                sigmoidBackward = Output * (1.0 - Output);
+                InputGrad = sigmoidBackward * outputGrad;
+            }
             return InputGrad;
         }
 
@@ -912,14 +1040,14 @@ namespace NNN
     {
         // "Identity" activation function
 
-        protected override NDArray CalcOutput()
+        protected override NDArray CalcOutput(bool useGPU = false)
         {
             // Pass through
 
             return Input;
         }
 
-        protected override NDArray CalcInputGrad(NDArray outputGrad)
+        protected override NDArray CalcInputGrad(NDArray outputGrad, bool useGPU = false)
         {
             // Pass through
 
@@ -942,14 +1070,21 @@ namespace NNN
     {
         // Hyperbolic tangent activation function
 
-        protected override NDArray CalcOutput()
+        protected override NDArray CalcOutput(bool useGPU = false)
         {
             return np.tanh(Input);
         }
 
-        protected override NDArray CalcInputGrad(NDArray outputGrad)
+        protected override NDArray CalcInputGrad(NDArray outputGrad, bool useGPU = false)
         {
-            return outputGrad * (1 - Output * Output);
+            if (useGPU)
+            {
+                return GPUNDArrayOps.PointwiseMultiply(outputGrad, 1 - GPUNDArrayOps.PointwiseMultiply(Output, Output));
+            }
+            else
+            {
+                return outputGrad * (1 - Output * Output);
+            }
         }
 
         public override Tanh Copy()
@@ -968,12 +1103,12 @@ namespace NNN
     {
         // Rectified linear unit activation function
 
-        protected override NDArray CalcOutput()
+        protected override NDArray CalcOutput(bool useGPU = false)
         {
             return np.clip(Input, 0, null);
         }
 
-        protected override NDArray CalcInputGrad(NDArray outputGrad)
+        protected override NDArray CalcInputGrad(NDArray outputGrad, bool useGPU = false)
         {
             var mask = Output >= 0;
             return outputGrad * mask;
@@ -998,14 +1133,14 @@ namespace NNN
         public NDArray Param { get; protected set; }
         public NDArray? ParamGrad { get; protected set; }
 
-        public override NDArray Backward(NDArray outputGrad)
+        public override NDArray Backward(NDArray outputGrad, bool useGPU = false)
         {
             // Calculate input gradient and parameter gradient from output gradient
 
             Helpers.AssertSameShape(Output, outputGrad);
 
-            InputGrad = CalcInputGrad(outputGrad);
-            ParamGrad = CalcParamGrad(outputGrad);
+            InputGrad = CalcInputGrad(outputGrad, useGPU);
+            ParamGrad = CalcParamGrad(outputGrad, useGPU);
 
             Helpers.AssertSameShape(Input, InputGrad);
             Helpers.AssertSameShape(Param, ParamGrad);
@@ -1018,7 +1153,7 @@ namespace NNN
             Param = newParams.Clone();
         }
 
-        protected virtual NDArray CalcParamGrad(NDArray outputGrad)
+        protected virtual NDArray CalcParamGrad(NDArray outputGrad, bool useGPU = false)
         {
             // CalcParamGrad() must be defined for each subclass
 
@@ -1050,25 +1185,45 @@ namespace NNN
     {
         // Weight multiplication operation for a neural network
 
-        protected override NDArray CalcOutput()
+        protected override NDArray CalcOutput(bool useGPU = false)
         {
             // Compute output
-
-            return np.dot(Input, Param);
+            if (useGPU)
+            {
+                return GPUNDArrayOps.MatrixMultiply(Input, Param);
+            }
+            else
+            {
+                return np.dot(Input, Param);
+            }
         }
 
-        protected override NDArray CalcInputGrad(NDArray outputGrad)
+        protected override NDArray CalcInputGrad(NDArray outputGrad, bool useGPU = false)
         {
             // Compute input gradient
 
-            return np.dot(outputGrad, np.transpose(Param, [1, 0]));
+            if (useGPU)
+            {
+                return GPUNDArrayOps.MatrixMultiply(outputGrad, np.transpose(Param, [1, 0]));
+            }
+            else
+            {
+                return np.dot(outputGrad, np.transpose(Param, [1, 0]));
+            }
         }
 
-        protected override NDArray CalcParamGrad(NDArray outputGrad)
+        protected override NDArray CalcParamGrad(NDArray outputGrad, bool useGPU = false)
         {
             // Compute parameter gradient
 
-            return np.dot(np.transpose(Input, [1, 0]), outputGrad);
+            if (useGPU)
+            {
+                return GPUNDArrayOps.MatrixMultiply(np.transpose(Input, [1, 0]), outputGrad);
+            }
+            else
+            {
+                return np.dot(np.transpose(Input, [1, 0]), outputGrad);
+            }
         }
 
         public override WeightMultiply Copy()
@@ -1095,25 +1250,39 @@ namespace NNN
     {
         // Perform bias addition
 
-        protected override NDArray CalcOutput()
+        protected override NDArray CalcOutput(bool useGPU = false)
         {
             // Compute output
 
             return Input + Param;
         }
 
-        protected override NDArray CalcInputGrad(NDArray outputGrad)
+        protected override NDArray CalcInputGrad(NDArray outputGrad, bool useGPU = false)
         {
             // Compute input gradient
 
-            return np.ones_like(Input) * outputGrad;
+            if (useGPU)
+            {
+                return GPUNDArrayOps.PointwiseMultiply(np.ones_like(Input), outputGrad);
+            }
+            else
+            {
+                return np.ones_like(Input) * outputGrad;
+            }
         }
 
-        protected override NDArray CalcParamGrad(NDArray outputGrad)
+        protected override NDArray CalcParamGrad(NDArray outputGrad, bool useGPU = false)
         {
             // Compute parameter gradient
 
-            ParamGrad = np.ones_like(Param) * outputGrad;
+            if (useGPU)
+            {
+                ParamGrad = GPUNDArrayOps.PointwiseMultiply(np.ones_like(Param), outputGrad);
+            }
+            else
+            {
+                ParamGrad = np.ones_like(Param) * outputGrad;
+            }
             return Helpers.SumAlongX0(ParamGrad).reshape(1, ParamGrad.shape[1]);
         }
 
@@ -1201,9 +1370,8 @@ namespace NNN
             var diff = Prediction - Target;
             var pow = np.power(diff, 2);
             var sum = pow.Data<double>().Sum();
-            var denom = Prediction.shape[0];
-            var doubleDenom = (double)denom;
-            var loss = sum / doubleDenom;
+            var denom = (double)Prediction.shape[0];
+            var loss = sum / denom;
             return loss;
         }
 
@@ -1491,6 +1659,539 @@ namespace NNN
         }
     }
 
+    public static class GPUNDArrayOps
+    {
+        public static NDArray PointwiseAdd(NDArray aArray, NDArray bArray)
+        {
+            using var context = Context.CreateDefault();
+            using var accelerator = context.GetPreferredDevice(preferCPU: false).CreateAccelerator(context);
+
+            var shapeA = aArray.shape.ToArray();
+            var shapeB = bArray.shape.ToArray();
+            var resultShape = GetBroadcastedShape(shapeA, shapeB);
+            int nDims = resultShape.Length;
+            int resultLength = resultShape.Aggregate(1, (acc, val) => acc * val);
+
+            using var aBuffer = accelerator.Allocate1D(aArray.Data<double>().ToArray());
+            using var bBuffer = accelerator.Allocate1D(bArray.Data<double>().ToArray());
+            using var cBuffer = accelerator.Allocate1D<double>(resultLength);
+
+            using var shapeABuffer = accelerator.Allocate1D(shapeA);
+            using var shapeBBuffer = accelerator.Allocate1D(shapeB);
+            using var resultShapeBuffer = accelerator.Allocate1D(resultShape);
+
+            var kernel = accelerator.LoadAutoGroupedStreamKernel<
+                Index1D, ArrayView<double>, ArrayView<double>, ArrayView<double>,
+                ArrayView<int>, ArrayView<int>, ArrayView<int>, int>(GPUKernels.PointwiseAddKernel);
+
+            kernel(resultLength, aBuffer.View, bBuffer.View, cBuffer.View, shapeABuffer.View, shapeBBuffer.View,
+                resultShapeBuffer.View, nDims);
+
+            accelerator.Synchronize();
+            var cData = cBuffer.GetAsArray1D();
+
+            var cArray = np.array(cData).reshape(resultShape);
+            return cArray;
+        }
+
+        public static NDArray PointwiseSubtract(NDArray aArray, NDArray bArray)
+        {
+            using var context = Context.CreateDefault();
+            using var accelerator = context.GetPreferredDevice(preferCPU: false).CreateAccelerator(context);
+
+            var shapeA = aArray.shape.ToArray();
+            var shapeB = bArray.shape.ToArray();
+            var resultShape = GetBroadcastedShape(shapeA, shapeB);
+            int nDims = resultShape.Length;
+            int resultLength = resultShape.Aggregate(1, (acc, val) => acc * val);
+
+            using var aBuffer = accelerator.Allocate1D(aArray.Data<double>().ToArray());
+            using var bBuffer = accelerator.Allocate1D(bArray.Data<double>().ToArray());
+            using var cBuffer = accelerator.Allocate1D<double>(resultLength);
+
+            using var shapeABuffer = accelerator.Allocate1D(shapeA);
+            using var shapeBBuffer = accelerator.Allocate1D(shapeB);
+            using var resultShapeBuffer = accelerator.Allocate1D(resultShape);
+
+            var kernel = accelerator.LoadAutoGroupedStreamKernel<
+                Index1D, ArrayView<double>, ArrayView<double>, ArrayView<double>,
+                ArrayView<int>, ArrayView<int>, ArrayView<int>, int>(GPUKernels.PointwiseSubtractKernel);
+
+            kernel(resultLength, aBuffer.View, bBuffer.View, cBuffer.View, shapeABuffer.View, shapeBBuffer.View,
+                resultShapeBuffer.View, nDims);
+
+            accelerator.Synchronize();
+            var cData = cBuffer.GetAsArray1D();
+
+            var cArray = np.array(cData).reshape(resultShape);
+            return cArray;
+        }
+
+        public static NDArray PointwiseMultiply(NDArray aArray, NDArray bArray)
+        {
+            using var context = Context.CreateDefault();
+            using var accelerator = context.GetPreferredDevice(preferCPU: false).CreateAccelerator(context);
+
+            var shapeA = aArray.shape.ToArray();
+            var shapeB = bArray.shape.ToArray();
+            var resultShape = GetBroadcastedShape(shapeA, shapeB);
+            int nDims = resultShape.Length;
+            int resultLength = resultShape.Aggregate(1, (acc, val) => acc * val);
+
+            using var aBuffer = accelerator.Allocate1D(aArray.Data<double>().ToArray());
+            using var bBuffer = accelerator.Allocate1D(bArray.Data<double>().ToArray());
+            using var cBuffer = accelerator.Allocate1D<double>(resultLength);
+
+            using var shapeABuffer = accelerator.Allocate1D(shapeA);
+            using var shapeBBuffer = accelerator.Allocate1D(shapeB);
+            using var resultShapeBuffer = accelerator.Allocate1D(resultShape);
+
+            var kernel = accelerator.LoadAutoGroupedStreamKernel<
+                Index1D, ArrayView<double>, ArrayView<double>, ArrayView<double>,
+                ArrayView<int>, ArrayView<int>, ArrayView<int>, int>(GPUKernels.PointwiseMultiplyKernel);
+
+            kernel(resultLength, aBuffer.View, bBuffer.View, cBuffer.View, shapeABuffer.View, shapeBBuffer.View,
+                resultShapeBuffer.View, nDims);
+
+            accelerator.Synchronize();
+            var cData = cBuffer.GetAsArray1D();
+
+            var cArray = np.array(cData).reshape(resultShape);
+            return cArray;
+        }
+
+        public static NDArray PointwiseDivide(NDArray aArray, NDArray bArray)
+        {
+            using var context = Context.CreateDefault();
+            using var accelerator = context.GetPreferredDevice(preferCPU: false).CreateAccelerator(context);
+
+            var shapeA = aArray.shape.ToArray();
+            var shapeB = bArray.shape.ToArray();
+            var resultShape = GetBroadcastedShape(shapeA, shapeB);
+            int nDims = resultShape.Length;
+            int resultLength = resultShape.Aggregate(1, (acc, val) => acc * val);
+
+            using var aBuffer = accelerator.Allocate1D(aArray.Data<double>().ToArray());
+            using var bBuffer = accelerator.Allocate1D(bArray.Data<double>().ToArray());
+            using var cBuffer = accelerator.Allocate1D<double>(resultLength);
+
+            using var shapeABuffer = accelerator.Allocate1D(shapeA);
+            using var shapeBBuffer = accelerator.Allocate1D(shapeB);
+            using var resultShapeBuffer = accelerator.Allocate1D(resultShape);
+
+            var kernel = accelerator.LoadAutoGroupedStreamKernel<
+                Index1D, ArrayView<double>, ArrayView<double>, ArrayView<double>,
+                ArrayView<int>, ArrayView<int>, ArrayView<int>, int>(GPUKernels.PointwiseDivideKernel);
+
+            kernel(resultLength, aBuffer.View, bBuffer.View, cBuffer.View, shapeABuffer.View, shapeBBuffer.View,
+                resultShapeBuffer.View, nDims);
+
+            accelerator.Synchronize();
+            var cData = cBuffer.GetAsArray1D();
+
+            var cArray = np.array(cData).reshape(resultShape);
+            return cArray;
+        }
+
+        public static NDArray MatrixMultiply(NDArray aArray, NDArray bArray)
+        {
+            using var context = Context.CreateDefault();
+            using var accelerator = context.GetPreferredDevice(preferCPU: false).CreateAccelerator(context);
+
+            var shapeA = aArray.shape.ToArray();
+            var shapeB = bArray.shape.ToArray();
+            var resultShape = GetMatMultBroadcastedShape(shapeA, shapeB);
+            int nDims = resultShape.Length;
+            int resultLength = resultShape.Aggregate(1, (acc, val) => acc * val);
+            int kDim = shapeA[nDims - 1];
+
+            using var aBuffer = accelerator.Allocate1D(aArray.Data<double>().ToArray());
+            using var bBuffer = accelerator.Allocate1D(bArray.Data<double>().ToArray());
+            using var cBuffer = accelerator.Allocate1D<double>(resultLength);
+
+            using var shapeABuffer = accelerator.Allocate1D(shapeA);
+            using var shapeBBuffer = accelerator.Allocate1D(shapeB);
+            using var resultShapeBuffer = accelerator.Allocate1D(resultShape);
+
+            var kernel = accelerator.LoadAutoGroupedStreamKernel<
+                Index1D, ArrayView<double>, ArrayView<double>, ArrayView<double>,
+                ArrayView<int>, ArrayView<int>, ArrayView<int>, int, int>(GPUKernels.MatrixMultiplyKernel);
+
+            kernel(resultLength, aBuffer.View, bBuffer.View, cBuffer.View,
+                shapeABuffer.View, shapeBBuffer.View, resultShapeBuffer.View, nDims, kDim);
+
+            accelerator.Synchronize();
+            var cData = cBuffer.GetAsArray1D();
+
+            var cArray = np.array(cData).reshape(resultShape);
+            return cArray;
+        }
+
+        static int[] GetBroadcastedShape(int[] shapeA, int[] shapeB)
+        {
+            int nDimsA = shapeA.Length;
+            int nDimsB = shapeB.Length;
+            int maxNDims = Math.Max(nDimsA, nDimsB);
+            var resultShape = new int[maxNDims];
+
+            for (int i = 1; i <= maxNDims; i++)
+            {
+                int dimA = (nDimsA - i >= 0) ? shapeA[nDimsA - i] : 1;
+                int dimB = (nDimsB - i >= 0) ? shapeB[nDimsB - i] : 1;
+
+                if (dimA != dimB && dimA != 1 && dimB != 1)
+                {
+                    throw new InvalidOperationException("Incompatible shapes for broadcasting.");
+                }
+                resultShape[maxNDims - i] = Math.Max(dimA, dimB);
+            }
+            return resultShape;
+        }
+
+        static int[] GetMatMultBroadcastedShape(int[] shapeA, int[] shapeB)
+        {
+            int nDimsA = shapeA.Length;
+            int nDimsB = shapeB.Length;
+
+            int innerDimA = shapeA[nDimsA - 1];
+            int outerDimA = shapeA[nDimsA - 2];
+            int innerDimB = shapeB[nDimsB - 2];
+            int outerDimB = shapeB[nDimsB - 1];
+
+            if (innerDimA != innerDimB)
+            {
+                throw new InvalidOperationException(
+                    "Incompatible shapes for matrix multiplication. Inner dimensions must match.");
+            }
+
+            int maxNDims = Math.Max(nDimsA, nDimsB);
+            var resultShape = new int[maxNDims];
+
+            resultShape[maxNDims - 2] = outerDimA;
+            resultShape[maxNDims - 1] = outerDimB;
+
+            for (int i = 1; i <= maxNDims - 2; i++)
+            {
+                int dimA = (nDimsA - 2 - i >= 0) ? shapeA[nDimsA - 2 - i] : 1;
+                int dimB = (nDimsB - 2 - i >= 0) ? shapeB[nDimsB - 2 - i] : 1;
+
+                if (dimA != dimB && dimA != 1 && dimB != 1)
+                {
+                    throw new InvalidOperationException("Incompatible batch shapes for broadcasting.");
+                }
+                resultShape[maxNDims - 2 - i] = Math.Max(dimA, dimB);
+            }
+
+            return resultShape;
+        }
+    }
+
+    public static class GPUKernels
+    {
+        public static void PointwiseAddKernel(
+            Index1D index,
+            ArrayView<double> a,
+            ArrayView<double> b,
+            ArrayView<double> c,
+            ArrayView<int> shapeA,
+            ArrayView<int> shapeB,
+            ArrayView<int> resultShape,
+            int nDims)
+        {
+            int linearIndex = index.X;
+
+            int indexA = 0;
+            int nDimsA = (int)shapeA.Length;
+            int remainingIndexA = linearIndex;
+            for (int i = nDims - 1; i >= 0; i--)
+            {
+                int coordA = remainingIndexA % resultShape[i];
+
+                int dimA = (nDims - 1 - i < nDimsA) ? shapeA[nDims - 1 - (nDims - i)] : 1;
+                if (dimA == 1) { coordA = 0; }
+
+                remainingIndexA /= resultShape[i];
+
+                int strideA = 1;
+                for (int j = i + 1; j < nDims; j++)
+                {
+                    strideA *= resultShape[j];
+                }
+                indexA += coordA + strideA;
+            }
+
+            int indexB = 0;
+            int nDimsB = (int)shapeB.Length;
+            int remainingIndexB = linearIndex;
+            for (int i = 0; i < nDims; i++)
+            {
+                int coordB = remainingIndexB % resultShape[i];
+
+                int dimB = (nDims - 1 - i < nDimsB) ? shapeB[nDims - 1 - (nDims - i)] : 1;
+                if (dimB == 1) { coordB = 0; }
+
+                remainingIndexB /= resultShape[i];
+
+                int strideB = 1;
+                for (int j = i + 1; j < nDims; j++)
+                {
+                    strideB *= resultShape[j];
+                }
+                indexB += coordB + strideB;
+            }
+
+            c[linearIndex] = a[indexA] + b[indexB];
+        }
+
+        public static void PointwiseSubtractKernel(
+            Index1D index,
+            ArrayView<double> a,
+            ArrayView<double> b,
+            ArrayView<double> c,
+            ArrayView<int> shapeA,
+            ArrayView<int> shapeB,
+            ArrayView<int> resultShape,
+            int nDims)
+        {
+            int linearIndex = index.X;
+
+            int indexA = 0;
+            int nDimsA = (int)shapeA.Length;
+            int remainingIndexA = linearIndex;
+            for (int i = nDims - 1; i >= 0; i--)
+            {
+                int coordA = remainingIndexA % resultShape[i];
+
+                int dimA = (nDims - 1 - i < nDimsA) ? shapeA[nDims - 1 - (nDims - i)] : 1;
+                if (dimA == 1) { coordA = 0; }
+
+                remainingIndexA /= resultShape[i];
+
+                int strideA = 1;
+                for (int j = i + 1; j < nDims; j++)
+                {
+                    strideA *= resultShape[j];
+                }
+                indexA += coordA + strideA;
+            }
+
+            int indexB = 0;
+            int nDimsB = (int)shapeB.Length;
+            int remainingIndexB = linearIndex;
+            for (int i = 0; i < nDims; i++)
+            {
+                int coordB = remainingIndexB % resultShape[i];
+
+                int dimB = (nDims - 1 - i < nDimsB) ? shapeB[nDims - 1 - (nDims - i)] : 1;
+                if (dimB == 1) { coordB = 0; }
+
+                remainingIndexB /= resultShape[i];
+
+                int strideB = 1;
+                for (int j = i + 1; j < nDims; j++)
+                {
+                    strideB *= resultShape[j];
+                }
+                indexB += coordB + strideB;
+            }
+
+            c[linearIndex] = a[indexA] - b[indexB];
+        }
+
+        public static void PointwiseMultiplyKernel(
+            Index1D index,
+            ArrayView<double> a,
+            ArrayView<double> b,
+            ArrayView<double> c,
+            ArrayView<int> shapeA,
+            ArrayView<int> shapeB,
+            ArrayView<int> resultShape,
+            int nDims)
+        {
+            int linearIndex = index.X;
+
+            int indexA = 0;
+            int nDimsA = (int)shapeA.Length;
+            int remainingIndexA = linearIndex;
+            for (int i = nDims - 1; i >= 0; i--)
+            {
+                int coordA = remainingIndexA % resultShape[i];
+
+                int dimA = (nDims - 1 - i < nDimsA) ? shapeA[nDims - 1 - (nDims - i)] : 1;
+                if (dimA == 1) { coordA = 0; }
+
+                remainingIndexA /= resultShape[i];
+
+                int strideA = 1;
+                for (int j = i + 1; j < nDims; j++)
+                {
+                    strideA *= resultShape[j];
+                }
+                indexA += coordA + strideA;
+            }
+
+            int indexB = 0;
+            int nDimsB = (int)shapeB.Length;
+            int remainingIndexB = linearIndex;
+            for (int i = 0; i < nDims; i++)
+            {
+                int coordB = remainingIndexB % resultShape[i];
+
+                int dimB = (nDims - 1 - i < nDimsB) ? shapeB[nDims - 1 - (nDims - i)] : 1;
+                if (dimB == 1) { coordB = 0; }
+
+                remainingIndexB /= resultShape[i];
+
+                int strideB = 1;
+                for (int j = i + 1; j < nDims; j++)
+                {
+                    strideB *= resultShape[j];
+                }
+                indexB += coordB + strideB;
+            }
+
+            c[linearIndex] = a[indexA] * b[indexB];
+        }
+
+        public static void PointwiseDivideKernel(
+            Index1D index,
+            ArrayView<double> a,
+            ArrayView<double> b,
+            ArrayView<double> c,
+            ArrayView<int> shapeA,
+            ArrayView<int> shapeB,
+            ArrayView<int> resultShape,
+            int nDims)
+        {
+            int linearIndex = index.X;
+
+            int indexA = 0;
+            int nDimsA = (int)shapeA.Length;
+            int remainingIndexA = linearIndex;
+            for (int i = nDims - 1; i >= 0; i--)
+            {
+                int coordA = remainingIndexA % resultShape[i];
+
+                int dimA = (nDims - 1 - i < nDimsA) ? shapeA[nDims - 1 - (nDims - i)] : 1;
+                if (dimA == 1) { coordA = 0; }
+
+                remainingIndexA /= resultShape[i];
+
+                int strideA = 1;
+                for (int j = i + 1; j < nDims; j++)
+                {
+                    strideA *= resultShape[j];
+                }
+                indexA += coordA + strideA;
+            }
+
+            int indexB = 0;
+            int nDimsB = (int)shapeB.Length;
+            int remainingIndexB = linearIndex;
+            for (int i = 0; i < nDims; i++)
+            {
+                int coordB = remainingIndexB % resultShape[i];
+
+                int dimB = (nDims - 1 - i < nDimsB) ? shapeB[nDims - 1 - (nDims - i)] : 1;
+                if (dimB == 1) { coordB = 0; }
+
+                remainingIndexB /= resultShape[i];
+
+                int strideB = 1;
+                for (int j = i + 1; j < nDims; j++)
+                {
+                    strideB *= resultShape[j];
+                }
+                indexB += coordB + strideB;
+            }
+
+            c[linearIndex] = a[indexA] / b[indexB];
+        }
+
+        public static void MatrixMultiplyKernel(
+            Index1D index,
+            ArrayView<double> a,
+            ArrayView<double> b,
+            ArrayView<double> c,
+            ArrayView<int> shapeA,
+            ArrayView<int> shapeB,
+            ArrayView<int> resultShape,
+            int nDims,
+            int kDim)
+        {
+            int linearIndex = index.X;
+
+            double sum = 0.0;
+
+            for (int k = 0; k < kDim; k++)
+            {
+                int indexA = 0;
+                int remainingIndexA = linearIndex;
+                int ndimsA = (int)shapeA.Length;
+                for (int i = nDims - 1; i >= 0; i--)
+                {
+                    int coord;
+                    if (i == nDims - 1)
+                    {
+                        coord = k;
+                    }
+                    else if (i == nDims - 2)
+                    {
+                        coord = remainingIndexA % resultShape[i];
+                    }
+                    else
+                    {
+                        int dimA = (nDims - 1 - i < ndimsA) ? shapeA[nDims - 1 - (nDims - i)] : 1;
+                        coord = (dimA == 1) ? 0 : remainingIndexA % resultShape[i];
+                    }
+
+                    int strideA = 1;
+                    for (int j = i + 1; j < nDims; j++)
+                    {
+                        strideA *= resultShape[j];
+                    }
+                    indexA += coord * strideA;
+
+                    remainingIndexA /= resultShape[i];
+                }
+
+                int indexB = 0;
+                int remainingIndexB = linearIndex;
+                int ndimsB = (int)shapeB.Length;
+                for (int i = nDims - 1; i >= 0; i--)
+                {
+                    int coord;
+                    if (i == nDims - 1)
+                    {
+                        coord = remainingIndexB % resultShape[i];
+                    }
+                    else if (i == nDims - 2)
+                    {
+                        coord = k;
+                    }
+                    else
+                    {
+                        int dimB = (nDims - 1 - i < ndimsB) ? shapeB[nDims - 1 - (nDims - i)] : 1;
+                        coord = (dimB == 1) ? 0 : remainingIndexB % resultShape[i];
+                    }
+
+                    int strideB = 1;
+                    for (int j = i + 1; j < nDims; j++)
+                    {
+                        strideB *= resultShape[j];
+                    }
+                    indexB += coord * strideB;
+
+                    remainingIndexB /= resultShape[i];
+                }
+
+                sum += a[indexA] * b[indexB];
+            }
+
+            c[linearIndex] = sum;
+        }
+    }
+
     public class NNData
     {
         public List<LayerData> Layers { get; set; }
@@ -1627,16 +2328,25 @@ namespace NNN
             MNISTData mnistData;
             if (!File.Exists(jsonFile))
             {
+                string pythonDLL = @"C:\Users\paren\AppData\Local\Programs\Python\Python38\python38.dll";
+                Runtime.PythonDLL = pythonDLL;
+
+                PythonEngine.PythonHome = @"C:\Users\paren\AppData\Local\Programs\Python\Python38";
+
+                PythonEngine.PythonPath = string.Join(";", new[]
+                {
+                    @"C:\Users\paren\AppData\Local\Programs\Python\Python38\Lib",
+                    @"C:\Users\paren\AppData\Local\Programs\Python\Python38\DLLs",
+                    @"C:\Users\paren\AppData\Local\Programs\Python\Python38\Lib\site-packages",
+                    @"C:\venv\tf38\Lib\site-packages"
+                });
+
+                PythonEngine.Initialize();
                 using (Py.GIL())
                 {
-                    string pythonDLL = @"C:\Users\paren\AppData\Local\Programs\Python\Python38\python38.dll";
-                    Runtime.PythonDLL = pythonDLL;
-                    PythonEngine.PythonPath += @";C:\Users\paren\AppData\Local\Programs\Python\Python38\Lib\site-packages";
-                    PythonEngine.Initialize();
-
                     Console.WriteLine("Downloading MNIST dataset...");
                     var (xTrain, yTrain, xTest, yTest) = (np.zeros(), np.zeros(), np.zeros(), np.zeros());
-                    dynamic mnist = Py.Import("keras.datasets.mnist");
+                    dynamic mnist = Py.Import("tensorflow.keras.datasets.mnist");
                     dynamic data = mnist.load_data();
 
                     dynamic train = data[0];
@@ -1671,7 +2381,9 @@ namespace NNN
         public double[] YTrain { get; set; }
         public double[][][] XTest { get; set; }
         public double[] YTest { get; set; }
+
         public MNISTData() { }
+
         public MNISTData(double[][][] xTrain, double[] yTrain, double[][][] xTest, double[] yTest)
         {
             XTrain = xTrain.ToArray();
