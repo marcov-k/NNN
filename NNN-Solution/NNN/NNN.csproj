@@ -9,8 +9,10 @@
 
   <ItemGroup>
     <PackageReference Include="CsvHelper" Version="33.1.0" />
+    <PackageReference Include="libtorch-cpu-win-x64" Version="2.5.1" />
     <PackageReference Include="NumSharp" Version="0.30.0" />
     <PackageReference Include="TorchSharp" Version="0.105.1" />
+    <PackageReference Include="TorchVision" Version="0.105.1" />
   </ItemGroup>
 
 </Project>
