@@ -177,7 +177,7 @@ namespace NNN
 
     public static class InputPreparer
     {
-        static readonly Regex tokenRegex = new(@"(?:[a-z'\-]+| |!|\.|\?|,|;|:)+?");
+        static readonly Regex tokenRegex = new(@"(?:[a-z'\-]+| |!|\.|\?|,|;|:|[0-9]+)+?");
 
         public static string ReadTextFile(string name)
         {
