@@ -22,7 +22,7 @@ var (stringKey, keyString) = InputPreparer.LoadTokens(tokenFileName);
 var input = InputPreparer.DivideInput(text, stringKey);
 
 int vocabSize = stringKey.Count;
-int sequenceLength = 10; // Number of previous words to look at
+int sequenceLength = 20; // Number of previous words to look at
 int embedDim = 64;
 int hiddenSize = 128;
 int logInterval = 10;
