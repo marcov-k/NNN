@@ -26,6 +26,7 @@ int sequenceLength = 20; // Number of previous words to look at
 int embedDim = 64;
 int hiddenSize = 128;
 int logInterval = 10;
+float temperature = 0f;
 
 var model = new MyLSTM(vocabSize, embedDim, hiddenSize);
 var optimizer = torch.optim.Adam(model.parameters(), lr: 0.001);
@@ -118,7 +119,7 @@ Console.WriteLine($"Seed: {TextGenerator.ConvertToText(seed.ToList(), keyString)
 Console.WriteLine();
 Console.WriteLine($"Generating next {wordsToGenerate} words");
 Console.WriteLine();
-var finalIndexes = TextGenerator.GenerateText(model, seed, wordsToGenerate, sequenceLength);
+var finalIndexes = TextGenerator.GenerateText(model, seed, wordsToGenerate, sequenceLength, temperature);
 Console.WriteLine($"Final text: {TextGenerator.ConvertToText(finalIndexes, keyString)}");
 Console.WriteLine("\nPress any key to close...");
 Console.ReadKey();
@@ -246,7 +247,7 @@ namespace NNN
                 for (int j = 0; j < windowSize; j++)
                     inputs[i, j] = tokenIndices[i + j];
 
-                targets[i] = tokenIndices[i + windowSize]; // The word immediately after the window
+                targets[i] = tokenIndices[i + windowSize];
             }
 
             return (torch.tensor(inputs), torch.tensor(targets));
@@ -255,9 +256,9 @@ namespace NNN
 
     public static class TextGenerator
     {
-        public static List<long> GenerateText(MyLSTM model, long[] seedIndices, int wordsToGenerate, int windowSize)
+        public static List<long> GenerateText(MyLSTM model, long[] seedIndices, int wordsToGenerate, int windowSize, float temperature)
         {
-            model.eval(); // Set to evaluation mode
+            model.eval();
             var generated = new List<long>(seedIndices);
 
             for (int i = 0; i < wordsToGenerate; i++)
@@ -270,7 +271,18 @@ namespace NNN
 
                 using var logits = model.forward(input);
 
-                var nextWordIndex = logits.argmax(1).item<long>();
+                long nextWordIndex = 0;
+                if (temperature == 0.0f)
+                {
+                    nextWordIndex = logits.argmax(1).item<long>();
+                }
+                else
+                {
+                    var scaledLogits = logits.div(temperature);
+                    var probabilities = softmax(scaledLogits, dim: -1);
+                    var nextWordTensor = multinomial(probabilities, num_samples: 1);
+                    nextWordIndex = nextWordTensor[0].item<long>();
+                }
 
                 generated.Add(nextWordIndex);
             }
