@@ -26,9 +26,9 @@ var (stringKey, keyString) = InputPreparer.LoadTokens(tokenFileName);
 var input = InputPreparer.DivideInput(text, stringKey);
 
 int vocabSize = stringKey.Count;
-int sequenceLength = 20; // Number of previous words to look at
+int sequenceLength = 50; // Number of previous tokens to look at
 int embedDim = 64;
-int numLayers = 1;
+int numLayers = 2;
 int hiddenSize = 128;
 int logInterval = 10;
 float temperature = 0f;
@@ -39,7 +39,7 @@ var criterion = CrossEntropyLoss();
 
 var (X, Y) = InputPreparer.CreateWindows(input, sequenceLength);
 using var dataset = new MyDataset(X, Y);
-int batchSize = 32;
+int batchSize = 64;
 var loader = DataLoader(dataset, batchSize, shuffle: true);
 
 Console.WriteLine("Load model from file? y/n");
@@ -118,20 +118,27 @@ if (train)
     }
 }
 
-int wordsToGenerate = 100;
+Console.WriteLine("Generate text? y/n");
+userInput = Console.ReadLine();
+if (userInput == "y")
+{
+    Console.WriteLine("Enter number of tokens to generate: ");
+    userInput = Console.ReadLine();
+    int wordsToGenerate = Convert.ToInt32(userInput);
 
-Console.WriteLine();
-Console.WriteLine("Testing RNN text generation...");
-Console.WriteLine("Enter seed string: ");
-string testString = Console.ReadLine();
-Console.WriteLine();
-long[] seed = InputPreparer.DivideInput(testString, stringKey)[0..sequenceLength];
-Console.WriteLine($"Seed: {TextGenerator.ConvertToText(seed.ToList(), keyString)}");
-Console.WriteLine();
-Console.WriteLine($"Generating next {wordsToGenerate} words");
-Console.WriteLine();
-var finalIndexes = TextGenerator.GenerateText(model, seed, wordsToGenerate, sequenceLength, temperature);
-Console.WriteLine($"Final text: {TextGenerator.ConvertToText(finalIndexes, keyString)}");
+    Console.WriteLine();
+    Console.WriteLine("Testing RNN text generation...");
+    Console.WriteLine("Enter seed string: ");
+    string testString = Console.ReadLine();
+    Console.WriteLine();
+    long[] seed = InputPreparer.DivideInput(testString, stringKey)[0..sequenceLength];
+    Console.WriteLine($"Seed: {TextGenerator.ConvertToText(seed.ToList(), keyString)}");
+    Console.WriteLine();
+    Console.WriteLine($"Generating next {wordsToGenerate} words");
+    Console.WriteLine();
+    var finalIndexes = TextGenerator.GenerateText(model, seed, wordsToGenerate, sequenceLength, temperature);
+    Console.WriteLine($"Final text: {TextGenerator.ConvertToText(finalIndexes, keyString)}");
+}
 Console.WriteLine("\nPress any key to close...");
 Console.ReadKey();
 
