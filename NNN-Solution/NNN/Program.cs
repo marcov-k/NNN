@@ -7,9 +7,13 @@ using static TorchSharp.torch;
 using static TorchSharp.torch.nn;
 using static TorchSharp.torch.utils.data;
 
-string tokenFileName = "tokens";
-string inputTextFile = "input.txt";
-string modelFile = "model.dat";
+string modelFile;
+
+Console.WriteLine("Enter input file name: ");
+string inputName = Console.ReadLine();
+string tokenFileName = inputName + "Tokens";
+string inputTextFile = inputName + ".txt";
+
 Console.WriteLine("Tokenize text input? y/n");
 var userInput = Console.ReadLine();
 string text = InputPreparer.ReadTextFile(inputTextFile);
@@ -24,11 +28,12 @@ var input = InputPreparer.DivideInput(text, stringKey);
 int vocabSize = stringKey.Count;
 int sequenceLength = 20; // Number of previous words to look at
 int embedDim = 64;
+int numLayers = 1;
 int hiddenSize = 128;
 int logInterval = 10;
 float temperature = 0f;
 
-var model = new MyLSTM(vocabSize, embedDim, hiddenSize);
+var model = new MyLSTM(vocabSize, embedDim, numLayers, hiddenSize);
 var optimizer = torch.optim.Adam(model.parameters(), lr: 0.001);
 var criterion = CrossEntropyLoss();
 
@@ -42,6 +47,9 @@ userInput = Console.ReadLine();
 bool train = true;
 if (userInput == "y")
 {
+    Console.WriteLine("Enter file name: ");
+    userInput = Console.ReadLine();
+    modelFile = userInput + ".model";
     model.load(modelFile);
     Console.WriteLine("\nContinue training model? y/n");
     userInput = Console.ReadLine();
@@ -103,6 +111,9 @@ if (train)
     userInput = Console.ReadLine();
     if (userInput == "y")
     {
+        Console.WriteLine("Enter file name: ");
+        userInput = Console.ReadLine();
+        modelFile = userInput + ".model";
         model.save(modelFile);
     }
 }
@@ -137,10 +148,10 @@ namespace NNN
         private readonly LSTM lstm;
         private readonly Module<Tensor, Tensor> linear;
 
-        public MyLSTM(int vocabSize, int embedDim, int hiddenSize) : base("MyLSTM")
+        public MyLSTM(int vocabSize, int embedDim, int numLayers, int hiddenSize) : base("MyLSTM")
         {
             this.embedding = Embedding(vocabSize, embedDim); // [Batch, Seq] -> [Batch, Seq, EmbedDim]
-            this.lstm = LSTM(embedDim, hiddenSize, numLayers: 1, batchFirst: true);
+            this.lstm = LSTM(embedDim, hiddenSize, numLayers: numLayers, batchFirst: true);
             this.linear = Linear(hiddenSize, vocabSize); // Output size must match vocab size for CrossEntropy
             RegisterComponents();
         }
@@ -178,7 +189,7 @@ namespace NNN
 
     public static class InputPreparer
     {
-        static readonly Regex tokenRegex = new(@"(?:[a-z'\-]+| |!|\.|\?|,|;|:|[0-9\.]+)+?");
+        static readonly Regex tokenRegex = new(@"(?:[a-z'\-]+| |!|\.|\?|,|;|:|[0-9\.]+|\n|\t)+?");
 
         public static string ReadTextFile(string name)
         {
