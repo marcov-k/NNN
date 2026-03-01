@@ -1,8 +1,17 @@
 ﻿using NNN;
 
-var output = Number.Mean([new(5), new(6), new(7)]);
+NDArray test = new(3, 3, 3, 3);
 
-Console.WriteLine($"Output: {output}");
+for (int i = 0; i < test.ElementCount; i++)
+{
+    test[i] = new(i);
+}
+
+Console.WriteLine($"Initial values: {test}");
+
+var result = test ^ test;
+
+Console.WriteLine($"Result values: {result}");
 
 namespace NNN
 {
@@ -52,9 +61,34 @@ namespace NNN
             }
             resultDims[^1] = b.Dimensions[^1];
 
-            //TODO: Implement matrix multiplication
+            NDArray output = new(resultDims);
+            if (a.Rank > 2)
+            {
+                // Recursively reduce arrays down to batches of 2D matrices
 
-            NDArray output = new(0);
+                var reducedA = a.ReduceDimensions();
+                var reducedB = b.ReduceDimensions();
+
+                for (int i = 0; i < reducedA.Length; i++)
+                {
+                    output.InsertSubArray(i, reducedA[i] ^ reducedB[i]);
+                }
+            }
+            else
+            {
+                // Standard 2D matrix multiplication
+                for (int rowA = 0; rowA < output.GetLength(0); rowA++)
+                {
+                    for (int colB = 0; colB < output.GetLength(1); colB++)
+                    {
+                        output[rowA, colB] = new(0);
+                        for (int i = 0; i < a.GetLength(1); i++)
+                        {
+                            output[rowA, colB] += a[rowA, i] * b[i, colB];
+                        }
+                    }
+                }
+            }
 
             return output;
         }
@@ -62,19 +96,19 @@ namespace NNN
         public NDArray(params int[] dimensions)
         {
             Dimensions = (int[])dimensions.Clone();
-            Multipliers = new int[dimensions.Length];
+            Multipliers = new int[Dimensions.Length];
 
             int totalSize = 1;
-            for (int i = Dimensions.Length - 1; i >= 0; i--)
+            for (int i = Rank - 1; i >= 0; i--)
             {
                 Multipliers[i] = totalSize;
-                totalSize *= dimensions[i];
+                totalSize *= Dimensions[i];
             }
 
             Data = new Number[totalSize];
         }
 
-        int GetLinearIndex(int[] indices)
+        public int GetLinearIndex(int[] indices)
         {
             int linearIndex = 0;
             for (int i = 0; i < Rank; i++)
@@ -82,6 +116,125 @@ namespace NNN
                 linearIndex += indices[i] * Multipliers[i];
             }
             return linearIndex;
+        }
+
+        public int[] GetFullIndices(int index)
+        {
+            var indices = new int[Rank];
+
+            for (int i = Rank - 1; i >= 0; i--)
+            {
+                indices[i] = index % Dimensions[i];
+                index /= Dimensions[i];
+            }
+
+            return indices;
+        }
+
+        public override string ToString()
+        {
+            string output = string.Empty;
+            for (int i = 0; i < ElementCount - 1; i++)
+            {
+                output += $"{Data[i].Value}, ";
+            }
+            output += Data[^1].Value;
+            return output;
+        }
+
+        public NDArray[] ReduceDimensions()
+        {
+            var output = new NDArray[Dimensions[0]];
+
+            for (int i = 0; i < output.Length; i++)
+            {
+                output[i] = ExtractSubArray(i);
+            }
+
+            return output;
+        }
+
+        NDArray ExtractSubArray(int firstDimIndex)
+        {
+            var extractDims = new int[Rank - 1];
+            for (int i = 1; i < Rank; i++)
+            {
+                extractDims[i - 1] = Dimensions[i];
+            }
+
+            NDArray output = new(extractDims);
+
+            for (int i = 0; i < output.ElementCount; i++)
+            {
+                var extractIndices = output.GetFullIndices(i);
+
+                var parentIndices = new int[extractIndices.Length + 1];
+
+                parentIndices[0] = firstDimIndex;
+                for (int j = 1; j < parentIndices.Length; j++)
+                {
+                    parentIndices[j] = extractIndices[j - 1];
+                }
+
+                output[extractIndices] = this[parentIndices];
+            }
+
+            return output;
+        }
+
+        public void InsertSubArray(int firstDimIndex, NDArray subArray)
+        {
+            for (int i = 0; i < subArray.ElementCount; i++)
+            {
+                var subIndices = subArray.GetFullIndices(i);
+
+                var parentIndices = new int[subIndices.Length + 1];
+
+                parentIndices[0] = firstDimIndex;
+                for (int j = 1; j < parentIndices.Length; j++)
+                {
+                    parentIndices[j] = subIndices[j - 1];
+                }
+
+                this[parentIndices] = subArray[subIndices];
+            }
+        }
+
+        public static NDArray Transpose(NDArray array, int[]? axes = null)
+        {
+            if (axes == null)
+            {
+                axes = new int[array.Rank];
+                for (int i = 0; i < array.Rank; i++)
+                {
+                    axes[i] = array.Rank - 1 - i;
+                }
+            }
+
+            AssertTranspositionAxes(array.Dimensions, axes);
+
+            var outputDims = RemapIndices(array.Dimensions, axes);
+
+            NDArray output = new(outputDims);
+
+            for (int i = 0; i < array.ElementCount; i++)
+            {
+                output[RemapIndices(array.GetFullIndices(i), axes)] = array[i];
+            }
+
+            return output;
+        }
+
+        public static int[] RemapIndices(int[] indices, int[] axes)
+        {
+            var output = new int[indices.Length];
+
+            for (int i = 0; i < axes.Length; i++)
+            {
+                output[i] = indices[axes[i]];
+            }
+
+            return output;
         }
 
         public Number this[params int[] indices]
@@ -119,6 +272,18 @@ namespace NNN
                 for (int i = 0; i < a.Rank - 2; i++)
                 {
                     if (a.GetLength(i) != b.GetLength(i)) throw new ArgumentException("Invalid array dimensions");
+                }
+            }
+        }
+
+        static void AssertTranspositionAxes(int[] dimensions, int[] axes)
+        {
+            if (axes.Length != dimensions.Length) throw new ArgumentException("Axes must match array dimensions");
+            else
+            {
+                foreach (var axis in axes)
+                {
+                    if (axis >= dimensions.Length) throw new ArgumentException("Axes must match array dimensions");
                 }
             }
         }
@@ -180,6 +345,17 @@ namespace NNN
                     DependsOn[1].Backward(newGrad);
 
                     break;
+            }
+        }
+
+        public void ZeroGradient()
+        {
+            Gradient = 0;
+
+            if (DependsOn.Count > 0)
+            {
+                DependsOn[0].ZeroGradient();
+                DependsOn[1].ZeroGradient();
             }
         }
 
