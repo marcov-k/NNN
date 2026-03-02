@@ -46,6 +46,9 @@ Console.WriteLine($"Inputs:   {NDArray.UnnormalizeArray(testInputs, inNorm)}");
 Console.WriteLine($"Targets:  {testTargets}");
 Console.WriteLine($"Predicts: {predictions}");
 
+Console.WriteLine("\nPress any key to quit...");
+Console.ReadKey();
+
 namespace NNN
 {
     public class Trainer(Model model, Optimizer optimizer, Cost cost)
