@@ -1,20 +1,296 @@
 ﻿using NNN;
 
-NDArray test = new(3, 3, 3, 3);
+NDArray inputs = new(10, 1);
+NDArray targets = new(10, 1);
 
-for (int i = 0; i < test.ElementCount; i++)
+for (int i = 0; i < inputs.ElementCount; i++)
 {
-    test[i] = new(i);
+    float value = i * 2;
+    inputs[i] = new(value);
+    targets[i] = new(value * value);
 }
 
-Console.WriteLine($"Initial values: {test}");
+(inputs, float inNorm) = NDArray.Normalize(inputs);
+(targets, float outNorm) = NDArray.Normalize(targets);
 
-var result = test ^ test;
+Model model = new([new Dense(5, new Sigmoid()), new Dense(5, new Sigmoid()), new Dense(1, new Linear())], inputs);
+Trainer trainer = new(model, optimizer: new SGD(learningRate: 0.01f), cost: new MSE());
 
-Console.WriteLine($"Result values: {result}");
+trainer.Train(inputs, targets, 50000);
+
+NDArray testInputs = new(30, 1);
+NDArray testTargets = new(30, 1);
+for (int i = 0; i < testInputs.ElementCount; i++)
+{
+    float value = i * 0.5f;
+    testInputs[i] = new(value);
+    testTargets[i] = new(value * value);
+}
+
+testInputs = NDArray.Normalize(testInputs, inNorm).normalizedArray;
+
+var predictions = model.Forward(testInputs);
+predictions = NDArray.UnnormalizeArray(predictions, outNorm);
+
+foreach (var target in testTargets.ToLinearArray())
+{
+    target.Value = MathF.Round(target.Value, MidpointRounding.AwayFromZero);
+}
+foreach (var prediction in predictions.ToLinearArray())
+{
+    prediction.Value = MathF.Round(prediction.Value, MidpointRounding.AwayFromZero);
+}
+
+Console.WriteLine();
+Console.WriteLine($"Inputs:   {NDArray.UnnormalizeArray(testInputs, inNorm)}");
+Console.WriteLine($"Targets:  {testTargets}");
+Console.WriteLine($"Predicts: {predictions}");
 
 namespace NNN
 {
+    public class Trainer(Model model, Optimizer optimizer, Cost cost)
+    {
+        readonly Model Model = model;
+        readonly Optimizer Optimizer = optimizer;
+        readonly Cost Cost = cost;
+
+        public void Train(NDArray inputs, NDArray targets, int epochs)
+        {
+            int logEvery = Math.Max(1, epochs / 500);
+            for (int e = 0; e < epochs; e++)
+            {
+                Model.ZeroGrad();
+                var predictions = Model.Forward(inputs);
+                var loss = Cost.CalculateCost(predictions, targets);
+                loss.Backward();
+
+                Model.Optimize(Optimizer);
+
+                if (e % logEvery == 0 || e == epochs - 1)
+                {
+                    Console.WriteLine($"Epoch {e} : Loss = {loss.Value}");
+                }
+            }
+        }
+    }
+
+    public class Optimizer(float learningRate)
+    {
+        protected readonly float LR = learningRate;
+
+        public virtual void Step(Number parameter)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    public class SGD(float learningRate) : Optimizer(learningRate)
+    {
+        public override void Step(Number parameter)
+        {
+            parameter.Value -= parameter.Gradient * LR;
+        }
+    }
+
+    public class Model
+    {
+        readonly Layer[] Layers;
+
+        public Model(Layer[] layers, NDArray inputFormat)
+        {
+            Layers = layers;
+            SetUpLayers(inputFormat);
+        }
+
+        public void SetUpLayers(NDArray inputFormat)
+        {
+            int inputs = inputFormat.GetLength(1);
+            foreach (var layer in Layers)
+            {
+                layer.SetUpLayer(inputs);
+                inputs = layer.NeuronCount;
+            }
+        }
+
+        public NDArray Forward(NDArray input)
+        {
+            var output = input;
+            foreach (var layer in Layers)
+            {
+                output = layer.Forward(output);
+            }
+            return output;
+        }
+
+        public void Optimize(Optimizer optimizer)
+        {
+            foreach (var layer in Layers)
+            {
+                layer.Optimize(optimizer);
+            }
+        }
+
+        public void ZeroGrad()
+        {
+            foreach (var layer in Layers)
+            {
+                layer.ZeroGrad();
+            }
+        }
+    }
+
+    public class Layer(int neuronCount)
+    {
+        public int NeuronCount { get; protected set; } = neuronCount;
+
+        public virtual void SetUpLayer(int inputCount)
+        {
+            throw new NotImplementedException();
+        }
+
+        public virtual NDArray Forward(NDArray input)
+        {
+            throw new NotImplementedException();
+        }
+
+        public virtual void Optimize(Optimizer optimizer)
+        {
+            throw new NotImplementedException();
+        }
+
+        public virtual void ZeroGrad()
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    public class Dense(int neuronCount, Activation activation) : Layer(neuronCount)
+    {
+        NDArray Weights = new();
+        NDArray Biases = new();
+        readonly Activation Activation = activation;
+
+        public override void SetUpLayer(int inputCount)
+        {
+            Weights = NDArray.InitWeights(inputCount, NeuronCount);
+            Biases = NDArray.InitBias(NeuronCount);
+        }
+
+        public override NDArray Forward(NDArray input)
+        {
+            var output = input ^ Weights;
+            output += NDArray.Broadcast(Biases, output.GetLength(0));
+            output = Activation.Forward(output);
+            return output;
+        }
+
+        public override void Optimize(Optimizer optimizer)
+        {
+            foreach (var weight in Weights.ToLinearArray())
+            {
+                optimizer.Step(weight);
+            }
+            foreach (var bias in Biases.ToLinearArray())
+            {
+                optimizer.Step(bias);
+            }
+        }
+
+        public override void ZeroGrad()
+        {
+            foreach (var weight in Weights.ToLinearArray())
+            {
+                weight.ZeroGradient();
+            }
+            foreach (var bias in Biases.ToLinearArray())
+            {
+                bias.ZeroGradient();
+            }
+        }
+    }
+
+    public class Activation
+    {
+        public virtual NDArray Forward(NDArray input)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    public class LeakyReLU(float tau = 0.01f) : Activation
+    {
+        readonly float Tau = tau;
+
+        public override NDArray Forward(NDArray input)
+        {
+            NDArray output = new(input.Dimensions);
+
+            for (int i = 0; i < input.ElementCount; i++)
+            {
+                if (input[i].Value >= 0) output[i] = input[i];
+                else output[i] = input[i] * Tau;
+            }
+
+            return output;
+        }
+    }
+
+    public class Tanh : Activation
+    {
+        public override NDArray Forward(NDArray input)
+        {
+            NDArray output = new(input.Dimensions);
+
+            for (int i = 0; i < input.ElementCount; i++)
+            {
+                output[i] = Number.Tanh(input[i]);
+            }
+
+            return output;
+        }
+    }
+
+    public class Sigmoid : Activation
+    {
+        public override NDArray Forward(NDArray input)
+        {
+            NDArray output = new(input.Dimensions);
+
+            for (int i = 0; i < input.ElementCount; i++)
+            {
+                output[i] = Number.Sigmoid(input[i]);
+            }
+
+            return output;
+        }
+    }
+
+    public class Linear : Activation
+    {
+        public override NDArray Forward(NDArray input)
+        {
+            return input;
+        }
+    }
+
+    public class Cost
+    {
+        public virtual Number CalculateCost(NDArray input, NDArray target)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    public class MSE : Cost
+    {
+        public override Number CalculateCost(NDArray input, NDArray target)
+        {
+            var diff = input - target;
+            diff *= diff;
+            return NDArray.Mean(diff);
+        }
+    }
+
     public class NDArray
     {
         readonly Number[] Data;
@@ -32,6 +308,19 @@ namespace NNN
             for (int i = 0; i < a.ElementCount; i++)
             {
                 output[i] = a[i] + b[i];
+            }
+
+            return output;
+        }
+
+        public static NDArray operator -(NDArray a, NDArray b)
+        {
+            AssertElementwiseDims(a, b);
+
+            NDArray output = new(a.Dimensions);
+            for (int i = 0; i < a.ElementCount; i++)
+            {
+                output[i] = a[i] - b[i];
             }
 
             return output;
@@ -93,6 +382,67 @@ namespace NNN
             return output;
         }
 
+        public static Number Mean(NDArray input)
+        {
+            return Number.Mean(input.ToLinearArray());
+        }
+
+        public static NDArray InitWeights(int inputCount, int neuronCount)
+        {
+            NDArray output = new(inputCount, neuronCount);
+
+            for (int i = 0; i < output.ElementCount; i++)
+            {
+                float weight = MathUtils.NextGaussian(0, MathF.Sqrt(2f / inputCount));
+                output[i] = new(weight);
+            }
+
+            return output;
+        }
+
+        public static NDArray InitBias(int neuronCount)
+        {
+            NDArray output = new(neuronCount);
+
+            for (int i = 0; i < output.ElementCount; i++)
+            {
+                output[i] = new(0.01f);
+            }
+
+            return output;
+        }
+
+        public static NDArray Broadcast(NDArray array, int firstDimLength)
+        {
+            var outputDims = new int[array.Rank + 1];
+            outputDims[0] = firstDimLength;
+            for (int i = 1; i < outputDims.Length; i++)
+            {
+                outputDims[i] = array.Dimensions[i - 1];
+            }
+
+            NDArray output = new(outputDims);
+
+            for (int i = 0; i < output.GetLength(0); i++)
+            {
+                for (int j = 0; j < array.ElementCount; j++)
+                {
+                    var inputIndices = array.GetFullIndices(j);
+
+                    var outputIndices = new int[output.Rank];
+                    outputIndices[0] = i;
+                    for (int k = 1; k < outputIndices.Length; k++)
+                    {
+                        outputIndices[k] = inputIndices[k - 1];
+                    }
+
+                    output[outputIndices] = array[inputIndices];
+                }
+            }
+
+            return output;
+        }
+
         public NDArray(params int[] dimensions)
         {
             Dimensions = (int[])dimensions.Clone();
@@ -129,6 +479,11 @@ namespace NNN
             }
 
             return indices;
+        }
+
+        public Number[] ToLinearArray()
+        {
+            return Data;
         }
 
         public override string ToString()
@@ -225,6 +580,38 @@ namespace NNN
             return output;
         }
 
+        public static (NDArray normalizedArray, float normalizeFactor) Normalize(NDArray array, float? normalizeFactor = null)
+        {
+            float maxValue = array[0].Value;
+            if (normalizeFactor == null)
+            {
+                foreach (var value in array.ToLinearArray())
+                {
+                    maxValue = MathF.Max(maxValue, value.Value);
+                }
+            }
+            else maxValue = normalizeFactor.Value;
+
+            NDArray output = new(array.Dimensions);
+            for (int i = 0; i < array.ElementCount; i++)
+            {
+                output[i] = new(array[i].Value / maxValue);
+            }
+
+            return (output, maxValue);
+        }
+
+        public static NDArray UnnormalizeArray(NDArray array, float normalizeFactor)
+        {
+            NDArray output = new(array.Dimensions);
+            for (int i = 0; i < array.ElementCount; i++)
+            {
+                output[i] = new(array[i].Value * normalizeFactor);
+            }
+
+            return output;
+        }
+
         public static int[] RemapIndices(int[] indices, int[] axes)
         {
             var output = new int[indices.Length];
@@ -291,7 +678,7 @@ namespace NNN
 
     public class Number(float value, List<Number>? dependsOn = null, string creationOp = "")
     {
-        public float Value { get; private set; } = value;
+        public float Value { get; set; } = value;
         public float Gradient { get; private set; } = 0;
         readonly List<Number> DependsOn = dependsOn ?? [];
         readonly string CreationOp = creationOp;
@@ -311,6 +698,21 @@ namespace NNN
             return new Number(a) + b;
         }
 
+        public static Number operator -(Number a, Number b)
+        {
+            return a + (b * -1);
+        }
+
+        public static Number operator -(Number a, float b)
+        {
+            return a - new Number(b);
+        }
+
+        public static Number operator -(float a, Number b)
+        {
+            return new Number(a) - b;
+        }
+
         public static Number operator *(Number a, Number b)
         {
             return new(value: a.Value * b.Value, dependsOn: [a, b], creationOp: "*");
@@ -326,8 +728,40 @@ namespace NNN
             return new Number(a) * b;
         }
 
+        public static Number operator /(Number a, Number b)
+        {
+            return new(value: a.Value / b.Value, dependsOn: [a, b], creationOp: "/");
+        }
+
+        public static Number operator /(Number a, float b)
+        {
+            return a / new Number(b);
+        }
+
+        public static Number operator /(float a, Number b)
+        {
+            return new Number(a) / b;
+        }
+
+        public static Number operator ^(Number a, Number b)
+        {
+            return new(value: MathF.Pow(a.Value, b.Value), dependsOn: [a, b], creationOp: "^");
+        }
+
+        public static Number operator ^(Number a, float b)
+        {
+            return a ^ new Number(b);
+        }
+
+        public static Number operator ^(float a, Number b)
+        {
+            return new Number(a) ^ b;
+        }
+
         public void Backward(float? backwardGrad = null)
         {
+            float newGrad;
+
             Gradient = (backwardGrad != null) ? Gradient + backwardGrad.Value : 1;
 
             switch (CreationOp)
@@ -338,10 +772,26 @@ namespace NNN
 
                     break;
                 case "*":
-                    var newGrad = DependsOn[1].Value * Gradient;
+                    newGrad = DependsOn[1].Value * Gradient;
                     DependsOn[0].Backward(newGrad);
 
                     newGrad = DependsOn[0].Value * Gradient;
+                    DependsOn[1].Backward(newGrad);
+
+                    break;
+                case "/":
+                    newGrad = Gradient * (1f / DependsOn[1].Value);
+                    DependsOn[0].Backward(newGrad);
+
+                    newGrad = Gradient * (-DependsOn[0].Value / MathF.Pow(DependsOn[1].Value, 2));
+                    DependsOn[1].Backward(newGrad);
+
+                    break;
+                case "^":
+                    newGrad = Gradient * DependsOn[1].Value * MathF.Pow(DependsOn[0].Value, DependsOn[1].Value - 1);
+                    DependsOn[0].Backward(newGrad);
+
+                    newGrad = Gradient * MathF.Pow(DependsOn[0].Value, DependsOn[1].Value) * MathF.Log(DependsOn[0].Value);
                     DependsOn[1].Backward(newGrad);
 
                     break;
@@ -351,12 +801,6 @@ namespace NNN
         public void ZeroGradient()
         {
             Gradient = 0;
-
-            if (DependsOn.Count > 0)
-            {
-                DependsOn[0].ZeroGradient();
-                DependsOn[1].ZeroGradient();
-            }
         }
 
         public override string ToString()
@@ -374,14 +818,45 @@ namespace NNN
             return (a.Value < b.Value) ? a : b;
         }
 
-        public static Number Mean(List<Number> inputs)
+        public static Number Mean(Number[] inputs)
         {
             Number sum = new(0);
             foreach (var input in inputs)
             {
                 sum += input;
             }
-            return sum * (1f / inputs.Count);
+            return sum * (1f / inputs.Length);
+        }
+
+        public static Number Tanh(Number x)
+        {
+            return ((MathF.E ^ (2 * x)) - 1) / ((MathF.E ^ (2 * x)) + 1);
+        }
+
+        public static Number Sigmoid(Number x)
+        {
+            return 1 / (1 + (MathF.E ^ (-1 * x)));
+        }
+    }
+
+    public static class MathUtils
+    {
+        static readonly Random random = new();
+
+        public static float NextGaussian()
+        {
+            double u1 = 1.0f - random.NextDouble();
+            double u2 = 1.0f - random.NextDouble();
+
+            double randStdNormal = Math.Sqrt(-2.0 * Math.Log(u1)) * Math.Sin(2.0 * Math.PI * u2);
+            return (float)randStdNormal;
+        }
+
+        public static float NextGaussian(float mean, float stdDev)
+        {
+            float randStdNormal = NextGaussian();
+            float randNormal = mean + stdDev * randStdNormal;
+            return randNormal;
         }
     }
 }
