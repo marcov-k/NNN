@@ -93,9 +93,6 @@
         }
       },
       "NumSharp/0.30.0": {
-        "dependencies": {
-          "System.Memory": "4.5.5"
-        },
         "runtime": {
           "lib/netstandard2.0/NumSharp.dll": {
             "assemblyVersion": "0.30.0.0",
@@ -178,13 +175,11 @@
           }
         }
       },
-      "System.Memory/4.5.5": {},
       "TorchSharp/0.105.1": {
         "dependencies": {
           "Google.Protobuf": "3.21.9",
           "SharpZipLib": "1.4.0",
-          "SkiaSharp": "2.88.6",
-          "System.Memory": "4.5.5"
+          "SkiaSharp": "2.88.6"
         },
         "runtime": {
           "lib/net6.0/TorchSharp.dll": {
@@ -300,13 +295,6 @@
       "sha512": "sha512-7TzFO0u/g2MpQsTty4fyCDdMcfcWI+aLswwfnYXr3gtNS6VLKdMXPMeKpJa3pJSLnUBN6wD0JjuCe8OoLBQ6cQ==",
       "path": "skiasharp.nativeassets.win32/2.88.6",
       "hashPath": "skiasharp.nativeassets.win32.2.88.6.nupkg.sha512"
-    },
-    "System.Memory/4.5.5": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-XIWiDvKPXaTveaB7HVganDlOCRoj03l+jrwNvcge/t8vhGYKvqV+dMv6G4SAX2NoNmN0wZfVPTAlFwZcZvVOUw==",
-      "path": "system.memory/4.5.5",
-      "hashPath": "system.memory.4.5.5.nupkg.sha512"
     },
     "TorchSharp/0.105.1": {
       "type": "package",
