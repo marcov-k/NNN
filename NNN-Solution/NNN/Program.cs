@@ -1,5 +1,7 @@
 ﻿using NNN;
 
+Model model;
+
 NDArray inputs = new(10, 1);
 NDArray targets = new(10, 1);
 
@@ -13,11 +15,6 @@ for (int i = 0; i < inputs.ElementCount; i++)
 (inputs, float inNorm) = NDArray.Normalize(inputs);
 (targets, float outNorm) = NDArray.Normalize(targets);
 
-Model model = new([new Dense(5, new Sigmoid()), new Dense(5, new Sigmoid()), new Dense(1, new Linear())], inputs);
-Trainer trainer = new(model, optimizer: new SGD(learningRate: 0.01f), cost: new MSE());
-
-trainer.Train(inputs, targets, 50000);
-
 NDArray testInputs = new(30, 1);
 NDArray testTargets = new(30, 1);
 for (int i = 0; i < testInputs.ElementCount; i++)
@@ -29,28 +26,146 @@ for (int i = 0; i < testInputs.ElementCount; i++)
 
 testInputs = NDArray.Normalize(testInputs, inNorm).normalizedArray;
 
-var predictions = model.Forward(testInputs);
-predictions = NDArray.UnnormalizeArray(predictions, outNorm);
-
 foreach (var target in testTargets.ToLinearArray())
 {
     target.Value = MathF.Round(target.Value, MidpointRounding.AwayFromZero);
 }
-foreach (var prediction in predictions.ToLinearArray())
+
+InteractionLoop();
+
+void InteractionLoop()
 {
-    prediction.Value = MathF.Round(prediction.Value, MidpointRounding.AwayFromZero);
+    Console.WriteLine("Welcome to the Neural Network Nonsense Terminal (Enter Q to quit)");
+
+    string fileName;
+
+    string input = GetInput("Load model from file? y/n", ["y", "n"]);
+    if (input == "y")
+    {
+        fileName = GetFileName();
+        model = Saver.LoadModel(fileName);
+        TrainingLoop();
+    }
+    else
+    {
+        model = new([new Dense(5, new Sigmoid()), new Dense(5, new Sigmoid()), new Dense(1, new Linear())], inputs);
+        TrainingLoop();
+    }
+
+    input = GetInput("Save model to a file? y/n", ["y", "n"]);
+    if (input == "y")
+    {
+        SaveLoop();
+    }
+
+    Console.WriteLine("\nPress any key to quit...");
+    Console.ReadKey();
+    Environment.Exit(0);
 }
 
-Console.WriteLine();
-Console.WriteLine($"Inputs:   {NDArray.UnnormalizeArray(testInputs, inNorm)}");
-Console.WriteLine($"Targets:  {testTargets}");
-Console.WriteLine($"Predicts: {predictions}");
+string GetInput(string prompt, List<string>? options = null)
+{
+    options ??= [];
+    for (int i = 0; i < options.Count; i++)
+    {
+        options[i] = options[i].ToLowerInvariant();
+    }
 
-Console.WriteLine("\nPress any key to quit...");
-Console.ReadKey();
+    string input;
+    while (true)
+    {
+        Console.WriteLine($"\n{prompt}");
+        input = Console.ReadLine().ToLowerInvariant();
+
+        if (input == "q") Environment.Exit(0);
+        else if (options.Count == 0 || options.Contains(input)) return input;
+    }
+}
+
+string GetFileName()
+{
+    string input;
+    while (true)
+    {
+        input = GetInput("Enter file name");
+        if (Saver.FileExists(input)) return input;
+        else Console.WriteLine("\nFile not found");
+    }
+}
+
+int GetInteger(string prompt)
+{
+    string input;
+    while (true)
+    {
+        input = GetInput(prompt);
+        if (int.TryParse(input, out int integer)) return integer;
+        else Console.WriteLine("\nNot a valid number");
+    }
+}
+
+void TrainingLoop()
+{
+    Trainer trainer = new(model, optimizer: new SGD(learningRate: 0.01f), cost: new MSE());
+    string input;
+    int epochs;
+
+    while (true)
+    {
+        input = GetInput("Train model? y/n", ["y", "n"]);
+        if (input == "y")
+        {
+            epochs = GetInteger("Enter number of training epochs");
+            trainer.Train(inputs, targets, epochs);
+
+            var predictions = model.Forward(testInputs);
+            predictions = NDArray.UnnormalizeArray(predictions, outNorm);
+
+            foreach (var prediction in predictions.ToLinearArray())
+            {
+                prediction.Value = MathF.Round(prediction.Value, MidpointRounding.AwayFromZero);
+            }
+
+            Console.WriteLine($"\nRunning test data...\n");
+            Console.WriteLine($"Inputs:   {NDArray.UnnormalizeArray(testInputs, inNorm)}");
+            Console.WriteLine($"Targets:  {testTargets}");
+            Console.WriteLine($"Predicts: {predictions}");
+        }
+        else break;
+    }
+}
+
+void SaveLoop()
+{
+    string fileName;
+    string input;
+
+    while (true)
+    {
+        fileName = GetInput("Enter file name");
+        if (Saver.FileExists(fileName))
+        {
+            input = GetInput($"File with name \"{fileName}\" already exists. Overwrite existing file? y/n", ["y", "n"]);
+            if (input == "y")
+            {
+                Saver.SaveModel(model, fileName);
+                Console.WriteLine("\nModel saved");
+                break;
+            }
+        }
+        else
+        {
+            Saver.SaveModel(model, fileName);
+            Console.WriteLine("\nModel saved");
+            break;
+        }
+    }
+}
 
 namespace NNN
 {
+    using System.Text.Json;
+
     public class Trainer(Model model, Optimizer optimizer, Cost cost)
     {
         readonly Model Model = model;
@@ -97,12 +212,35 @@ namespace NNN
 
     public class Model
     {
-        readonly Layer[] Layers;
+        public Layer[] Layers { get; private set; }
 
         public Model(Layer[] layers, NDArray inputFormat)
         {
             Layers = layers;
             SetUpLayers(inputFormat);
+        }
+
+        public Model(Saver.ModelData data)
+        {
+            Layers = new Layer[data.Layers.Length];
+
+            BuildFromData(data);
+        }
+
+        void BuildFromData(Saver.ModelData data)
+        {
+            for (int i = 0; i < data.Layers.Length; i++)
+            {
+                var layerData = data.Layers[i];
+
+                var layerType = Type.GetType(layerData.LayerName);
+                if (layerType != null)
+                {
+                    var layer = Activator.CreateInstance(layerType) as Layer;
+                    layer?.BuildFromData(layerData);
+                    if (layer != null) Layers[i] = layer;
+                }
+            }
         }
 
         public void SetUpLayers(NDArray inputFormat)
@@ -142,9 +280,16 @@ namespace NNN
         }
     }
 
-    public class Layer(int neuronCount)
+    public class Layer
     {
-        public int NeuronCount { get; protected set; } = neuronCount;
+        public int NeuronCount { get; protected set; }
+
+        public Layer(int neuronCount)
+        {
+            NeuronCount = neuronCount;
+        }
+
+        public Layer() { }
 
         public virtual void SetUpLayer(int inputCount)
         {
@@ -165,13 +310,26 @@ namespace NNN
         {
             throw new NotImplementedException();
         }
+
+        public virtual void BuildFromData(Saver.LayerData data)
+        {
+            throw new NotImplementedException();
+        }
     }
 
-    public class Dense(int neuronCount, Activation activation) : Layer(neuronCount)
+    public class Dense : Layer
     {
-        NDArray Weights = new();
-        NDArray Biases = new();
-        readonly Activation Activation = activation;
+        public NDArray Weights { get; private set; } = new();
+        public NDArray Biases { get; private set; } = new();
+        public Activation Activation { get; private set; } = new();
+
+        public Dense(int neuronCount, Activation activation)
+        {
+            NeuronCount = neuronCount;
+            Activation = activation;
+        }
+
+        public Dense() { }
 
         public override void SetUpLayer(int inputCount)
         {
@@ -208,6 +366,19 @@ namespace NNN
             foreach (var bias in Biases.ToLinearArray())
             {
                 bias.ZeroGradient();
+            }
+        }
+
+        public override void BuildFromData(Saver.LayerData data)
+        {
+            NeuronCount = data.NeuronCount;
+            Weights = data.Weights;
+            Biases = data.Biases;
+
+            var activType = Type.GetType(data.Activation);
+            if (activType != null)
+            {
+                Activation = Activator.CreateInstance(activType) as Activation ?? new();
             }
         }
     }
@@ -294,11 +465,12 @@ namespace NNN
         }
     }
 
+    [Serializable]
     public class NDArray
     {
-        readonly Number[] Data;
-        public readonly int[] Dimensions;
-        readonly int[] Multipliers;
+        public Number[] Data { get; set; }
+        public int[] Dimensions { get; set; }
+        public int[] Multipliers { get; set; }
 
         public int Rank => Dimensions.Length;
         public int ElementCount => Data.Length;
@@ -679,12 +851,22 @@ namespace NNN
         }
     }
 
-    public class Number(float value, List<Number>? dependsOn = null, string creationOp = "")
+    [Serializable]
+    public class Number
     {
-        public float Value { get; set; } = value;
-        public float Gradient { get; private set; } = 0;
-        readonly List<Number> DependsOn = dependsOn ?? [];
-        readonly string CreationOp = creationOp;
+        public float Value { get; set; }
+        public float Gradient = 0;
+        public List<Number> DependsOn = [];
+        public string CreationOp = "";
+
+        public Number(float value, List<Number>? dependsOn = null, string creationOp = "")
+        {
+            Value = value;
+            DependsOn = dependsOn ?? [];
+            CreationOp = creationOp;
+        }
+
+        public Number() { }
 
         public static Number operator +(Number a, Number b)
         {
@@ -860,6 +1042,77 @@ namespace NNN
             float randStdNormal = NextGaussian();
             float randNormal = mean + stdDev * randStdNormal;
             return randNormal;
+        }
+    }
+
+    public static class Saver
+    {
+        const string Extension = ".nnn";
+
+#pragma warning disable CS8604 // Possible null reference argument.
+        public static void SaveModel(Model model, string fileName)
+        {
+            fileName += Extension;
+
+            var layers = new LayerData[model.Layers.Length];
+            for (int i = 0; i < layers.Length; i++)
+            {
+                var layer = model.Layers[i];
+
+                switch (layer)
+                {
+                    case Dense dense:
+                        LayerData layerData = new(dense.NeuronCount, dense.GetType().AssemblyQualifiedName, dense.Weights,
+                            dense.Biases, dense.Activation.GetType().AssemblyQualifiedName);
+                        layers[i] = layerData;
+
+                        break;
+                }
+            }
+
+            ModelData modelData = new(layers);
+
+            string json = JsonSerializer.Serialize(modelData);
+
+            File.WriteAllText(fileName, json);
+        }
+
+        public static Model LoadModel(string fileName)
+        {
+            fileName += Extension;
+
+            string json = File.ReadAllText(fileName);
+
+            var modelData = JsonSerializer.Deserialize<ModelData>(json);
+
+            Model model = new(modelData);
+
+            return model;
+        }
+#pragma warning restore CS8604 // Possible null reference argument.
+
+        public static bool FileExists(string fileName)
+        {
+            fileName += Extension;
+
+            if (File.Exists(fileName)) return true;
+            else return false;
+        }
+
+        [Serializable]
+        public class ModelData(LayerData[] layers)
+        {
+            public LayerData[] Layers { get; set; } = layers;
+        }
+
+        [Serializable]
+        public class LayerData(int neuronCount, string layerName, NDArray weights, NDArray biases, string activation)
+        {
+            public int NeuronCount { get; set; } = neuronCount;
+            public string LayerName { get; set; } = layerName;
+            public NDArray Weights { get; set; } = weights;
+            public NDArray Biases { get; set; } = biases;
+            public string Activation { get; set; } = activation;
         }
     }
 }
