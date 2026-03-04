@@ -75,7 +75,7 @@ string GetInput(string prompt, List<string>? options = null)
     while (true)
     {
         Console.WriteLine($"\n{prompt}");
-        input = Console.ReadLine().ToLowerInvariant();
+        input = Console.ReadLine()?.ToLowerInvariant() ?? "";
 
         if (input == "q") Environment.Exit(0);
         else if (options.Count == 0 || options.Contains(input)) return input;
@@ -110,6 +110,7 @@ void TrainingLoop()
     string input;
     int epochs;
 
+    NDArray predictions;
     while (true)
     {
         input = GetInput("Train model? y/n", ["y", "n"]);
@@ -118,7 +119,7 @@ void TrainingLoop()
             epochs = GetInteger("Enter number of training epochs");
             trainer.Train(inputs, targets, epochs);
 
-            var predictions = model.Forward(testInputs);
+            predictions = model.Forward(testInputs);
             predictions = NDArray.UnnormalizeArray(predictions, outNorm);
 
             foreach (var prediction in predictions.ToLinearArray())
@@ -174,12 +175,14 @@ namespace NNN
 
         public void Train(NDArray inputs, NDArray targets, int epochs)
         {
-            int logEvery = Math.Max(1, epochs / 500);
+            int logEvery = Math.Max(100, epochs / 500);
+            NDArray predictions;
+            Number loss;
             for (int e = 0; e < epochs; e++)
             {
                 Model.ZeroGrad();
-                var predictions = Model.Forward(inputs);
-                var loss = Cost.CalculateCost(predictions, targets);
+                predictions = Model.Forward(inputs);
+                loss = Cost.CalculateCost(predictions, targets);
                 loss.Backward();
 
                 Model.Optimize(Optimizer);
@@ -229,11 +232,13 @@ namespace NNN
 
         void BuildFromData(Saver.ModelData data)
         {
+            Saver.LayerData layerData;
+            Type? layerType;
             for (int i = 0; i < data.Layers.Length; i++)
             {
-                var layerData = data.Layers[i];
+                layerData = data.Layers[i];
 
-                var layerType = Type.GetType(layerData.LayerName);
+                layerType = Type.GetType(layerData.LayerName);
                 if (layerType != null)
                 {
                     var layer = Activator.CreateInstance(layerType) as Layer;
@@ -480,6 +485,7 @@ namespace NNN
             AssertElementwiseDims(a, b);
 
             NDArray output = new(a.Dimensions);
+
             for (int i = 0; i < a.ElementCount; i++)
             {
                 output[i] = a[i] + b[i];
@@ -493,6 +499,7 @@ namespace NNN
             AssertElementwiseDims(a, b);
 
             NDArray output = new(a.Dimensions);
+
             for (int i = 0; i < a.ElementCount; i++)
             {
                 output[i] = a[i] - b[i];
@@ -506,6 +513,7 @@ namespace NNN
             AssertElementwiseDims(a, b);
 
             NDArray output = new(a.Dimensions);
+
             for (int i = 0; i < a.ElementCount; i++)
             {
                 output[i] = a[i] * b[i];
@@ -566,9 +574,10 @@ namespace NNN
         {
             NDArray output = new(inputCount, neuronCount);
 
+            float weight;
             for (int i = 0; i < output.ElementCount; i++)
             {
-                float weight = MathUtils.NextGaussian(0, MathF.Sqrt(2f / inputCount));
+                weight = MathUtils.NextGaussian(0, MathF.Sqrt(2f / inputCount));
                 output[i] = new(weight);
             }
 
@@ -598,13 +607,15 @@ namespace NNN
 
             NDArray output = new(outputDims);
 
+            int[] inputIndices;
+            int[] outputIndices;
             for (int i = 0; i < output.GetLength(0); i++)
             {
                 for (int j = 0; j < array.ElementCount; j++)
                 {
-                    var inputIndices = array.GetFullIndices(j);
+                    inputIndices = array.GetFullIndices(j);
 
-                    var outputIndices = new int[output.Rank];
+                    outputIndices = new int[output.Rank];
                     outputIndices[0] = i;
                     for (int k = 1; k < outputIndices.Length; k++)
                     {
@@ -694,11 +705,13 @@ namespace NNN
 
             NDArray output = new(extractDims);
 
+            int[] extractIndices;
+            int[] parentIndices;
             for (int i = 0; i < output.ElementCount; i++)
             {
-                var extractIndices = output.GetFullIndices(i);
+                extractIndices = output.GetFullIndices(i);
 
-                var parentIndices = new int[extractIndices.Length + 1];
+                parentIndices = new int[extractIndices.Length + 1];
 
                 parentIndices[0] = firstDimIndex;
                 for (int j = 1; j < parentIndices.Length; j++)
@@ -714,11 +727,13 @@ namespace NNN
 
         public void InsertSubArray(int firstDimIndex, NDArray subArray)
         {
+            int[] subIndices;
+            int[] parentIndices;
             for (int i = 0; i < subArray.ElementCount; i++)
             {
-                var subIndices = subArray.GetFullIndices(i);
+                subIndices = subArray.GetFullIndices(i);
 
-                var parentIndices = new int[subIndices.Length + 1];
+                parentIndices = new int[subIndices.Length + 1];
 
                 parentIndices[0] = firstDimIndex;
                 for (int j = 1; j < parentIndices.Length; j++)
@@ -957,10 +972,10 @@ namespace NNN
 
                     break;
                 case "*":
-                    newGrad = DependsOn[1].Value * Gradient;
+                    newGrad = Gradient * DependsOn[1].Value;
                     DependsOn[0].Backward(newGrad);
 
-                    newGrad = DependsOn[0].Value * Gradient;
+                    newGrad = Gradient * DependsOn[0].Value;
                     DependsOn[1].Backward(newGrad);
 
                     break;
