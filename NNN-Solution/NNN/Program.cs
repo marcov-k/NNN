@@ -175,7 +175,7 @@ namespace NNN
 
         public void Train(NDArray inputs, NDArray targets, int epochs)
         {
-            int logEvery = Math.Max(100, epochs / 500);
+            int logEvery = Math.Max(100, MathUtils.RoundToInterval(epochs / 500f, 100));
             NDArray predictions;
             Number loss;
             for (int e = 0; e < epochs; e++)
@@ -1057,6 +1057,11 @@ namespace NNN
             float randStdNormal = NextGaussian();
             float randNormal = mean + stdDev * randStdNormal;
             return randNormal;
+        }
+
+        public static int RoundToInterval(float value, int interval)
+        {
+            return (int)MathF.Round(value / interval, MidpointRounding.AwayFromZero) * interval;
         }
     }
 
