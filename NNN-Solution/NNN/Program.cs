@@ -2,8 +2,8 @@
 
 Model model;
 
-NDArray inputs = new(10, 1);
-NDArray targets = new(10, 1);
+Tensor inputs = new(10, 1);
+Tensor targets = new(10, 1);
 
 for (int i = 0; i < inputs.ElementCount; i++)
 {
@@ -12,11 +12,11 @@ for (int i = 0; i < inputs.ElementCount; i++)
     targets[i] = new(value * value);
 }
 
-(inputs, float inNorm) = NDArray.Normalize(inputs);
-(targets, float outNorm) = NDArray.Normalize(targets);
+(inputs, float inNorm) = Tensor.Normalize(inputs);
+(targets, float outNorm) = Tensor.Normalize(targets);
 
-NDArray testInputs = new(30, 1);
-NDArray testTargets = new(30, 1);
+Tensor testInputs = new(30, 1);
+Tensor testTargets = new(30, 1);
 for (int i = 0; i < testInputs.ElementCount; i++)
 {
     float value = i * 0.5f;
@@ -24,7 +24,7 @@ for (int i = 0; i < testInputs.ElementCount; i++)
     testTargets[i] = new(value * value);
 }
 
-testInputs = NDArray.Normalize(testInputs, inNorm).normalizedArray;
+testInputs = Tensor.Normalize(testInputs, inNorm).normalizedArray;
 
 foreach (var target in testTargets.ToLinearArray())
 {
@@ -110,7 +110,7 @@ void TrainingLoop()
     string input;
     int epochs;
 
-    NDArray predictions;
+    Tensor predictions;
     while (true)
     {
         input = GetInput("Train model? y/n", ["y", "n"]);
@@ -120,7 +120,7 @@ void TrainingLoop()
             trainer.Train(inputs, targets, epochs);
 
             predictions = model.Forward(testInputs);
-            predictions = NDArray.UnnormalizeArray(predictions, outNorm);
+            predictions = Tensor.UnnormalizeArray(predictions, outNorm);
 
             foreach (var prediction in predictions.ToLinearArray())
             {
@@ -128,7 +128,7 @@ void TrainingLoop()
             }
 
             Console.WriteLine($"\nRunning test data...\n");
-            Console.WriteLine($"Inputs:   {NDArray.UnnormalizeArray(testInputs, inNorm)}");
+            Console.WriteLine($"Inputs:   {Tensor.UnnormalizeArray(testInputs, inNorm)}");
             Console.WriteLine($"Targets:  {testTargets}");
             Console.WriteLine($"Predicts: {predictions}");
         }
@@ -173,10 +173,10 @@ namespace NNN
         readonly Optimizer Optimizer = optimizer;
         readonly Cost Cost = cost;
 
-        public void Train(NDArray inputs, NDArray targets, int epochs)
+        public void Train(Tensor inputs, Tensor targets, int epochs)
         {
             int logEvery = Math.Max(100, MathUtils.RoundToInterval(epochs / 500f, 100));
-            NDArray predictions;
+            Tensor predictions;
             Number loss;
             for (int e = 0; e < epochs; e++)
             {
@@ -217,7 +217,7 @@ namespace NNN
     {
         public Layer[] Layers { get; private set; }
 
-        public Model(Layer[] layers, NDArray inputFormat)
+        public Model(Layer[] layers, Tensor inputFormat)
         {
             Layers = layers;
             SetUpLayers(inputFormat);
@@ -248,7 +248,7 @@ namespace NNN
             }
         }
 
-        public void SetUpLayers(NDArray inputFormat)
+        public void SetUpLayers(Tensor inputFormat)
         {
             int inputs = inputFormat.GetLength(1);
             foreach (var layer in Layers)
@@ -258,7 +258,7 @@ namespace NNN
             }
         }
 
-        public NDArray Forward(NDArray input)
+        public Tensor Forward(Tensor input)
         {
             var output = input;
             foreach (var layer in Layers)
@@ -301,7 +301,7 @@ namespace NNN
             throw new NotImplementedException();
         }
 
-        public virtual NDArray Forward(NDArray input)
+        public virtual Tensor Forward(Tensor input)
         {
             throw new NotImplementedException();
         }
@@ -324,8 +324,8 @@ namespace NNN
 
     public class Dense : Layer
     {
-        public NDArray Weights { get; private set; } = new();
-        public NDArray Biases { get; private set; } = new();
+        public Tensor Weights { get; private set; } = new();
+        public Tensor Biases { get; private set; } = new();
         public Activation Activation { get; private set; } = new();
 
         public Dense(int neuronCount, Activation activation)
@@ -338,14 +338,14 @@ namespace NNN
 
         public override void SetUpLayer(int inputCount)
         {
-            Weights = NDArray.InitWeights(inputCount, NeuronCount);
-            Biases = NDArray.InitBias(NeuronCount);
+            Weights = Tensor.InitWeights(inputCount, NeuronCount);
+            Biases = Tensor.InitBias(NeuronCount);
         }
 
-        public override NDArray Forward(NDArray input)
+        public override Tensor Forward(Tensor input)
         {
             var output = input ^ Weights;
-            output += NDArray.Broadcast(Biases, output.GetLength(0));
+            output += Tensor.Broadcast(Biases, output.GetLength(0));
             output = Activation.Forward(output);
             return output;
         }
@@ -390,7 +390,7 @@ namespace NNN
 
     public class Activation
     {
-        public virtual NDArray Forward(NDArray input)
+        public virtual Tensor Forward(Tensor input)
         {
             throw new NotImplementedException();
         }
@@ -400,9 +400,9 @@ namespace NNN
     {
         readonly float Tau = tau;
 
-        public override NDArray Forward(NDArray input)
+        public override Tensor Forward(Tensor input)
         {
-            NDArray output = new(input.Dimensions);
+            Tensor output = new(input.Dimensions);
 
             for (int i = 0; i < input.ElementCount; i++)
             {
@@ -416,9 +416,9 @@ namespace NNN
 
     public class Tanh : Activation
     {
-        public override NDArray Forward(NDArray input)
+        public override Tensor Forward(Tensor input)
         {
-            NDArray output = new(input.Dimensions);
+            Tensor output = new(input.Dimensions);
 
             for (int i = 0; i < input.ElementCount; i++)
             {
@@ -431,9 +431,9 @@ namespace NNN
 
     public class Sigmoid : Activation
     {
-        public override NDArray Forward(NDArray input)
+        public override Tensor Forward(Tensor input)
         {
-            NDArray output = new(input.Dimensions);
+            Tensor output = new(input.Dimensions);
 
             for (int i = 0; i < input.ElementCount; i++)
             {
@@ -446,7 +446,7 @@ namespace NNN
 
     public class Linear : Activation
     {
-        public override NDArray Forward(NDArray input)
+        public override Tensor Forward(Tensor input)
         {
             return input;
         }
@@ -454,7 +454,7 @@ namespace NNN
 
     public class Cost
     {
-        public virtual Number CalculateCost(NDArray input, NDArray target)
+        public virtual Number CalculateCost(Tensor input, Tensor target)
         {
             throw new NotImplementedException();
         }
@@ -462,16 +462,16 @@ namespace NNN
 
     public class MSE : Cost
     {
-        public override Number CalculateCost(NDArray input, NDArray target)
+        public override Number CalculateCost(Tensor input, Tensor target)
         {
             var diff = input - target;
             diff *= diff;
-            return NDArray.Mean(diff);
+            return Tensor.Mean(diff);
         }
     }
 
     [Serializable]
-    public class NDArray
+    public class Tensor
     {
         public Number[] Data { get; set; }
         public int[] Dimensions { get; set; }
@@ -480,11 +480,11 @@ namespace NNN
         public int Rank => Dimensions.Length;
         public int ElementCount => Data.Length;
 
-        public static NDArray operator +(NDArray a, NDArray b)
+        public static Tensor operator +(Tensor a, Tensor b)
         {
             AssertElementwiseDims(a, b);
 
-            NDArray output = new(a.Dimensions);
+            Tensor output = new(a.Dimensions);
 
             for (int i = 0; i < a.ElementCount; i++)
             {
@@ -494,11 +494,11 @@ namespace NNN
             return output;
         }
 
-        public static NDArray operator -(NDArray a, NDArray b)
+        public static Tensor operator -(Tensor a, Tensor b)
         {
             AssertElementwiseDims(a, b);
 
-            NDArray output = new(a.Dimensions);
+            Tensor output = new(a.Dimensions);
 
             for (int i = 0; i < a.ElementCount; i++)
             {
@@ -508,11 +508,11 @@ namespace NNN
             return output;
         }
 
-        public static NDArray operator *(NDArray a, NDArray b)
+        public static Tensor operator *(Tensor a, Tensor b)
         {
             AssertElementwiseDims(a, b);
 
-            NDArray output = new(a.Dimensions);
+            Tensor output = new(a.Dimensions);
 
             for (int i = 0; i < a.ElementCount; i++)
             {
@@ -522,7 +522,7 @@ namespace NNN
             return output;
         }
 
-        public static NDArray operator ^(NDArray a, NDArray b)
+        public static Tensor operator ^(Tensor a, Tensor b)
         {
             AssertMultiplicationDims(a, b);
 
@@ -533,7 +533,7 @@ namespace NNN
             }
             resultDims[^1] = b.Dimensions[^1];
 
-            NDArray output = new(resultDims);
+            Tensor output = new(resultDims);
             if (a.Rank > 2)
             {
                 // Recursively reduce arrays down to batches of 2D matrices
@@ -565,14 +565,14 @@ namespace NNN
             return output;
         }
 
-        public static Number Mean(NDArray input)
+        public static Number Mean(Tensor input)
         {
             return Number.Mean(input.ToLinearArray());
         }
 
-        public static NDArray InitWeights(int inputCount, int neuronCount)
+        public static Tensor InitWeights(int inputCount, int neuronCount)
         {
-            NDArray output = new(inputCount, neuronCount);
+            Tensor output = new(inputCount, neuronCount);
 
             float weight;
             for (int i = 0; i < output.ElementCount; i++)
@@ -584,9 +584,9 @@ namespace NNN
             return output;
         }
 
-        public static NDArray InitBias(int neuronCount)
+        public static Tensor InitBias(int neuronCount)
         {
-            NDArray output = new(neuronCount);
+            Tensor output = new(neuronCount);
 
             for (int i = 0; i < output.ElementCount; i++)
             {
@@ -596,7 +596,7 @@ namespace NNN
             return output;
         }
 
-        public static NDArray Broadcast(NDArray array, int firstDimLength)
+        public static Tensor Broadcast(Tensor array, int firstDimLength)
         {
             var outputDims = new int[array.Rank + 1];
             outputDims[0] = firstDimLength;
@@ -605,7 +605,7 @@ namespace NNN
                 outputDims[i] = array.Dimensions[i - 1];
             }
 
-            NDArray output = new(outputDims);
+            Tensor output = new(outputDims);
 
             int[] inputIndices;
             int[] outputIndices;
@@ -629,7 +629,7 @@ namespace NNN
             return output;
         }
 
-        public NDArray(params int[] dimensions)
+        public Tensor(params int[] dimensions)
         {
             Dimensions = (int[])dimensions.Clone();
             Multipliers = new int[Dimensions.Length];
@@ -683,9 +683,9 @@ namespace NNN
             return output;
         }
 
-        public NDArray[] ReduceDimensions()
+        public Tensor[] ReduceDimensions()
         {
-            var output = new NDArray[Dimensions[0]];
+            var output = new Tensor[Dimensions[0]];
 
             for (int i = 0; i < output.Length; i++)
             {
@@ -695,7 +695,7 @@ namespace NNN
             return output;
         }
 
-        NDArray ExtractSubArray(int firstDimIndex)
+        Tensor ExtractSubArray(int firstDimIndex)
         {
             var extractDims = new int[Rank - 1];
             for (int i = 1; i < Rank; i++)
@@ -703,7 +703,7 @@ namespace NNN
                 extractDims[i - 1] = Dimensions[i];
             }
 
-            NDArray output = new(extractDims);
+            Tensor output = new(extractDims);
 
             int[] extractIndices;
             int[] parentIndices;
@@ -725,7 +725,7 @@ namespace NNN
             return output;
         }
 
-        public void InsertSubArray(int firstDimIndex, NDArray subArray)
+        public void InsertSubArray(int firstDimIndex, Tensor subArray)
         {
             int[] subIndices;
             int[] parentIndices;
@@ -745,7 +745,7 @@ namespace NNN
             }
         }
 
-        public static NDArray Transpose(NDArray array, int[]? axes = null)
+        public static Tensor Transpose(Tensor array, int[]? axes = null)
         {
             if (axes == null)
             {
@@ -760,7 +760,7 @@ namespace NNN
 
             var outputDims = RemapIndices(array.Dimensions, axes);
 
-            NDArray output = new(outputDims);
+            Tensor output = new(outputDims);
 
             for (int i = 0; i < array.ElementCount; i++)
             {
@@ -770,7 +770,7 @@ namespace NNN
             return output;
         }
 
-        public static (NDArray normalizedArray, float normalizeFactor) Normalize(NDArray array, float? normalizeFactor = null)
+        public static (Tensor normalizedArray, float normalizeFactor) Normalize(Tensor array, float? normalizeFactor = null)
         {
             float maxValue = array[0].Value;
             if (normalizeFactor == null)
@@ -782,7 +782,7 @@ namespace NNN
             }
             else maxValue = normalizeFactor.Value;
 
-            NDArray output = new(array.Dimensions);
+            Tensor output = new(array.Dimensions);
             for (int i = 0; i < array.ElementCount; i++)
             {
                 output[i] = new(array[i].Value / maxValue);
@@ -791,9 +791,9 @@ namespace NNN
             return (output, maxValue);
         }
 
-        public static NDArray UnnormalizeArray(NDArray array, float normalizeFactor)
+        public static Tensor UnnormalizeArray(Tensor array, float normalizeFactor)
         {
-            NDArray output = new(array.Dimensions);
+            Tensor output = new(array.Dimensions);
             for (int i = 0; i < array.ElementCount; i++)
             {
                 output[i] = new(array[i].Value * normalizeFactor);
@@ -828,7 +828,7 @@ namespace NNN
 
         public int GetLength(int dimension) => Dimensions[dimension];
 
-        static void AssertElementwiseDims(NDArray a, NDArray b)
+        static void AssertElementwiseDims(Tensor a, Tensor b)
         {
             if (a.Rank != b.Rank) throw new ArgumentException("Array dimensions mismatch");
             else
@@ -840,7 +840,7 @@ namespace NNN
             }
         }
 
-        static void AssertMultiplicationDims(NDArray a, NDArray b)
+        static void AssertMultiplicationDims(Tensor a, Tensor b)
         {
             if (a.Rank != b.Rank) throw new ArgumentException("Invalid array dimensions");
             else
@@ -1126,12 +1126,12 @@ namespace NNN
         }
 
         [Serializable]
-        public class LayerData(int neuronCount, string layerName, NDArray weights, NDArray biases, string activation)
+        public class LayerData(int neuronCount, string layerName, Tensor weights, Tensor biases, string activation)
         {
             public int NeuronCount { get; set; } = neuronCount;
             public string LayerName { get; set; } = layerName;
-            public NDArray Weights { get; set; } = weights;
-            public NDArray Biases { get; set; } = biases;
+            public Tensor Weights { get; set; } = weights;
+            public Tensor Biases { get; set; } = biases;
             public string Activation { get; set; } = activation;
         }
     }
