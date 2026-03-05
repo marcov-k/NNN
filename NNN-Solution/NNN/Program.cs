@@ -2,8 +2,8 @@
 
 Model model;
 
-Tensor inputs = new(10, 1);
-Tensor targets = new(10, 1);
+Tensor inputs = new(20, 1);
+Tensor targets = new(20, 1);
 
 for (int i = 0; i < inputs.ElementCount; i++)
 {
@@ -15,8 +15,8 @@ for (int i = 0; i < inputs.ElementCount; i++)
 (inputs, float inNorm) = Tensor.Normalize(inputs);
 (targets, float outNorm) = Tensor.Normalize(targets);
 
-Tensor testInputs = new(30, 1);
-Tensor testTargets = new(30, 1);
+Tensor testInputs = new(80, 1);
+Tensor testTargets = new(80, 1);
 for (int i = 0; i < testInputs.ElementCount; i++)
 {
     float value = i * 0.5f;
@@ -111,6 +111,8 @@ void TrainingLoop()
     int epochs;
 
     Tensor predictions;
+    Tensor diff;
+    float avgDiff;
     while (true)
     {
         input = GetInput("Train model? y/n", ["y", "n"]);
@@ -127,10 +129,14 @@ void TrainingLoop()
                 prediction.Value = MathF.Round(prediction.Value, MidpointRounding.AwayFromZero);
             }
 
+            diff = testTargets - predictions;
+            avgDiff = Number.Mean(diff.Data).Value;
+
             Console.WriteLine($"\nRunning test data...\n");
             Console.WriteLine($"Inputs:   {Tensor.UnnormalizeArray(testInputs, inNorm)}");
             Console.WriteLine($"Targets:  {testTargets}");
             Console.WriteLine($"Predicts: {predictions}");
+            Console.WriteLine($"Average difference: {avgDiff:F2}");
         }
         else break;
     }
@@ -165,6 +171,7 @@ void SaveLoop()
 
 namespace NNN
 {
+    using System.Diagnostics;
     using System.Text.Json;
 
     public class Trainer(Model model, Optimizer optimizer, Cost cost)
@@ -175,9 +182,13 @@ namespace NNN
 
         public void Train(Tensor inputs, Tensor targets, int epochs)
         {
+            Stopwatch timer = new();
+
             int logEvery = Math.Max(100, MathUtils.RoundToInterval(epochs / 500f, 100));
             Tensor predictions;
             Number loss;
+
+            timer.Start();
             for (int e = 0; e < epochs; e++)
             {
                 Model.ZeroGrad();
@@ -189,7 +200,8 @@ namespace NNN
 
                 if (e % logEvery == 0 || e == epochs - 1)
                 {
-                    Console.WriteLine($"Epoch {e} : Loss = {loss.Value}");
+                    Console.WriteLine($"Epoch {e} : Loss = {loss.Value} : Time elapsed = {timer.ElapsedMilliseconds}ms : Time per epoch = {((float)timer.ElapsedMilliseconds / logEvery):F2}ms");
+                    timer.Restart();
                 }
             }
         }
