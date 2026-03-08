@@ -44,6 +44,7 @@ void InteractionLoop()
     {
         fileName = GetFileName();
         model = Saver.LoadModel(fileName);
+        TestModel();
         TrainingLoop();
     }
     else
@@ -110,9 +111,6 @@ void TrainingLoop()
     string input;
     int epochs;
 
-    Tensor predictions;
-    Tensor diff;
-    float avgDiff;
     while (true)
     {
         input = GetInput("Train model? y/n", ["y", "n"]);
@@ -120,26 +118,30 @@ void TrainingLoop()
         {
             epochs = GetInteger("Enter number of training epochs");
             trainer.Train(inputs, targets, epochs);
-
-            predictions = model.Forward(testInputs);
-            predictions = Tensor.UnnormalizeArray(predictions, outNorm);
-
-            foreach (var prediction in predictions.ToLinearArray())
-            {
-                prediction.Value = MathF.Round(prediction.Value, MidpointRounding.AwayFromZero);
-            }
-
-            diff = testTargets - predictions;
-            avgDiff = Number.Mean(diff.Data).Value;
-
-            Console.WriteLine($"\nRunning test data...\n");
-            Console.WriteLine($"Inputs:   {Tensor.UnnormalizeArray(testInputs, inNorm)}");
-            Console.WriteLine($"Targets:  {testTargets}");
-            Console.WriteLine($"Predicts: {predictions}");
-            Console.WriteLine($"Average difference: {avgDiff:F2}");
+            TestModel();
         }
         else break;
     }
+}
+
+void TestModel()
+{
+    var predictions = model.Forward(testInputs);
+    predictions = Tensor.UnnormalizeArray(predictions, outNorm);
+
+    foreach (var prediction in predictions.ToLinearArray())
+    {
+        prediction.Value = MathF.Round(prediction.Value, MidpointRounding.AwayFromZero);
+    }
+
+    var diff = testTargets - predictions;
+    var avgDiff = Number.Mean(diff.Data).Value;
+
+    Console.WriteLine($"\nRunning test data...\n");
+    Console.WriteLine($"Inputs:   {Tensor.UnnormalizeArray(testInputs, inNorm)}");
+    Console.WriteLine($"Targets:  {testTargets}");
+    Console.WriteLine($"Predicts: {predictions}");
+    Console.WriteLine($"Average difference: {avgDiff:F2}");
 }
 
 void SaveLoop()
