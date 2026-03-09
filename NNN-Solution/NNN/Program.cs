@@ -49,7 +49,7 @@ void InteractionLoop()
     }
     else
     {
-        model = new([new Dense(5, new Sigmoid()), new Dense(5, new Sigmoid()), new Dense(1, new Linear())], inputs);
+        model = new([new Dense(10, new Sigmoid()), new Dense(10, new Sigmoid()), new Dense(1, new Linear())], inputs);
         TrainingLoop();
     }
 
