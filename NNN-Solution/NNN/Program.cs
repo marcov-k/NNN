@@ -914,7 +914,7 @@ namespace NNN
 
         public static Number operator -(Number a, Number b)
         {
-            return a + (b * -1);
+            return new(value: a.Value - b.Value, dependsOn: [a, b], creationOp: "-");
         }
 
         public static Number operator -(Number a, float b)
@@ -983,6 +983,11 @@ namespace NNN
                 case "+":
                     DependsOn[0].Backward(Gradient);
                     DependsOn[1].Backward(Gradient);
+
+                    break;
+                case "-":
+                    DependsOn[0].Backward(Gradient);
+                    DependsOn[1].Backward(-Gradient);
 
                     break;
                 case "*":
