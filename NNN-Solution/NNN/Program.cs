@@ -209,7 +209,7 @@ namespace NNN
         }
     }
 
-    public class Optimizer(float learningRate)
+    public abstract class Optimizer(float learningRate)
     {
         protected readonly float LR = learningRate;
 
@@ -299,7 +299,7 @@ namespace NNN
         }
     }
 
-    public class Layer
+    public abstract class Layer
     {
         public int NeuronCount { get; protected set; }
 
@@ -340,7 +340,7 @@ namespace NNN
     {
         public Tensor Weights { get; private set; } = new();
         public Tensor Biases { get; private set; } = new();
-        public Activation Activation { get; private set; } = new();
+        public Activation Activation { get; private set; } = new Linear();
 
         public Dense(int neuronCount, Activation activation)
         {
@@ -397,12 +397,12 @@ namespace NNN
             var activType = Type.GetType(data.Activation);
             if (activType != null)
             {
-                Activation = Activator.CreateInstance(activType) as Activation ?? new();
+                Activation = Activator.CreateInstance(activType) as Activation ?? new Linear();
             }
         }
     }
 
-    public class Activation
+    public abstract class Activation
     {
         public virtual Tensor Forward(Tensor input)
         {
@@ -466,7 +466,7 @@ namespace NNN
         }
     }
 
-    public class Cost
+    public abstract class Cost
     {
         public virtual Number CalculateCost(Tensor input, Tensor target)
         {
