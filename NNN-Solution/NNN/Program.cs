@@ -7,19 +7,19 @@ Tensor targets = new(20, 1);
 
 for (int i = 0; i < inputs.ElementCount; i++)
 {
-    float value = i * 2;
+    double value = i * 2;
     inputs[i] = new(value);
     targets[i] = new(value * value);
 }
 
-(inputs, float inNorm) = Tensor.Normalize(inputs);
-(targets, float outNorm) = Tensor.Normalize(targets);
+(inputs, double inNorm) = Tensor.Normalize(inputs);
+(targets, double outNorm) = Tensor.Normalize(targets);
 
 Tensor testInputs = new(80, 1);
 Tensor testTargets = new(80, 1);
 for (int i = 0; i < testInputs.ElementCount; i++)
 {
-    float value = i * 0.5f;
+    double value = i * 0.5;
     testInputs[i] = new(value);
     testTargets[i] = new(value * value);
 }
@@ -28,7 +28,7 @@ testInputs = Tensor.Normalize(testInputs, inNorm).normalizedArray;
 
 foreach (var target in testTargets.ToLinearArray())
 {
-    target.Value = MathF.Round(target.Value, MidpointRounding.AwayFromZero);
+    target.Value = Math.Round(target.Value, MidpointRounding.AwayFromZero);
 }
 
 InteractionLoop();
@@ -107,7 +107,7 @@ int GetInteger(string prompt)
 
 void TrainingLoop()
 {
-    Trainer trainer = new(model, optimizer: new SGD(learningRate: 0.01f), cost: new MSE());
+    Trainer trainer = new(model, optimizer: new SGD(learningRate: 0.01), cost: new MSE());
     string input;
     int epochs;
 
@@ -131,7 +131,7 @@ void TestModel()
 
     foreach (var prediction in predictions.ToLinearArray())
     {
-        prediction.Value = MathF.Round(prediction.Value, MidpointRounding.AwayFromZero);
+        prediction.Value = Math.Round(prediction.Value, MidpointRounding.AwayFromZero);
     }
 
     var diff = testTargets - predictions;
@@ -209,9 +209,9 @@ namespace NNN
         }
     }
 
-    public abstract class Optimizer(float learningRate)
+    public abstract class Optimizer(double learningRate)
     {
-        protected readonly float LR = learningRate;
+        protected readonly double LR = learningRate;
 
         public virtual void Step(Number parameter)
         {
@@ -219,7 +219,7 @@ namespace NNN
         }
     }
 
-    public class SGD(float learningRate) : Optimizer(learningRate)
+    public class SGD(double learningRate) : Optimizer(learningRate)
     {
         public override void Step(Number parameter)
         {
@@ -410,9 +410,9 @@ namespace NNN
         }
     }
 
-    public class LeakyReLU(float tau = 0.01f) : Activation
+    public class LeakyReLU(double tau = 0.01) : Activation
     {
-        readonly float Tau = tau;
+        readonly double Tau = tau;
 
         public override Tensor Forward(Tensor input)
         {
@@ -563,6 +563,7 @@ namespace NNN
             else
             {
                 // Standard 2D matrix multiplication
+
                 for (int rowA = 0; rowA < output.GetLength(0); rowA++)
                 {
                     for (int colB = 0; colB < output.GetLength(1); colB++)
@@ -588,10 +589,10 @@ namespace NNN
         {
             Tensor output = new(inputCount, neuronCount);
 
-            float weight;
+            double weight;
             for (int i = 0; i < output.ElementCount; i++)
             {
-                weight = MathUtils.NextGaussian(0, MathF.Sqrt(2f / inputCount));
+                weight = MathUtils.NextGaussian(0, Math.Sqrt(2.0 / inputCount));
                 output[i] = new(weight);
             }
 
@@ -784,14 +785,14 @@ namespace NNN
             return output;
         }
 
-        public static (Tensor normalizedArray, float normalizeFactor) Normalize(Tensor array, float? normalizeFactor = null)
+        public static (Tensor normalizedArray, double normalizeFactor) Normalize(Tensor array, double? normalizeFactor = null)
         {
-            float maxValue = array[0].Value;
+            double maxValue = array[0].Value;
             if (normalizeFactor == null)
             {
                 foreach (var value in array.ToLinearArray())
                 {
-                    maxValue = MathF.Max(maxValue, value.Value);
+                    maxValue = Math.Max(maxValue, value.Value);
                 }
             }
             else maxValue = normalizeFactor.Value;
@@ -805,7 +806,7 @@ namespace NNN
             return (output, maxValue);
         }
 
-        public static Tensor UnnormalizeArray(Tensor array, float normalizeFactor)
+        public static Tensor UnnormalizeArray(Tensor array, double normalizeFactor)
         {
             Tensor output = new(array.Dimensions);
             for (int i = 0; i < array.ElementCount; i++)
@@ -883,12 +884,12 @@ namespace NNN
     [Serializable]
     public class Number
     {
-        public float Value { get; set; }
-        public float Gradient = 0;
+        public double Value { get; set; }
+        public double Gradient = 0;
         public List<Number> DependsOn = [];
         public string CreationOp = "";
 
-        public Number(float value, List<Number>? dependsOn = null, string creationOp = "")
+        public Number(double value, List<Number>? dependsOn = null, string creationOp = "")
         {
             Value = value;
             DependsOn = dependsOn ?? [];
@@ -902,12 +903,12 @@ namespace NNN
             return new(value: a.Value + b.Value, dependsOn: [a, b], creationOp: "+");
         }
 
-        public static Number operator +(Number a, float b)
+        public static Number operator +(Number a, double b)
         {
             return a + new Number(b);
         }
 
-        public static Number operator +(float a, Number b)
+        public static Number operator +(double a, Number b)
         {
             return new Number(a) + b;
         }
@@ -917,12 +918,12 @@ namespace NNN
             return new(value: a.Value - b.Value, dependsOn: [a, b], creationOp: "-");
         }
 
-        public static Number operator -(Number a, float b)
+        public static Number operator -(Number a, double b)
         {
             return a - new Number(b);
         }
 
-        public static Number operator -(float a, Number b)
+        public static Number operator -(double a, Number b)
         {
             return new Number(a) - b;
         }
@@ -932,12 +933,12 @@ namespace NNN
             return new(value: a.Value * b.Value, dependsOn: [a, b], creationOp: "*");
         }
 
-        public static Number operator *(Number a, float b)
+        public static Number operator *(Number a, double b)
         {
             return a * new Number(b);
         }
 
-        public static Number operator *(float a, Number b)
+        public static Number operator *(double a, Number b)
         {
             return new Number(a) * b;
         }
@@ -947,34 +948,34 @@ namespace NNN
             return new(value: a.Value / b.Value, dependsOn: [a, b], creationOp: "/");
         }
 
-        public static Number operator /(Number a, float b)
+        public static Number operator /(Number a, double b)
         {
             return a / new Number(b);
         }
 
-        public static Number operator /(float a, Number b)
+        public static Number operator /(double a, Number b)
         {
             return new Number(a) / b;
         }
 
         public static Number operator ^(Number a, Number b)
         {
-            return new(value: MathF.Pow(a.Value, b.Value), dependsOn: [a, b], creationOp: "^");
+            return new(value: Math.Pow(a.Value, b.Value), dependsOn: [a, b], creationOp: "^");
         }
 
-        public static Number operator ^(Number a, float b)
+        public static Number operator ^(Number a, double b)
         {
             return a ^ new Number(b);
         }
 
-        public static Number operator ^(float a, Number b)
+        public static Number operator ^(double a, Number b)
         {
             return new Number(a) ^ b;
         }
 
-        public void Backward(float? backwardGrad = null)
+        public void Backward(double? backwardGrad = null)
         {
-            float newGrad;
+            double newGrad;
 
             Gradient = (backwardGrad != null) ? Gradient + backwardGrad.Value : 1;
 
@@ -1002,15 +1003,15 @@ namespace NNN
                     newGrad = Gradient * (1f / DependsOn[1].Value);
                     DependsOn[0].Backward(newGrad);
 
-                    newGrad = Gradient * (-DependsOn[0].Value / MathF.Pow(DependsOn[1].Value, 2));
+                    newGrad = Gradient * (-DependsOn[0].Value / Math.Pow(DependsOn[1].Value, 2));
                     DependsOn[1].Backward(newGrad);
 
                     break;
                 case "^":
-                    newGrad = Gradient * DependsOn[1].Value * MathF.Pow(DependsOn[0].Value, DependsOn[1].Value - 1);
+                    newGrad = Gradient * DependsOn[1].Value * Math.Pow(DependsOn[0].Value, DependsOn[1].Value - 1);
                     DependsOn[0].Backward(newGrad);
 
-                    newGrad = Gradient * MathF.Pow(DependsOn[0].Value, DependsOn[1].Value) * MathF.Log(DependsOn[0].Value);
+                    newGrad = Gradient * Math.Pow(DependsOn[0].Value, DependsOn[1].Value) * Math.Log(DependsOn[0].Value);
                     DependsOn[1].Backward(newGrad);
 
                     break;
@@ -1062,25 +1063,25 @@ namespace NNN
     {
         static readonly Random random = new();
 
-        public static float NextGaussian()
+        public static double NextGaussian()
         {
-            double u1 = 1.0f - random.NextDouble();
-            double u2 = 1.0f - random.NextDouble();
+            double u1 = 1.0 - random.NextDouble();
+            double u2 = 1.0 - random.NextDouble();
 
             double randStdNormal = Math.Sqrt(-2.0 * Math.Log(u1)) * Math.Sin(2.0 * Math.PI * u2);
-            return (float)randStdNormal;
+            return randStdNormal;
         }
 
-        public static float NextGaussian(float mean, float stdDev)
+        public static double NextGaussian(double mean, double stdDev)
         {
-            float randStdNormal = NextGaussian();
-            float randNormal = mean + stdDev * randStdNormal;
+            double randStdNormal = NextGaussian();
+            double randNormal = mean + stdDev * randStdNormal;
             return randNormal;
         }
 
-        public static int RoundToInterval(float value, int interval)
+        public static int RoundToInterval(double value, int interval)
         {
-            return (int)MathF.Round(value / interval, MidpointRounding.AwayFromZero) * interval;
+            return (int)Math.Round(value / interval, MidpointRounding.AwayFromZero) * interval;
         }
     }
 
