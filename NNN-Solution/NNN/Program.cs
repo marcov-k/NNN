@@ -1,67 +1,97 @@
 ﻿using NNN;
 
 Model model;
-
-Tensor inputs = new(20, 1);
-Tensor targets = new(20, 1);
-
-for (int i = 0; i < inputs.ElementCount; i++)
-{
-    double value = i * 2;
-    inputs[i] = new(value);
-    targets[i] = new(value * value);
-}
-
-(inputs, double inNorm) = Tensor.Normalize(inputs);
-(targets, double outNorm) = Tensor.Normalize(targets);
-
-Tensor testInputs = new(80, 1);
-Tensor testTargets = new(80, 1);
-for (int i = 0; i < testInputs.ElementCount; i++)
-{
-    double value = i * 0.5;
-    testInputs[i] = new(value);
-    testTargets[i] = new(value * value);
-}
-
-testInputs = Tensor.Normalize(testInputs, inNorm).normalizedArray;
-
-foreach (var target in testTargets.ToLinearArray())
-{
-    target.Value = Math.Round(target.Value, MidpointRounding.AwayFromZero);
-}
+NNN.Environment env = new MovementGrid2D(-5, 5, -5, 5);
+DQNTrainer dqnTrainer;
 
 InteractionLoop();
 
 void InteractionLoop()
 {
-    Console.WriteLine("Welcome to the Neural Network Nonsense Terminal (Enter Q to quit)");
-
-    string fileName;
+    Console.WriteLine("Welcome to the DQN Training Terminal (Enter Q to quit)");
 
     string input = GetInput("Load model from file? y/n", ["y", "n"]);
     if (input == "y")
     {
-        fileName = GetFileName();
+        string fileName = GetFileName();
         model = Saver.LoadModel(fileName);
-        TestModel();
-        TrainingLoop();
     }
     else
     {
-        model = new([new Dense(10, new Sigmoid()), new Dense(10, new Sigmoid()), new Dense(1, new Linear())], inputs);
-        TrainingLoop();
+        model = new([
+            new Dense(10, new LeakyReLU()),
+            new Dense(10, new LeakyReLU()),
+            new Dense(4, new Linear())
+        ], new Tensor(0, 4));
     }
 
-    input = GetInput("Save model to a file? y/n", ["y", "n"]);
-    if (input == "y")
+    dqnTrainer = new DQNTrainer(
+        agent: model,
+        environment: env,
+        actionCount: 4,
+        explorationDecay: 0.9995,
+        discount: 0.999,
+        optimizer: new SGD(0.001),
+        cost: new MSE(),
+        replayBufferSize: 20000,
+        batchSize: 128,
+        minExperiences: 2000
+    );
+
+    TrainingLoop();
+
+    if (GetInput("Save model to a file? y/n", ["y", "n"]) == "y")
     {
         SaveLoop();
     }
 
     Console.WriteLine("\nPress any key to quit...");
     Console.ReadKey();
-    Environment.Exit(0);
+    System.Environment.Exit(0);
+}
+
+void TrainingLoop()
+{
+    while (true)
+    {
+        string input = GetInput("Run DQN Training episodes? y/n", ["y", "n"]);
+        if (input == "y")
+        {
+            int episodes = GetInteger("Enter number of episodes to train");
+            Console.WriteLine($"Training for {episodes} episodes...");
+            dqnTrainer.Train(episodes);
+
+            TestDQNModel();
+        }
+        else break;
+    }
+}
+
+void TestDQNModel()
+{
+    Console.WriteLine("\n--- Testing Agent Performance ---");
+    env.Reset();
+    Tensor state = env.GetState();
+    Tensor batchState = new(1, state.Dimensions[0]);
+    bool done = false;
+    double totalReward = 0;
+    int steps = 0;
+
+    while (!done && steps < 50)
+    {
+        steps++;
+        batchState.InsertSubArray(0, state);
+        int action = model.Forward(batchState).MaxIndex();
+        var (reward, nextState, isDone) = env.Step(action, steps);
+
+        totalReward += reward;
+        state = nextState;
+        done = isDone;
+    }
+
+    Console.WriteLine($"Test Finished in {steps} steps.");
+    Console.WriteLine($"Total Reward: {totalReward:F2}");
+    Console.WriteLine($"Final State: ({state[0].Value}, {state[1].Value}), Target: ({state[2].Value}, {state[3].Value})");
 }
 
 string GetInput(string prompt, List<string>? options = null)
@@ -78,7 +108,7 @@ string GetInput(string prompt, List<string>? options = null)
         Console.WriteLine($"\n{prompt}");
         input = Console.ReadLine()?.ToLowerInvariant() ?? "";
 
-        if (input == "q") Environment.Exit(0);
+        if (input == "q") System.Environment.Exit(0);
         else if (options.Count == 0 || options.Contains(input)) return input;
     }
 }
@@ -103,45 +133,6 @@ int GetInteger(string prompt)
         if (int.TryParse(input, out int integer)) return integer;
         else Console.WriteLine("\nNot a valid number");
     }
-}
-
-void TrainingLoop()
-{
-    Trainer trainer = new(model, optimizer: new SGD(learningRate: 0.01), cost: new MSE());
-    string input;
-    int epochs;
-
-    while (true)
-    {
-        input = GetInput("Train model? y/n", ["y", "n"]);
-        if (input == "y")
-        {
-            epochs = GetInteger("Enter number of training epochs");
-            trainer.Train(inputs, targets, epochs);
-            TestModel();
-        }
-        else break;
-    }
-}
-
-void TestModel()
-{
-    var predictions = model.Forward(testInputs);
-    predictions = Tensor.UnnormalizeArray(predictions, outNorm);
-
-    foreach (var prediction in predictions.ToLinearArray())
-    {
-        prediction.Value = Math.Round(prediction.Value, MidpointRounding.AwayFromZero);
-    }
-
-    var diff = testTargets - predictions;
-    var avgDiff = Number.Mean(diff.Data).Value;
-
-    Console.WriteLine($"\nRunning test data...\n");
-    Console.WriteLine($"Inputs:   {Tensor.UnnormalizeArray(testInputs, inNorm)}");
-    Console.WriteLine($"Targets:  {testTargets}");
-    Console.WriteLine($"Predicts: {predictions}");
-    Console.WriteLine($"Average difference: {avgDiff:F2}");
 }
 
 void SaveLoop()
@@ -175,6 +166,285 @@ namespace NNN
 {
     using System.Diagnostics;
     using System.Text.Json;
+
+    public abstract class Environment
+    {
+        public virtual Tensor GetState()
+        {
+            throw new NotImplementedException();
+        }
+
+        public virtual (double reward, Tensor nextState, bool done) Step(int action, int steps)
+        {
+            throw new NotImplementedException();
+        }
+
+        public virtual void Reset()
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    public class MovementGrid2D : Environment
+    {
+        readonly Random random = new();
+        readonly Tensor State = new(4); // current x, current y, target x, target y
+        readonly int[] Bounds; // xMin, xMax, yMin, yMax
+
+        public MovementGrid2D(int xMin, int xMax, int yMin, int yMax)
+        {
+            State[0] = new(0);
+            State[1] = new(0);
+            State[2] = new(random.Next(xMin, xMax));
+            State[3] = new(random.Next(yMin, yMax));
+            Bounds = [xMin, xMax, yMin, yMax];
+        }
+
+        public override Tensor GetState()
+        {
+            return State.Copy();
+        }
+
+        public override (double reward, Tensor nextState, bool done) Step(int action, int steps)
+        {
+            double xDiff = State[2].Value - State[0].Value;
+            double yDiff = State[3].Value - State[1].Value;
+            double prevDist = Math.Sqrt(Math.Pow(xDiff, 2.0) + Math.Pow(yDiff, 2.0));
+
+            switch (action)
+            {
+                case 0: // left
+                    State[0].Value--;
+                    break;
+                case 1: // right
+                    State[0].Value++;
+                    break;
+                case 2: // up
+                    State[1].Value++;
+                    break;
+                case 3: // down
+                    State[1].Value--;
+                    break;
+            }
+
+            xDiff = State[2].Value - State[0].Value;
+            yDiff = State[3].Value - State[1].Value;
+            double newDist = Math.Sqrt(Math.Pow(xDiff, 2.0) + Math.Pow(yDiff, 2.0));
+
+            double reward = prevDist - newDist;
+
+            bool done = false;
+
+            bool reachedTarget = (State[0].Value == State[2].Value && State[1].Value == State[3].Value);
+            bool outOfBounds = (State[0].Value < Bounds[0]) || (State[0].Value > Bounds[1]) ||
+                               (State[1].Value < Bounds[2]) || (State[1].Value > Bounds[3]);
+
+            if (newDist < 5.0) reward += 0.5;
+            if (newDist < 2.0) reward += 1.0;
+            if (reachedTarget)
+            {
+                reward = 20.0;
+                done = true;
+            }
+
+            if (outOfBounds)
+            {
+                reward = -20.0;
+                done = true;
+            }
+
+            if (steps >= 50) done = true;
+
+            return (reward, State, done);
+        }
+
+        public override void Reset()
+        {
+            State[0] = new(0);
+            State[1] = new(0);
+            State[2] = new(random.Next(Bounds[0], Bounds[1]));
+            State[3] = new(random.Next(Bounds[2], Bounds[3]));
+        }
+    }
+
+    public record Experience(Tensor State, int Action, double Reward, Tensor NextState, bool Done)
+    {
+        public readonly Tensor State = State.Copy();
+        public readonly int Action = Action;
+        public readonly double Reward = Reward;
+        public readonly Tensor NextState = NextState.Copy();
+        public readonly bool Done = Done;
+    }
+
+    public class ReplayBuffer(int maxSize)
+    {
+        readonly Random random = new();
+        readonly int MaxSize = maxSize;
+        readonly List<Experience> Buffer = [];
+        public int Count => Buffer.Count;
+
+        public void AddExperience(Experience experience)
+        {
+            Buffer.Add(experience);
+            if (Buffer.Count > MaxSize)
+            {
+                Buffer.RemoveAt(0);
+            }
+        }
+
+        public List<Experience> GetBatch(int batchSize)
+        {
+            List<Experience> batch = [];
+            for (int i = 0; i < batchSize; i++)
+            {
+                batch.Add(Buffer[random.Next(0, Buffer.Count)]);
+            }
+            return batch;
+        }
+    }
+
+    public class DQNTrainer(Model agent, Environment environment, int actionCount, Optimizer optimizer, Cost cost, double discount = 0.995, double exploration = 1.0,
+        double explorationDecay = 0.99, int replayBufferSize = 10000, int batchSize = 64, int minExperiences = 1000)
+    {
+        readonly Random random = new();
+        readonly Model Agent = agent;
+        Model TargetModel = agent.Copy();
+        readonly Environment Environment = environment;
+        readonly int ActionCount = actionCount;
+        readonly Optimizer Optimizer = optimizer;
+        readonly Cost Cost = cost;
+        readonly ReplayBuffer ReplayBuffer = new(replayBufferSize);
+        readonly int BatchSize = batchSize;
+        readonly double Discount = discount;
+        double Exploration = exploration;
+        readonly double ExplorationDecay = explorationDecay;
+        readonly double MinExploration = 0.01;
+        int totalSteps = 0;
+        readonly int TargetUpdateFrequency = 1000;
+        readonly int MinExperiences = minExperiences;
+
+        public void Train(int episodes = 1000)
+        {
+            Tensor state;
+            Tensor initialState;
+            bool done;
+            int action;
+            double reward;
+            double totalReward;
+            int step;
+            Tensor nextState;
+            for (int e = 0; e < episodes; e++)
+            {
+                Environment.Reset();
+                state = Environment.GetState();
+                initialState = Environment.GetState();
+
+                done = false;
+                step = 0;
+                totalReward = 0;
+                while (!done)
+                {
+                    totalSteps++;
+                    step++;
+                    action = PickNextAction(state);
+                    (reward, nextState, done) = Environment.Step(action, step);
+                    totalReward += reward;
+                    ReplayBuffer.AddExperience(new(state, action, reward, nextState, done));
+
+                    TrainNetwork();
+
+                    state = nextState;
+
+                    if (totalSteps >= TargetUpdateFrequency)
+                    {
+                        TargetModel = Agent.Copy();
+                        totalSteps = 0;
+                    }
+                }
+
+                Exploration = Math.Max(Exploration * ExplorationDecay, MinExploration);
+                Console.WriteLine($"\nEpisode {e + 1}/{episodes} finished...");
+                Console.WriteLine($"Initial State: ({initialState[0].Value}, {initialState[1].Value}), Final State: ({state[0].Value}, {state[1].Value}), Target: (" +
+                    $"{initialState[2].Value}, {initialState[3].Value}), Steps Taken: {step}, Total Reward: {totalReward:F2},");
+                Console.WriteLine($"Exploration Rate: {Exploration:F2}, Experience Count: {ReplayBuffer.Count}");
+            }
+        }
+
+        int PickNextAction(Tensor state)
+        {
+            if (random.NextDouble() < Exploration)
+            {
+                return random.Next(0, ActionCount);
+            }
+            else
+            {
+                Tensor batchState = new(1, state.Dimensions[0]);
+                batchState.InsertSubArray(0, state);
+
+                return Agent.Forward(batchState).MaxIndex();
+            }
+        }
+
+        void TrainNetwork()
+        {
+            if (ReplayBuffer.Count < MinExperiences) return;
+
+            var batch = ReplayBuffer.GetBatch(BatchSize);
+            int stateSize = batch[0].State.Dimensions[0];
+
+            Tensor currentBatch = new(BatchSize, stateSize);
+            Tensor nextBatch = new(BatchSize, stateSize);
+            
+            for (int i = 0; i < BatchSize; i++)
+            {
+                currentBatch.InsertSubArray(i, batch[i].State);
+                nextBatch.InsertSubArray(i, batch[i].NextState);
+            }
+
+            var predictions = Agent.Forward(currentBatch);
+            var nextQs = TargetModel.Forward(nextBatch);
+
+            var predictedQs = MaskQValues(predictions, batch, breakGraph: false);
+            var targetQs = MaskQValues(nextQs, batch, breakGraph: true);
+
+            var loss = Cost.CalculateCost(predictedQs, targetQs);
+            loss.Backward();
+            Agent.Optimize(Optimizer);
+        }
+
+        Tensor MaskQValues(Tensor qValues, List<Experience> batch, bool breakGraph)
+        {
+            if (breakGraph)
+            {
+                var targetQs = qValues.ReduceDimensions();
+                Tensor maskedQs = new(BatchSize, 1);
+
+                for (int i = 0; i < BatchSize; i++)
+                {
+                    double qTarget = batch[i].Reward;
+                    if (!batch[i].Done)
+                    {
+                        qTarget += Discount * targetQs[i].Max().Value;
+                    }
+
+                    maskedQs[i] = new(qTarget);
+                }
+
+                return maskedQs;
+            }
+            else
+            {
+                Tensor maskedQs = new(BatchSize, 1);
+
+                for (int i = 0; i < BatchSize; i++)
+                {
+                    maskedQs[i] = qValues[i, batch[i].Action];
+                }
+
+                return maskedQs;
+            }
+        }
+    }
 
     public class Trainer(Model model, Optimizer optimizer, Cost cost)
     {
@@ -230,6 +500,11 @@ namespace NNN
     public class Model
     {
         public Layer[] Layers { get; private set; }
+
+        public Model(Layer[] layers)
+        {
+            Layers = layers;
+        }
 
         public Model(Layer[] layers, Tensor inputFormat)
         {
@@ -297,6 +572,18 @@ namespace NNN
                 layer.ZeroGrad();
             }
         }
+
+        public Model Copy()
+        {
+            var layers = new Layer[Layers.Length];
+
+            for (int i = 0; i < Layers.Length; i++)
+            {
+                layers[i] = Layers[i].Copy();
+            }
+
+            return new(layers);
+        }
     }
 
     public abstract class Layer
@@ -330,6 +617,11 @@ namespace NNN
             throw new NotImplementedException();
         }
 
+        public virtual Layer Copy()
+        {
+            throw new NotImplementedException();
+        }
+
         public virtual void BuildFromData(Saver.LayerData data)
         {
             throw new NotImplementedException();
@@ -345,6 +637,14 @@ namespace NNN
         public Dense(int neuronCount, Activation activation)
         {
             NeuronCount = neuronCount;
+            Activation = activation;
+        }
+
+        public Dense(int neuronCount, Tensor weights, Tensor biases, Activation activation)
+        {
+            NeuronCount = neuronCount;
+            Weights = weights;
+            Biases = biases;
             Activation = activation;
         }
 
@@ -388,6 +688,11 @@ namespace NNN
             }
         }
 
+        public override Layer Copy()
+        {
+            return new Dense(NeuronCount, Weights.Copy(), Biases.Copy(), Activation.Copy());
+        }
+
         public override void BuildFromData(Saver.LayerData data)
         {
             NeuronCount = data.NeuronCount;
@@ -405,6 +710,11 @@ namespace NNN
     public abstract class Activation
     {
         public virtual Tensor Forward(Tensor input)
+        {
+            throw new NotImplementedException();
+        }
+
+        public virtual Activation Copy()
         {
             throw new NotImplementedException();
         }
@@ -426,6 +736,11 @@ namespace NNN
 
             return output;
         }
+
+        public override Activation Copy()
+        {
+            return new LeakyReLU(Tau);
+        }
     }
 
     public class Tanh : Activation
@@ -440,6 +755,11 @@ namespace NNN
             }
 
             return output;
+        }
+
+        public override Activation Copy()
+        {
+            return new Tanh();
         }
     }
 
@@ -456,6 +776,11 @@ namespace NNN
 
             return output;
         }
+
+        public override Activation Copy()
+        {
+            return new Sigmoid();
+        }
     }
 
     public class Linear : Activation
@@ -463,6 +788,11 @@ namespace NNN
         public override Tensor Forward(Tensor input)
         {
             return input;
+        }
+
+        public override Activation Copy()
+        {
+            return new Linear();
         }
     }
 
@@ -580,6 +910,26 @@ namespace NNN
             return output;
         }
 
+        public int MaxIndex()
+        {
+            int maxIndex = 0;
+            double maxValue = this[0].Value;
+            for (int i = 1; i < ElementCount; i++)
+            {
+                if (this[i].Value > maxValue)
+                {
+                    maxIndex = i;
+                    maxValue = this[i].Value;
+                }
+            }
+            return maxIndex;
+        }
+
+        public Number Max()
+        {
+            return this[MaxIndex()];
+        }
+
         public static Number Mean(Tensor input)
         {
             return Number.Mean(input.ToLinearArray());
@@ -657,6 +1007,11 @@ namespace NNN
             }
 
             Data = new Number[totalSize];
+
+            for (int i = 0; i < ElementCount; i++)
+            {
+                this[i] = new(0);
+            }
         }
 
         public int GetLinearIndex(int[] indices)
@@ -758,6 +1113,18 @@ namespace NNN
 
                 this[parentIndices] = subArray[subIndices];
             }
+        }
+
+        public Tensor Copy()
+        {
+            Tensor output = new(Dimensions);
+
+            for (int i = 0; i < ElementCount; i++)
+            {
+                output[i] = this[i].Copy();
+            }
+
+            return output;
         }
 
         public static Tensor Transpose(Tensor array, int[]? axes = null)
@@ -1026,6 +1393,11 @@ namespace NNN
         public override string ToString()
         {
             return $"Value = {Value}; Gradient = {Gradient}";
+        }
+
+        public Number Copy()
+        {
+            return new(value: Value);
         }
 
         public static Number Max(Number a, Number b)
