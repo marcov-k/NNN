@@ -29,8 +29,8 @@ void InteractionLoop()
         agent: model,
         environment: env,
         actionCount: 4,
-        explorationDecay: 0.9995,
-        discount: 0.999,
+        explorationDecay: 0.998,
+        discount: 0.99,
         optimizer: new SGD(0.005),
         cost: new MSE(),
         replayBufferSize: 20000,
@@ -412,10 +412,13 @@ namespace NNN
             }
 
             var predictions = Agent.Forward(currentBatch);
-            var nextQs = TargetModel.Forward(nextBatch);
+            var nextAgentQs = Agent.Forward(nextBatch);
+            var nextTargetQs = TargetModel.Forward(nextBatch);
 
             var predictedQs = MaskQValues(predictions, batch, breakGraph: false);
-            var targetQs = MaskQValues(nextQs, batch, breakGraph: true);
+            var targetQs = MaskQValuesDouble(nextAgentQs, nextTargetQs, batch);
+
+            Agent.ZeroGrad();
 
             var loss = Cost.CalculateCost(predictedQs, targetQs);
             loss.Backward();
@@ -453,6 +456,30 @@ namespace NNN
 
                 return maskedQs;
             }
+        }
+
+        Tensor MaskQValuesDouble(Tensor agentQValues, Tensor targetQValues, List<Experience> batch)
+        {
+            var agentQs = agentQValues.ReduceDimensions();
+            var targetQs = targetQValues.ReduceDimensions();
+
+            Tensor maskedQs = new(BatchSize, 1);
+
+            for (int i = 0; i < BatchSize; i++)
+            {
+                double qTarget = batch[i].Reward;
+
+                if (!batch[i].Done)
+                {
+                    int bestAction = agentQs[i].MaxIndex();
+                    double evalQ = targetQs[i][bestAction].Value;
+                    qTarget += Discount * evalQ;
+                }
+
+                maskedQs[i] = new(qTarget);
+            }
+
+            return maskedQs;
         }
     }
 
