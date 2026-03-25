@@ -31,7 +31,7 @@ void InteractionLoop()
         actionCount: 4,
         explorationDecay: 0.9995,
         discount: 0.999,
-        optimizer: new SGD(0.001),
+        optimizer: new SGD(0.005),
         cost: new MSE(),
         replayBufferSize: 20000,
         batchSize: 128,
@@ -333,6 +333,9 @@ namespace NNN
             double totalReward;
             int step;
             Tensor nextState;
+            TimeSpan avgElapsed = new(0);
+            Stopwatch stopwatch = new();
+            stopwatch.Start();
             for (int e = 0; e < episodes; e++)
             {
                 Environment.Reset();
@@ -363,10 +366,17 @@ namespace NNN
                 }
 
                 Exploration = Math.Max(Exploration * ExplorationDecay, MinExploration);
+
+                var elapsed = stopwatch.Elapsed;
+                avgElapsed += (elapsed - avgElapsed) / (e + 1);
+                var eta = avgElapsed * (episodes - e - 1);
+
                 Console.WriteLine($"\nEpisode {e + 1}/{episodes} finished...");
                 Console.WriteLine($"Initial State: ({initialState[0].Value}, {initialState[1].Value}), Final State: ({state[0].Value}, {state[1].Value}), Target: (" +
                     $"{initialState[2].Value}, {initialState[3].Value}), Steps Taken: {step}, Total Reward: {totalReward:F2},");
                 Console.WriteLine($"Exploration Rate: {Exploration:F2}, Experience Count: {ReplayBuffer.Count}");
+                Console.WriteLine($"Episode Duration: {elapsed}, Estimated Time Remaining: {eta}");
+                stopwatch.Restart();
             }
         }
 
