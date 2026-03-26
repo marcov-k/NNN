@@ -29,13 +29,13 @@ void InteractionLoop()
         agent: model,
         environment: env,
         actionCount: 4,
-        explorationDecay: 0.998,
+        explorationDecay: 0.999,
         discount: 0.99,
-        optimizer: new SGD(0.005),
+        optimizer: new SGD(0.001),
         cost: new MSE(),
         replayBufferSize: 20000,
-        batchSize: 128,
-        minExperiences: 2000
+        batchSize: 64,
+        minExperiences: 1000
     );
 
     TrainingLoop();
@@ -71,7 +71,8 @@ void TestDQNModel()
 {
     Console.WriteLine("\n--- Testing Agent Performance ---");
     env.Reset();
-    Tensor state = env.GetState();
+    var state = env.GetNormalizedState();
+    var startState = env.GetState();
     Tensor batchState = new(1, state.Dimensions[0]);
     bool done = false;
     double totalReward = 0;
@@ -89,9 +90,11 @@ void TestDQNModel()
         done = isDone;
     }
 
+    var logState = env.GetState();
     Console.WriteLine($"Test Finished in {steps} steps.");
     Console.WriteLine($"Total Reward: {totalReward:F2}");
-    Console.WriteLine($"Final State: ({state[0].Value}, {state[1].Value}), Target: ({state[2].Value}, {state[3].Value})");
+    Console.WriteLine($"Starting State: ({startState[0].Value}, {startState[1].Value})");
+    Console.WriteLine($"Final State: ({logState[0].Value}, {logState[1].Value}), Target: ({logState[2].Value}, {logState[3].Value})");
 }
 
 string GetInput(string prompt, List<string>? options = null)
@@ -169,6 +172,11 @@ namespace NNN
 
     public abstract class Environment
     {
+        public virtual Tensor GetNormalizedState()
+        {
+            throw new NotImplementedException();
+        }
+
         public virtual Tensor GetState()
         {
             throw new NotImplementedException();
@@ -193,11 +201,23 @@ namespace NNN
 
         public MovementGrid2D(int xMin, int xMax, int yMin, int yMax)
         {
-            State[0] = new(0);
-            State[1] = new(0);
+            State[0] = new(random.Next(xMin, xMax + 1));
+            State[1] = new(random.Next(yMin, yMax + 1));
             State[2] = new(random.Next(xMin, xMax));
             State[3] = new(random.Next(yMin, yMax));
             Bounds = [xMin, xMax, yMin, yMax];
+        }
+
+        public override Tensor GetNormalizedState()
+        {
+            Tensor normalized = new(4);
+
+            normalized[0] = new(State[0].Value / Math.Max(Bounds[0], Bounds[1]));
+            normalized[1] = new(State[1].Value / Math.Max(Bounds[2], Bounds[3]));
+            normalized[2] = new(State[2].Value / Math.Max(Bounds[0], Bounds[1]));
+            normalized[3] = new(State[3].Value / Math.Max(Bounds[2], Bounds[3]));
+
+            return normalized;
         }
 
         public override Tensor GetState()
@@ -231,7 +251,7 @@ namespace NNN
             yDiff = State[3].Value - State[1].Value;
             double newDist = Math.Sqrt(Math.Pow(xDiff, 2.0) + Math.Pow(yDiff, 2.0));
 
-            double reward = prevDist - newDist;
+            double reward = -0.05 + prevDist - newDist;
 
             bool done = false;
 
@@ -239,17 +259,11 @@ namespace NNN
             bool outOfBounds = (State[0].Value < Bounds[0]) || (State[0].Value > Bounds[1]) ||
                                (State[1].Value < Bounds[2]) || (State[1].Value > Bounds[3]);
 
-            if (newDist < 5.0) reward += 0.5;
             if (newDist < 2.0) reward += 1.0;
+            if (outOfBounds) reward -= 5.0;
             if (reachedTarget)
             {
                 reward = 20.0;
-                done = true;
-            }
-
-            if (outOfBounds)
-            {
-                reward = -20.0;
                 done = true;
             }
 
@@ -260,10 +274,10 @@ namespace NNN
 
         public override void Reset()
         {
-            State[0] = new(0);
-            State[1] = new(0);
-            State[2] = new(random.Next(Bounds[0], Bounds[1]));
-            State[3] = new(random.Next(Bounds[2], Bounds[3]));
+            State[0] = new(random.Next(Bounds[0], Bounds[1] + 1));
+            State[1] = new(random.Next(Bounds[2], Bounds[3] + 1));
+            State[2] = new(random.Next(Bounds[0], Bounds[1] + 1));
+            State[3] = new(random.Next(Bounds[2], Bounds[3] + 1));
         }
     }
 
@@ -327,6 +341,7 @@ namespace NNN
         {
             Tensor state;
             Tensor initialState;
+            Tensor logState;
             bool done;
             int action;
             double reward;
@@ -339,7 +354,7 @@ namespace NNN
             for (int e = 0; e < episodes; e++)
             {
                 Environment.Reset();
-                state = Environment.GetState();
+                state = Environment.GetNormalizedState();
                 initialState = Environment.GetState();
 
                 done = false;
@@ -371,8 +386,9 @@ namespace NNN
                 avgElapsed += (elapsed - avgElapsed) / (e + 1);
                 var eta = avgElapsed * (episodes - e - 1);
 
+                logState = Environment.GetState();
                 Console.WriteLine($"\nEpisode {e + 1}/{episodes} finished...");
-                Console.WriteLine($"Initial State: ({initialState[0].Value}, {initialState[1].Value}), Final State: ({state[0].Value}, {state[1].Value}), Target: (" +
+                Console.WriteLine($"Initial State: ({initialState[0].Value}, {initialState[1].Value}), Final State: ({logState[0].Value}, {logState[1].Value}), Target: (" +
                     $"{initialState[2].Value}, {initialState[3].Value}), Steps Taken: {step}, Total Reward: {totalReward:F2},");
                 Console.WriteLine($"Exploration Rate: {Exploration:F2}, Experience Count: {ReplayBuffer.Count}");
                 Console.WriteLine($"Episode Duration: {elapsed}, Estimated Time Remaining: {eta}");
@@ -412,8 +428,8 @@ namespace NNN
             }
 
             var predictions = Agent.Forward(currentBatch);
-            var nextAgentQs = Agent.Forward(nextBatch);
-            var nextTargetQs = TargetModel.Forward(nextBatch);
+            var nextAgentQs = Agent.Forward(nextBatch).Copy();
+            var nextTargetQs = TargetModel.Forward(nextBatch).Copy();
 
             var predictedQs = MaskQValues(predictions, batch, breakGraph: false);
             var targetQs = MaskQValuesDouble(nextAgentQs, nextTargetQs, batch);
@@ -1289,7 +1305,7 @@ namespace NNN
     public class Number
     {
         public double Value { get; set; }
-        public double Gradient = 0;
+        public double Gradient = 0.0;
         public List<Number> DependsOn = [];
         public string CreationOp = "";
 
@@ -1377,47 +1393,60 @@ namespace NNN
             return new Number(a) ^ b;
         }
 
-        public void Backward(double? backwardGrad = null)
+        public void Backward()
         {
-            double newGrad;
+            List<Number> topography = [];
+            HashSet<Number> visited = [];
 
-            Gradient = (backwardGrad != null) ? Gradient + backwardGrad.Value : 1;
+            BuildTopography(topography, visited);
 
+            foreach (var node in topography) node.Gradient = 0.0;
+            Gradient = 1.0;
+
+            for (int i = topography.Count - 1; i >= 0; i--)
+            {
+                topography[i].ApplyBackward();
+            }
+        }
+
+        void BuildTopography(List<Number> topography, HashSet<Number> visited)
+        {
+            if (!visited.Contains(this))
+            {
+                visited.Add(this);
+
+                foreach (var parent in DependsOn)
+                {
+                    parent.BuildTopography(topography, visited);
+                }
+
+                topography.Add(this);
+            }
+        }
+
+        void ApplyBackward()
+        {
             switch (CreationOp)
             {
                 case "+":
-                    DependsOn[0].Backward(Gradient);
-                    DependsOn[1].Backward(Gradient);
-
+                    DependsOn[0].Gradient += Gradient;
+                    DependsOn[1].Gradient += Gradient;
                     break;
                 case "-":
-                    DependsOn[0].Backward(Gradient);
-                    DependsOn[1].Backward(-Gradient);
-
+                    DependsOn[0].Gradient += Gradient;
+                    DependsOn[1].Gradient -= Gradient;
                     break;
                 case "*":
-                    newGrad = Gradient * DependsOn[1].Value;
-                    DependsOn[0].Backward(newGrad);
-
-                    newGrad = Gradient * DependsOn[0].Value;
-                    DependsOn[1].Backward(newGrad);
-
+                    DependsOn[0].Gradient += Gradient * DependsOn[1].Value;
+                    DependsOn[1].Gradient += Gradient * DependsOn[0].Value;
                     break;
                 case "/":
-                    newGrad = Gradient * (1f / DependsOn[1].Value);
-                    DependsOn[0].Backward(newGrad);
-
-                    newGrad = Gradient * (-DependsOn[0].Value / Math.Pow(DependsOn[1].Value, 2));
-                    DependsOn[1].Backward(newGrad);
-
+                    DependsOn[0].Gradient += Gradient * (1.0 / DependsOn[1].Value);
+                    DependsOn[1].Gradient += Gradient * (-DependsOn[0].Value / Math.Pow(DependsOn[1].Value, 2.0));
                     break;
                 case "^":
-                    newGrad = Gradient * DependsOn[1].Value * Math.Pow(DependsOn[0].Value, DependsOn[1].Value - 1);
-                    DependsOn[0].Backward(newGrad);
-
-                    newGrad = Gradient * Math.Pow(DependsOn[0].Value, DependsOn[1].Value) * Math.Log(DependsOn[0].Value);
-                    DependsOn[1].Backward(newGrad);
-
+                    DependsOn[0].Gradient += Gradient * DependsOn[1].Value * Math.Pow(DependsOn[0].Value, DependsOn[1].Value - 1.0);
+                    DependsOn[1].Gradient += Gradient * Math.Pow(DependsOn[0].Value, DependsOn[1].Value) * Math.Log(DependsOn[0].Value);
                     break;
             }
         }
