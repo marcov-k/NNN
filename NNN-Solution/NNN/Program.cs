@@ -19,23 +19,23 @@ void InteractionLoop()
     else
     {
         model = new([
-            new Dense(32, new LeakyReLU()),
-            new Dense(32, new LeakyReLU()),
+            new Dense(64, new LeakyReLU()),
+            new Dense(64, new LeakyReLU()),
             new Dense(4, new Linear())
-        ], new Tensor(0, 2));
+        ], new Tensor(0, 4));
     }
 
     dqnTrainer = new DQNTrainer(
         agent: model,
         environment: env,
         actionCount: 4,
-        explorationDecay: 0.995,
+        explorationDecay: 0.999,
         discount: 0.99,
         optimizer: new Adam(),
         cost: new Huber(),
         replayBufferSize: 20000,
         batchSize: 64,
-        minExperiences: 5000
+        minExperiences: 2000
     );
 
     TrainingLoop();
@@ -216,13 +216,12 @@ namespace NNN
 
         public override Tensor GetNormalizedState()
         {
-            Tensor normalized = new(2);
+            Tensor normalized = new(4);
 
-            double dx = State[2].Value - State[0].Value;
-            double dy = State[3].Value - State[1].Value;
-
-            normalized[0] = new(dx / XRange);
-            normalized[1] = new(dy / YRange);
+            normalized[0] = new(2.0 * (State[0].Value - Bounds[0]) / XRange - 1.0);
+            normalized[1] = new(2.0 * (State[1].Value - Bounds[2]) / YRange - 1.0);
+            normalized[2] = new(2.0 * (State[2].Value - Bounds[0]) / XRange - 1.0);
+            normalized[3] = new(2.0 * (State[3].Value - Bounds[2]) / YRange - 1.0);
 
             return normalized;
         }
