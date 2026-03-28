@@ -324,11 +324,11 @@ namespace NNN
     }
 
     public class DQNTrainer(Model agent, Environment environment, int actionCount, Optimizer optimizer, Cost cost, double discount = 0.995, double exploration = 1.0,
-        double explorationDecay = 0.99, int replayBufferSize = 10000, int batchSize = 64, int minExperiences = 1000)
+        double explorationDecay = 0.99, int replayBufferSize = 10000, int batchSize = 64, double tau = 0.005, int minExperiences = 1000)
     {
         readonly Random random = new();
         readonly Model Agent = agent;
-        Model TargetModel = agent.Copy();
+        readonly Model TargetModel = agent.Copy();
         readonly Environment Environment = environment;
         readonly int ActionCount = actionCount;
         readonly Optimizer Optimizer = optimizer;
@@ -339,9 +339,8 @@ namespace NNN
         double Exploration = exploration;
         readonly double ExplorationDecay = explorationDecay;
         readonly double MinExploration = 0.01;
-        int totalSteps = 0;
         int optimizerSteps = 0;
-        readonly int TargetUpdateFrequency = 500;
+        readonly double Tau = tau;
         readonly int MinExperiences = minExperiences;
 
         public void Train(int episodes = 1000)
@@ -369,7 +368,6 @@ namespace NNN
                 totalReward = 0;
                 while (!done)
                 {
-                    totalSteps++;
                     step++;
                     action = PickNextAction(state);
                     (reward, nextState, done) = Environment.Step(action, step);
@@ -379,12 +377,6 @@ namespace NNN
                     TrainNetwork();
 
                     state = nextState;
-
-                    if (totalSteps >= TargetUpdateFrequency)
-                    {
-                        TargetModel = Agent.Copy();
-                        totalSteps = 0;
-                    }
                 }
 
                 Exploration = Math.Max(Exploration * ExplorationDecay, MinExploration);
@@ -445,7 +437,15 @@ namespace NNN
 
             var loss = Cost.CalculateCost(predictedQs, targetQs);
             loss.Backward();
-            Agent.Optimize(Optimizer, optimizerSteps);
+
+            double targetParam;
+            for (int i = 0; i < Agent.ParameterCount; i++)
+            {
+                Optimizer.Step(Agent.Parameters[i], optimizerSteps);
+                targetParam = (Tau * Agent.Parameters[i].Value) + ((1.0 - Tau) * TargetModel.Parameters[i].Value);
+                TargetModel.Parameters[i] = new(targetParam);
+            }
+
             optimizerSteps++;
         }
 
@@ -529,7 +529,10 @@ namespace NNN
                 loss = Cost.CalculateCost(predictions, targets);
                 loss.Backward();
 
-                Model.Optimize(Optimizer, epochs);
+                foreach (var param in Model.Parameters)
+                {
+                    Optimizer.Step(param, epochs);
+                }
 
                 if (e % logEvery == 0 || e == epochs - 1)
                 {
@@ -566,6 +569,7 @@ namespace NNN
 
         public override void Step(Number parameter, int iteration)
         {
+            iteration++;
             parameter.FirstMoment = ((Beta1 * parameter.FirstMoment) + ((1.0 - Beta1) * parameter.Gradient)) / (1.0 - Math.Pow(Beta1, iteration));
             parameter.SecondMoment = ((Beta2 * parameter.SecondMoment) + ((1.0 - Beta2) * Math.Pow(parameter.Gradient, 2.0))) / (1.0 - Math.Pow(Beta2, iteration));
 
@@ -576,6 +580,16 @@ namespace NNN
     public class Model
     {
         public Layer[] Layers { get; private set; }
+        public List<Number> Parameters
+        {
+            get
+            {
+                parameters ??= [.. GetParameters()];
+                return parameters;
+            }
+        }
+        List<Number>? parameters;
+        public int ParameterCount => Parameters.Count;
 
         public Model(Layer[] layers)
         {
@@ -597,6 +611,7 @@ namespace NNN
 
         void BuildFromData(Saver.ModelData data)
         {
+            InvalidateParameters();
             Saver.LayerData layerData;
             Type? layerType;
             for (int i = 0; i < data.Layers.Length; i++)
@@ -633,11 +648,14 @@ namespace NNN
             return output;
         }
 
-        public void Optimize(Optimizer optimizer, int iteration)
+        public IEnumerable<Number> GetParameters()
         {
             foreach (var layer in Layers)
             {
-                layer.Optimize(optimizer, iteration + 1);
+                foreach (var param in layer.GetParameters())
+                {
+                    yield return param;
+                }
             }
         }
 
@@ -659,6 +677,11 @@ namespace NNN
             }
 
             return new(layers);
+        }
+
+        void InvalidateParameters()
+        {
+            parameters = null;
         }
     }
 
@@ -683,7 +706,7 @@ namespace NNN
             throw new NotImplementedException();
         }
 
-        public virtual void Optimize(Optimizer optimizer, int iteration)
+        public virtual IEnumerable<Number> GetParameters()
         {
             throw new NotImplementedException();
         }
@@ -740,15 +763,16 @@ namespace NNN
             return output;
         }
 
-        public override void Optimize(Optimizer optimizer, int iteration)
+        public override IEnumerable<Number> GetParameters()
         {
             foreach (var weight in Weights.ToLinearArray())
             {
-                optimizer.Step(weight, iteration);
+                yield return weight;
             }
+            
             foreach (var bias in Biases.ToLinearArray())
             {
-                optimizer.Step(bias, iteration);
+                yield return bias;
             }
         }
 
