@@ -29,9 +29,9 @@ void InteractionLoop()
         agent: model,
         environment: env,
         actionCount: 4,
-        explorationDecay: 0.999,
-        discount: 0.99,
-        optimizer: new SGD(0.001),
+        explorationDecay: 0.9995,
+        discount: 0.999,
+        optimizer: new Adam(),
         cost: new MSE(),
         replayBufferSize: 20000,
         batchSize: 64,
@@ -334,6 +334,7 @@ namespace NNN
         readonly double ExplorationDecay = explorationDecay;
         readonly double MinExploration = 0.01;
         int totalSteps = 0;
+        int optimizerSteps = 0;
         readonly int TargetUpdateFrequency = 1000;
         readonly int MinExperiences = minExperiences;
 
@@ -438,7 +439,8 @@ namespace NNN
 
             var loss = Cost.CalculateCost(predictedQs, targetQs);
             loss.Backward();
-            Agent.Optimize(Optimizer);
+            Agent.Optimize(Optimizer, optimizerSteps);
+            optimizerSteps++;
         }
 
         Tensor MaskQValues(Tensor qValues, List<Experience> batch, bool breakGraph)
@@ -521,7 +523,7 @@ namespace NNN
                 loss = Cost.CalculateCost(predictions, targets);
                 loss.Backward();
 
-                Model.Optimize(Optimizer);
+                Model.Optimize(Optimizer, epochs);
 
                 if (e % logEvery == 0 || e == epochs - 1)
                 {
@@ -536,7 +538,7 @@ namespace NNN
     {
         protected readonly double LR = learningRate;
 
-        public virtual void Step(Number parameter)
+        public virtual void Step(Number parameter, int iterations)
         {
             throw new NotImplementedException();
         }
@@ -544,9 +546,24 @@ namespace NNN
 
     public class SGD(double learningRate) : Optimizer(learningRate)
     {
-        public override void Step(Number parameter)
+        public override void Step(Number parameter, int iterations)
         {
             parameter.Value -= parameter.Gradient * LR;
+        }
+    }
+
+    public class Adam(double learningRate = 0.001, double beta1 = 0.9, double beta2 = 0.999, double epsilon = 1e-8) : Optimizer(learningRate)
+    {
+        readonly double Beta1 = beta1;
+        readonly double Beta2 = beta2;
+        readonly double Epsilon = epsilon;
+
+        public override void Step(Number parameter, int iteration)
+        {
+            parameter.FirstMoment = ((Beta1 * parameter.FirstMoment) + ((1.0 - Beta1) * parameter.Gradient)) / (1.0 - Math.Pow(Beta1, iteration));
+            parameter.SecondMoment = ((Beta2 * parameter.SecondMoment) + ((1.0 - Beta2) * Math.Pow(parameter.Gradient, 2.0))) / (1.0 - Math.Pow(Beta2, iteration));
+
+            parameter.Value -= (LR * parameter.FirstMoment) / (Math.Sqrt(parameter.SecondMoment) + Epsilon);
         }
     }
 
@@ -610,11 +627,11 @@ namespace NNN
             return output;
         }
 
-        public void Optimize(Optimizer optimizer)
+        public void Optimize(Optimizer optimizer, int iteration)
         {
             foreach (var layer in Layers)
             {
-                layer.Optimize(optimizer);
+                layer.Optimize(optimizer, iteration + 1);
             }
         }
 
@@ -660,7 +677,7 @@ namespace NNN
             throw new NotImplementedException();
         }
 
-        public virtual void Optimize(Optimizer optimizer)
+        public virtual void Optimize(Optimizer optimizer, int iteration)
         {
             throw new NotImplementedException();
         }
@@ -717,15 +734,15 @@ namespace NNN
             return output;
         }
 
-        public override void Optimize(Optimizer optimizer)
+        public override void Optimize(Optimizer optimizer, int iteration)
         {
             foreach (var weight in Weights.ToLinearArray())
             {
-                optimizer.Step(weight);
+                optimizer.Step(weight, iteration);
             }
             foreach (var bias in Biases.ToLinearArray())
             {
-                optimizer.Step(bias);
+                optimizer.Step(bias, iteration);
             }
         }
 
@@ -1308,6 +1325,8 @@ namespace NNN
         public double Gradient = 0.0;
         public List<Number> DependsOn = [];
         public string CreationOp = "";
+        public double FirstMoment = 0.0;
+        public double SecondMoment = 0.0;
 
         public Number(double value, List<Number>? dependsOn = null, string creationOp = "")
         {
