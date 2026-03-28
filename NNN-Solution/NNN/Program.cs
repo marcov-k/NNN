@@ -29,13 +29,13 @@ void InteractionLoop()
         agent: model,
         environment: env,
         actionCount: 4,
-        explorationDecay: 0.999,
+        explorationDecay: 0.995,
         discount: 0.99,
         optimizer: new Adam(),
         cost: new Huber(),
         replayBufferSize: 20000,
         batchSize: 64,
-        minExperiences: 1000
+        minExperiences: 5000
     );
 
     TrainingLoop();
@@ -198,24 +198,30 @@ namespace NNN
         readonly Random random = new();
         readonly Tensor State = new(4); // current x, current y, target x, target y
         readonly int[] Bounds; // xMin, xMax, yMin, yMax
+        readonly int MaxSteps;
+        readonly double XRange;
+        readonly double YRange;
 
-        public MovementGrid2D(int xMin, int xMax, int yMin, int yMax)
+        public MovementGrid2D(int xMin, int xMax, int yMin, int yMax, int maxSteps = 100)
         {
             State[0] = new(random.Next(xMin, xMax + 1));
             State[1] = new(random.Next(yMin, yMax + 1));
             State[2] = new(random.Next(xMin, xMax));
             State[3] = new(random.Next(yMin, yMax));
             Bounds = [xMin, xMax, yMin, yMax];
+            XRange = xMax - xMin;
+            YRange = yMax - yMin;
+            MaxSteps = maxSteps;
         }
 
         public override Tensor GetNormalizedState()
         {
             Tensor normalized = new(4);
 
-            normalized[0] = new(State[0].Value / Math.Max(Bounds[0], Bounds[1]));
-            normalized[1] = new(State[1].Value / Math.Max(Bounds[2], Bounds[3]));
-            normalized[2] = new(State[2].Value / Math.Max(Bounds[0], Bounds[1]));
-            normalized[3] = new(State[3].Value / Math.Max(Bounds[2], Bounds[3]));
+            normalized[0] = new(2.0 * (State[0].Value - Bounds[0]) / XRange - 1.0);
+            normalized[1] = new(2.0 * (State[1].Value - Bounds[2]) / YRange - 1.0);
+            normalized[2] = new(2.0 * (State[2].Value - Bounds[0]) / XRange - 1.0);
+            normalized[3] = new(2.0 * (State[3].Value - Bounds[2]) / YRange - 1.0);
 
             return normalized;
         }
@@ -260,20 +266,24 @@ namespace NNN
                                (State[1].Value < Bounds[2]) || (State[1].Value > Bounds[3]);
 
             if (newDist < 2.0) reward += 1.0;
-            if (outOfBounds) reward -= 5.0;
-            if (reachedTarget)
-            {
-                reward += 5.0;
-                done = true;
-            }
 
-            if (steps >= 50)
+            if (outOfBounds)
             {
                 reward -= 5.0;
                 done = true;
             }
 
-            reward = Math.Tanh(reward); // clip rewards to [-1, 1] range
+            if (reachedTarget)
+            {
+                reward += 10.0;
+                done = true;
+            }
+
+            if (steps >= MaxSteps)
+            {
+                reward -= 5.0;
+                done = true;
+            }
 
             return (reward, GetNormalizedState(), done);
         }
@@ -324,7 +334,7 @@ namespace NNN
     }
 
     public class DQNTrainer(Model agent, Environment environment, int actionCount, Optimizer optimizer, Cost cost, double discount = 0.995, double exploration = 1.0,
-        double explorationDecay = 0.99, int replayBufferSize = 10000, int batchSize = 64, double tau = 0.005, int minExperiences = 1000)
+        double explorationDecay = 0.99, int replayBufferSize = 10000, int batchSize = 64, double tau = 0.005, double maxGradNorm = 1.0, int minExperiences = 1000)
     {
         readonly Random random = new();
         readonly Model Agent = agent;
@@ -341,6 +351,7 @@ namespace NNN
         readonly double MinExploration = 0.01;
         int optimizerSteps = 0;
         readonly double Tau = tau;
+        readonly double MaxNorm = maxGradNorm;
         readonly int MinExperiences = minExperiences;
 
         public void Train(int episodes = 1000)
@@ -437,6 +448,8 @@ namespace NNN
 
             var loss = Cost.CalculateCost(predictedQs, targetQs);
             loss.Backward();
+
+            Agent.ClipGradients(MaxNorm);
 
             double targetParam;
             for (int i = 0; i < Agent.ParameterCount; i++)
@@ -655,6 +668,28 @@ namespace NNN
                 foreach (var param in layer.GetParameters())
                 {
                     yield return param;
+                }
+            }
+        }
+
+        public void ClipGradients(double maxNorm)
+        {
+            double totalNorm = 0.0;
+
+            foreach (var param in Parameters)
+            {
+                totalNorm += Math.Pow(param.Gradient, 2.0);
+            }
+
+            totalNorm = Math.Sqrt(totalNorm);
+
+            if (totalNorm > maxNorm)
+            {
+                double scale = maxNorm / (totalNorm + 1e-8);
+
+                foreach (var param in Parameters)
+                {
+                    param.Gradient *= scale;
                 }
             }
         }
