@@ -32,7 +32,7 @@ void InteractionLoop()
         explorationDecay: 0.999,
         discount: 0.99,
         optimizer: new Adam(),
-        cost: new MSE(),
+        cost: new Huber(),
         replayBufferSize: 20000,
         batchSize: 64,
         minExperiences: 1000
@@ -890,7 +890,7 @@ namespace NNN
         }
     }
 
-    public class Huber(double delta) : Cost
+    public class Huber(double delta = 1.0) : Cost
     {
         readonly double Delta = delta;
 
