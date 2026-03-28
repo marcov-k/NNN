@@ -29,7 +29,7 @@ void InteractionLoop()
         agent: model,
         environment: env,
         actionCount: 4,
-        explorationDecay: 0.995,
+        explorationDecay: 0.997,
         discount: 0.99,
         optimizer: new Adam(),
         cost: new Huber(),
