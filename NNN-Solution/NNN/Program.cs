@@ -22,7 +22,7 @@ void InteractionLoop()
             new Dense(32, new LeakyReLU()),
             new Dense(32, new LeakyReLU()),
             new Dense(4, new Linear())
-        ], new Tensor(0, 4));
+        ], new Tensor(0, 2));
     }
 
     dqnTrainer = new DQNTrainer(
@@ -216,12 +216,13 @@ namespace NNN
 
         public override Tensor GetNormalizedState()
         {
-            Tensor normalized = new(4);
+            Tensor normalized = new(2);
 
-            normalized[0] = new(2.0 * (State[0].Value - Bounds[0]) / XRange - 1.0);
-            normalized[1] = new(2.0 * (State[1].Value - Bounds[2]) / YRange - 1.0);
-            normalized[2] = new(2.0 * (State[2].Value - Bounds[0]) / XRange - 1.0);
-            normalized[3] = new(2.0 * (State[3].Value - Bounds[2]) / YRange - 1.0);
+            double dx = State[2].Value - State[0].Value;
+            double dy = State[3].Value - State[1].Value;
+
+            normalized[0] = new(dx / XRange);
+            normalized[1] = new(dy / YRange);
 
             return normalized;
         }
