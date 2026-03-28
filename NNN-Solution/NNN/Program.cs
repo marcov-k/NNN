@@ -266,8 +266,6 @@ namespace NNN
             bool outOfBounds = (State[0].Value < Bounds[0]) || (State[0].Value > Bounds[1]) ||
                                (State[1].Value < Bounds[2]) || (State[1].Value > Bounds[3]);
 
-            if (newDist < 2.0) reward += 1.0;
-
             if (outOfBounds)
             {
                 reward -= 5.0;
