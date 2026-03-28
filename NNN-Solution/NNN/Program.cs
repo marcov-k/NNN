@@ -19,8 +19,8 @@ void InteractionLoop()
     else
     {
         model = new([
-            new Dense(10, new LeakyReLU()),
-            new Dense(10, new LeakyReLU()),
+            new Dense(32, new LeakyReLU()),
+            new Dense(32, new LeakyReLU()),
             new Dense(4, new Linear())
         ], new Tensor(0, 4));
     }
@@ -29,8 +29,8 @@ void InteractionLoop()
         agent: model,
         environment: env,
         actionCount: 4,
-        explorationDecay: 0.9995,
-        discount: 0.999,
+        explorationDecay: 0.999,
+        discount: 0.99,
         optimizer: new Adam(),
         cost: new MSE(),
         replayBufferSize: 20000,
@@ -263,13 +263,19 @@ namespace NNN
             if (outOfBounds) reward -= 5.0;
             if (reachedTarget)
             {
-                reward = 20.0;
+                reward += 5.0;
                 done = true;
             }
 
-            if (steps >= 50) done = true;
+            if (steps >= 50)
+            {
+                reward -= 5.0;
+                done = true;
+            }
 
-            return (reward, State, done);
+            reward = Math.Tanh(reward); // clip rewards to [-1, 1] range
+
+            return (reward, GetNormalizedState(), done);
         }
 
         public override void Reset()
@@ -335,7 +341,7 @@ namespace NNN
         readonly double MinExploration = 0.01;
         int totalSteps = 0;
         int optimizerSteps = 0;
-        readonly int TargetUpdateFrequency = 1000;
+        readonly int TargetUpdateFrequency = 500;
         readonly int MinExperiences = minExperiences;
 
         public void Train(int episodes = 1000)
@@ -884,6 +890,29 @@ namespace NNN
         }
     }
 
+    public class Huber(double delta) : Cost
+    {
+        readonly double Delta = delta;
+
+        public override Number CalculateCost(Tensor input, Tensor target)
+        {
+            var diff = input - target;
+            for (int i = 0; i < diff.ElementCount; i++)
+            {
+                if (Math.Abs(diff[i].Value) <= Delta)
+                {
+                    diff[i] = 0.5 * (diff[i] ^ 2.0);
+                }
+                else
+                {
+                    diff[i] = Delta * (Number.Abs(diff[i]) - (0.5 * Delta));
+                }
+            }
+
+            return Tensor.Mean(diff);
+        }
+    }
+
     [Serializable]
     public class Tensor
     {
@@ -1412,6 +1441,11 @@ namespace NNN
             return new Number(a) ^ b;
         }
 
+        public static Number Abs(Number a)
+        {
+            return new(value: Math.Abs(a.Value), dependsOn: [a], creationOp: "abs");
+        }
+
         public void Backward()
         {
             List<Number> topography = [];
@@ -1466,6 +1500,9 @@ namespace NNN
                 case "^":
                     DependsOn[0].Gradient += Gradient * DependsOn[1].Value * Math.Pow(DependsOn[0].Value, DependsOn[1].Value - 1.0);
                     DependsOn[1].Gradient += Gradient * Math.Pow(DependsOn[0].Value, DependsOn[1].Value) * Math.Log(DependsOn[0].Value);
+                    break;
+                case "abs":
+                    DependsOn[0].Gradient += Gradient * Math.Sign(DependsOn[0].Value);
                     break;
             }
         }
