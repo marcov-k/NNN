@@ -19,8 +19,8 @@ void InteractionLoop()
     else
     {
         model = new([
-            new Dense(64, new LeakyReLU()),
-            new Dense(64, new LeakyReLU()),
+            new Dense(32, new LeakyReLU()),
+            new Dense(32, new LeakyReLU()),
             new Dense(4, new Linear())
         ], new Tensor(0, 4));
     }
@@ -29,12 +29,13 @@ void InteractionLoop()
         agent: model,
         environment: env,
         actionCount: 4,
-        explorationDecay: 0.999,
+        explorationDecay: 0.995,
         discount: 0.99,
         optimizer: new Adam(),
         cost: new Huber(),
         replayBufferSize: 20000,
         batchSize: 64,
+        tau: 0.01,
         minExperiences: 2000
     );
 
@@ -202,7 +203,7 @@ namespace NNN
         readonly double XRange;
         readonly double YRange;
 
-        public MovementGrid2D(int xMin, int xMax, int yMin, int yMax, int maxSteps = 100)
+        public MovementGrid2D(int xMin, int xMax, int yMin, int yMax, int maxSteps = 50)
         {
             State[0] = new(random.Next(xMin, xMax + 1));
             State[1] = new(random.Next(yMin, yMax + 1));
@@ -257,7 +258,7 @@ namespace NNN
             yDiff = State[3].Value - State[1].Value;
             double newDist = Math.Sqrt(Math.Pow(xDiff, 2.0) + Math.Pow(yDiff, 2.0));
 
-            double reward = -0.05 + prevDist - newDist;
+            double reward = -0.01 + 2.0 * (prevDist - newDist);
 
             bool done = false;
 
