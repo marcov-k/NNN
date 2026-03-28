@@ -796,9 +796,16 @@ namespace NNN
         }
     }
 
-    public class LeakyReLU(double tau = 0.01) : Activation
+    public class LeakyReLU : Activation
     {
-        readonly double Tau = tau;
+        readonly double Tau;
+
+        public LeakyReLU(double tau = 0.01)
+        {
+            Tau = tau;
+        }
+
+        public LeakyReLU() { }
 
         public override Tensor Forward(Tensor input)
         {
