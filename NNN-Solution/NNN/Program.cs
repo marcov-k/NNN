@@ -8,7 +8,7 @@ double discount = 0.99;
 Optimizer optimizer = new Adam();
 Cost cost = new Huber();
 int replayBufferSize = 20000;
-int batchSize = 64;
+int batchSize = 128;
 double tau = 0.01;
 int minExperiences = 2000;
 DQNTrainer dqnTrainer;
