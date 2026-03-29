@@ -8,11 +8,11 @@ double explorationDecay = 0.99;
 double discount = 0.99;
 Optimizer optimizer = new Adam();
 Cost cost = new Huber();
-int replayBufferSize = 20000;
-int batchSize = 64;
+int replayBufferSize = 5000;
+int batchSize = 32;
 double tau = 0.01;
 double maxGradNorm = 2.0;
-int minExperiences = 5000;
+int minExperiences = 1000;
 DQNTrainer dqnTrainer;
 
 InteractionLoop();
@@ -31,8 +31,8 @@ void InteractionLoop()
     else
     {
         model = new([
-            new Dense(128, new LeakyReLU()),
-            new Dense(128, new LeakyReLU()),
+            new Dense(32, new LeakyReLU()),
+            new Dense(32, new LeakyReLU()),
             new Dense(4, new Linear())
         ], new Tensor(0, 5));
     }
