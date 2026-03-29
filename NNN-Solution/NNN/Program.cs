@@ -4,7 +4,7 @@ Model model;
 NNN.Environment env = new MovementGrid2D(-5, 5, -5, 5);
 int actionCount = 4;
 double exploration = 1.0;
-double explorationDecay = 0.998;
+double explorationDecay = 0.995;
 double discount = 0.99;
 Optimizer optimizer = new Adam(0.01);
 Cost cost = new Huber();
@@ -12,7 +12,7 @@ int replayBufferSize = 5000;
 int batchSize = 32;
 double tau = 0.005;
 double maxGradNorm = 2.0;
-int minExperiences = 3000;
+int minExperiences = 1000;
 DQNTrainer dqnTrainer;
 
 InteractionLoop();
@@ -31,7 +31,7 @@ void InteractionLoop()
     else
     {
         model = new([
-            new Dense(16, new LeakyReLU()),
+            new Dense(32, new LeakyReLU()),
             new Dense(4, new Linear())
         ], new Tensor(0, 7));
     }
@@ -280,7 +280,7 @@ namespace NNN
             yDiff = State[3].Value - State[1].Value;
             double newDist = Math.Sqrt(Math.Pow(xDiff, 2.0) + Math.Pow(yDiff, 2.0));
 
-            double reward = -0.02 + 10.0 * (prevDist - newDist);
+            double reward = -0.01 + 5.0 * (prevDist - newDist);
 
             bool done = false;
 
@@ -292,12 +292,12 @@ namespace NNN
             {
                 State[0].Value = Math.Clamp(State[0].Value, Bounds[0], Bounds[1]);
                 State[1].Value = Math.Clamp(State[1].Value, Bounds[2], Bounds[3]);
-                reward -= 5.0;
+                reward -= 1.0;
             }
 
             if (reachedTarget)
             {
-                reward += 50.0;
+                reward += 20.0;
                 done = true;
             }
 
@@ -333,14 +333,16 @@ namespace NNN
         readonly Random random = new();
         readonly int MaxSize = maxSize;
         readonly List<Experience> Buffer = [];
+        int FirstIndex = 0;
         public int Count => Buffer.Count;
 
         public void AddExperience(Experience experience)
         {
-            Buffer.Add(experience);
-            if (Buffer.Count > MaxSize)
+            if (Count < MaxSize) Buffer.Add(experience);
+            else
             {
-                Buffer.RemoveAt(0);
+                Buffer[FirstIndex] = experience;
+                FirstIndex = FirstIndex < MaxSize - 1 ? FirstIndex + 1 : 0;
             }
         }
 
