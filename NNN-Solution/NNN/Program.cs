@@ -4,9 +4,9 @@ Model model;
 NNN.Environment env = new MovementGrid2D(-5, 5, -5, 5);
 int actionCount = 4;
 double exploration = 1.0;
-double explorationDecay = 0.99;
+double explorationDecay = 0.995;
 double discount = 0.99;
-Optimizer optimizer = new Adam();
+Optimizer optimizer = new Adam(0.01);
 Cost cost = new Huber();
 int replayBufferSize = 5000;
 int batchSize = 32;
@@ -31,10 +31,9 @@ void InteractionLoop()
     else
     {
         model = new([
-            new Dense(32, new LeakyReLU()),
-            new Dense(32, new LeakyReLU()),
+            new Dense(16, new LeakyReLU()),
             new Dense(4, new Linear())
-        ], new Tensor(0, 5));
+        ], new Tensor(0, 7));
     }
 
     dqnTrainer = new(
@@ -231,7 +230,7 @@ namespace NNN
 
         public override Tensor GetNormalizedState()
         {
-            Tensor normalized = new(5);
+            Tensor normalized = new(7);
 
             double dx = (State[2].Value - State[0].Value) / XRange;
             double dy = (State[3].Value - State[1].Value) / YRange;
@@ -240,8 +239,11 @@ namespace NNN
             double normX = 2.0 * (State[0].Value - Bounds[0]) / XRange - 1.0;
             double normY = 2.0 * (State[1].Value - Bounds[2]) / YRange - 1.0;
 
-            (normalized[0], normalized[1], normalized[2], normalized[3], normalized[4]) =
-                (new(dx), new(dy), new(distance), new(normX), new(normY));
+            double normTargetX = 2.0 * (State[2].Value - Bounds[0]) / XRange - 1.0;
+            double normTargetY = 2.0 * (State[3].Value - Bounds[2]) / YRange - 1.0;
+
+            (normalized[0], normalized[1], normalized[2], normalized[3], normalized[4], normalized[5], normalized[6]) =
+                (new(dx), new(dy), new(distance), new(normX), new(normY), new(normTargetX), new(normTargetY));
 
             return normalized;
         }
@@ -277,7 +279,7 @@ namespace NNN
             yDiff = State[3].Value - State[1].Value;
             double newDist = Math.Sqrt(Math.Pow(xDiff, 2.0) + Math.Pow(yDiff, 2.0));
 
-            double reward = -0.01 + 2.0 * (prevDist - newDist);
+            double reward = -0.01 + 5.0 * (prevDist - newDist);
 
             bool done = false;
 
@@ -294,7 +296,7 @@ namespace NNN
 
             if (reachedTarget)
             {
-                reward += 10.0;
+                reward += 20.0;
                 done = true;
             }
 
