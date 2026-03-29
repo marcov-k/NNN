@@ -387,12 +387,14 @@ namespace NNN
             double totalReward;
             int step;
             Tensor nextState;
+            int[] movementMagnitude = new int[2];
             TimeSpan avgElapsed = new(0);
             Stopwatch stopwatch = new();
             stopwatch.Start();
             for (int e = 0; e < episodes; e++)
             {
                 Environment.Reset();
+                (movementMagnitude[0], movementMagnitude[1]) = (0, 0);
                 state = Environment.GetNormalizedState();
                 initialState = Environment.GetState();
 
@@ -403,6 +405,19 @@ namespace NNN
                 {
                     step++;
                     action = PickNextAction(state);
+
+                    switch (action)
+                    {
+                        case 0:
+                        case 1:
+                            movementMagnitude[0]++;
+                            break;
+                        case 2:
+                        case 3:
+                            movementMagnitude[1]++;
+                            break;
+                    }
+
                     (reward, nextState, done) = Environment.Step(action, step);
                     totalReward += reward;
                     ReplayBuffer.AddExperience(new(state, action, reward, nextState, done));
@@ -422,6 +437,7 @@ namespace NNN
                 Console.WriteLine($"\nEpisode {e + 1}/{episodes} finished...");
                 Console.WriteLine($"Initial State: ({initialState[0].Value}, {initialState[1].Value}), Final State: ({logState[0].Value}, {logState[1].Value}), Target: (" +
                     $"{initialState[2].Value}, {initialState[3].Value}), Steps Taken: {step}, Total Reward: {totalReward:F2},");
+                Console.WriteLine($"Total Movement Magnitude: ({movementMagnitude[0]}, {movementMagnitude[1]})");
                 Console.WriteLine($"Exploration Rate: {Exploration:F2}, Experience Count: {ReplayBuffer.Count}");
                 Console.WriteLine($"Episode Duration: {elapsed}, Estimated Time Remaining: {eta}");
                 stopwatch.Restart();
