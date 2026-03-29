@@ -4,13 +4,13 @@ Model model;
 NNN.Environment env = new MovementGrid2D(-5, 5, -5, 5);
 int actionCount = 4;
 double exploration = 1.0;
-double explorationDecay = 0.999;
+double explorationDecay = 0.9995;
 double discount = 0.99;
 Optimizer optimizer = new Adam(0.01);
 Cost cost = new Huber();
 int replayBufferSize = 5000;
 int batchSize = 32;
-double tau = 0.01;
+double tau = 0.05;
 double maxGradNorm = 2.0;
 int minExperiences = 1000;
 DQNTrainer dqnTrainer;
@@ -32,7 +32,7 @@ void InteractionLoop()
     {
         model = new([
             new Dense(32, new LeakyReLU()),
-            new Dense(4, new Linear())
+            new Dense(4, new Tanh())
         ], new Tensor(0, 4));
     }
 
@@ -276,7 +276,7 @@ namespace NNN
             yDiff = State[3].Value - State[1].Value;
             double newDist = Math.Sqrt(Math.Pow(xDiff, 2.0) + Math.Pow(yDiff, 2.0));
 
-            double reward = 3.0 * (prevDist - newDist);
+            double reward = -0.01 + 0.5 * (prevDist - newDist);
 
             bool done = false;
 
@@ -288,18 +288,18 @@ namespace NNN
             {
                 State[0].Value = Math.Clamp(State[0].Value, Bounds[0], Bounds[1]);
                 State[1].Value = Math.Clamp(State[1].Value, Bounds[2], Bounds[3]);
-                reward -= 1.0;
+                reward -= 0.1;
             }
 
             if (reachedTarget)
             {
-                reward += 10.0;
+                reward += 1.0;
                 done = true;
             }
 
             if (steps >= MaxSteps)
             {
-                reward -= 5.0;
+                reward -= 0.5;
                 done = true;
             }
 
