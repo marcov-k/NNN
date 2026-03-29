@@ -33,7 +33,7 @@ void InteractionLoop()
         model = new([
             new Dense(32, new LeakyReLU()),
             new Dense(4, new Linear())
-        ], new Tensor(0, 7));
+        ], new Tensor(0, 4));
     }
 
     dqnTrainer = new(
