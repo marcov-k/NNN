@@ -3,7 +3,8 @@
 Model model;
 NNN.Environment env = new MovementGrid2D(-5, 5, -5, 5);
 int actionCount = 4;
-double explorationDecay = 0.997;
+double exploration = 1.0;
+double explorationDecay = 0.99;
 double discount = 0.99;
 Optimizer optimizer = new Adam();
 Cost cost = new Huber();
@@ -11,7 +12,7 @@ int replayBufferSize = 20000;
 int batchSize = 64;
 double tau = 0.01;
 double maxGradNorm = 2.0;
-int minExperiences = 2000;
+int minExperiences = 5000;
 DQNTrainer dqnTrainer;
 
 InteractionLoop();
@@ -25,44 +26,32 @@ void InteractionLoop()
     {
         string fileName = GetFileName();
         model = Saver.LoadModel(fileName);
-        dqnTrainer = new(
-            agent: model,
-            environment: env,
-            actionCount: actionCount,
-            exploration: 0.01,
-            explorationDecay: explorationDecay,
-            discount: discount,
-            optimizer: optimizer,
-            cost: cost,
-            replayBufferSize: replayBufferSize,
-            batchSize: batchSize,
-            tau: tau,
-            maxGradNorm: maxGradNorm,
-            minExperiences: minExperiences
-        );
+        exploration = 0.01;
     }
     else
     {
         model = new([
-            new Dense(64, new Tanh()),
+            new Dense(128, new LeakyReLU()),
+            new Dense(128, new LeakyReLU()),
             new Dense(4, new Linear())
         ], new Tensor(0, 5));
-
-        dqnTrainer = new(
-            agent: model,
-            environment: env,
-            actionCount: actionCount,
-            explorationDecay: explorationDecay,
-            discount: discount,
-            optimizer: optimizer,
-            cost: cost,
-            replayBufferSize: replayBufferSize,
-            batchSize: batchSize,
-            tau: tau,
-            maxGradNorm: maxGradNorm,
-            minExperiences: minExperiences
-        );
     }
+
+    dqnTrainer = new(
+        agent: model,
+        environment: env,
+        actionCount: actionCount,
+        exploration: exploration,
+        explorationDecay: explorationDecay,
+        discount: discount,
+        optimizer: optimizer,
+        cost: cost,
+        replayBufferSize: replayBufferSize,
+        batchSize: batchSize,
+        tau: tau,
+        maxGradNorm: maxGradNorm,
+        minExperiences: minExperiences
+    );
 
     TrainingLoop();
 
@@ -249,7 +238,7 @@ namespace NNN
             double distance = Math.Sqrt(Math.Pow(dx, 2.0) + Math.Pow(dy, 2.0));
 
             double normX = 2.0 * (State[0].Value - Bounds[0]) / XRange - 1.0;
-            double normY = 2.0 * (State[1].Value - Bounds[0]) / YRange - 1.0;
+            double normY = 2.0 * (State[1].Value - Bounds[2]) / YRange - 1.0;
 
             (normalized[0], normalized[1], normalized[2], normalized[3], normalized[4]) =
                 (new(dx), new(dy), new(distance), new(normX), new(normY));
@@ -298,8 +287,9 @@ namespace NNN
 
             if (outOfBounds)
             {
-                reward -= 5.0;
-                done = true;
+                State[0].Value = Math.Clamp(State[0].Value, Bounds[0], Bounds[1]);
+                State[1].Value = Math.Clamp(State[1].Value, Bounds[2], Bounds[3]);
+                reward -= 0.2;
             }
 
             if (reachedTarget)
