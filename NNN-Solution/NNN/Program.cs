@@ -4,15 +4,15 @@ Model model;
 NNN.Environment env = new MovementGrid2D(-5, 5, -5, 5);
 int actionCount = 4;
 double exploration = 1.0;
-double explorationDecay = 0.995;
+double explorationDecay = 0.998;
 double discount = 0.99;
 Optimizer optimizer = new Adam(0.01);
 Cost cost = new Huber();
 int replayBufferSize = 5000;
 int batchSize = 32;
-double tau = 0.01;
+double tau = 0.005;
 double maxGradNorm = 2.0;
-int minExperiences = 1000;
+int minExperiences = 3000;
 DQNTrainer dqnTrainer;
 
 InteractionLoop();
@@ -183,6 +183,7 @@ namespace NNN
 {
     using System.Diagnostics;
     using System.Text.Json;
+    using System.Linq;
 
     public abstract class Environment
     {
@@ -279,7 +280,7 @@ namespace NNN
             yDiff = State[3].Value - State[1].Value;
             double newDist = Math.Sqrt(Math.Pow(xDiff, 2.0) + Math.Pow(yDiff, 2.0));
 
-            double reward = -0.01 + 5.0 * (prevDist - newDist);
+            double reward = -0.02 + 10.0 * (prevDist - newDist);
 
             bool done = false;
 
@@ -291,18 +292,18 @@ namespace NNN
             {
                 State[0].Value = Math.Clamp(State[0].Value, Bounds[0], Bounds[1]);
                 State[1].Value = Math.Clamp(State[1].Value, Bounds[2], Bounds[3]);
-                reward -= 0.2;
+                reward -= 5.0;
             }
 
             if (reachedTarget)
             {
-                reward += 20.0;
+                reward += 50.0;
                 done = true;
             }
 
             if (steps >= MaxSteps)
             {
-                reward -= 5.0;
+                reward -= 10.0;
                 done = true;
             }
 
@@ -345,12 +346,7 @@ namespace NNN
 
         public List<Experience> GetBatch(int batchSize)
         {
-            List<Experience> batch = [];
-            for (int i = 0; i < batchSize; i++)
-            {
-                batch.Add(Buffer[random.Next(0, Buffer.Count)]);
-            }
-            return batch;
+            return [.. Buffer.OrderBy(x => random.Next()).Take(batchSize)];
         }
     }
 
@@ -478,7 +474,7 @@ namespace NNN
             var nextAgentQs = Agent.Forward(nextBatch).Copy();
             var nextTargetQs = TargetModel.Forward(nextBatch).Copy();
 
-            var predictedQs = MaskQValues(predictions, batch, breakGraph: false);
+            var predictedQs = MaskQValues(predictions, batch);
             var targetQs = MaskQValuesDouble(nextAgentQs, nextTargetQs, batch);
 
             Agent.ZeroGrad();
@@ -493,43 +489,22 @@ namespace NNN
             {
                 Optimizer.Step(Agent.Parameters[i], optimizerSteps);
                 targetParam = (Tau * Agent.Parameters[i].Value) + ((1.0 - Tau) * TargetModel.Parameters[i].Value);
-                TargetModel.Parameters[i] = new(targetParam);
+                TargetModel.Parameters[i].Value = targetParam;
             }
 
             optimizerSteps++;
         }
 
-        Tensor MaskQValues(Tensor qValues, List<Experience> batch, bool breakGraph)
+        Tensor MaskQValues(Tensor qValues, List<Experience> batch)
         {
-            if (breakGraph)
+            Tensor maskedQs = new(BatchSize, 1);
+
+            for (int i = 0; i < BatchSize; i++)
             {
-                var targetQs = qValues.ReduceDimensions();
-                Tensor maskedQs = new(BatchSize, 1);
-
-                for (int i = 0; i < BatchSize; i++)
-                {
-                    double qTarget = batch[i].Reward;
-                    if (!batch[i].Done)
-                    {
-                        qTarget += Discount * targetQs[i].Max().Value;
-                    }
-
-                    maskedQs[i] = new(qTarget);
-                }
-
-                return maskedQs;
+                maskedQs[i] = qValues[i, batch[i].Action];
             }
-            else
-            {
-                Tensor maskedQs = new(BatchSize, 1);
 
-                for (int i = 0; i < BatchSize; i++)
-                {
-                    maskedQs[i] = qValues[i, batch[i].Action];
-                }
-
-                return maskedQs;
-            }
+            return maskedQs;
         }
 
         Tensor MaskQValuesDouble(Tensor agentQValues, Tensor targetQValues, List<Experience> batch)
@@ -620,10 +595,13 @@ namespace NNN
         public override void Step(Number parameter, int iteration)
         {
             iteration++;
-            parameter.FirstMoment = ((Beta1 * parameter.FirstMoment) + ((1.0 - Beta1) * parameter.Gradient)) / (1.0 - Math.Pow(Beta1, iteration));
-            parameter.SecondMoment = ((Beta2 * parameter.SecondMoment) + ((1.0 - Beta2) * Math.Pow(parameter.Gradient, 2.0))) / (1.0 - Math.Pow(Beta2, iteration));
+            parameter.FirstMoment = (Beta1 * parameter.FirstMoment) + ((1.0 - Beta1) * parameter.Gradient);
+            parameter.SecondMoment = (Beta2 * parameter.SecondMoment) + ((1.0 - Beta2) * Math.Pow(parameter.Gradient, 2.0));
 
-            parameter.Value -= (LR * parameter.FirstMoment) / (Math.Sqrt(parameter.SecondMoment) + Epsilon);
+            double mHat = parameter.FirstMoment / (1.0 - Math.Pow(Beta1, iteration));
+            double vHat = parameter.SecondMoment / (1.0 - Math.Pow(Beta2, iteration));
+
+            parameter.Value -= (LR * mHat) / (Math.Sqrt(vHat) + Epsilon);
         }
     }
 
@@ -909,8 +887,7 @@ namespace NNN
 
             for (int i = 0; i < input.ElementCount; i++)
             {
-                if (input[i].Value >= 0) output[i] = input[i];
-                else output[i] = input[i] * Tau;
+                output[i] = Number.LeakyReLU(input[i], Tau);
             }
 
             return output;
@@ -1000,19 +977,14 @@ namespace NNN
         public override Number CalculateCost(Tensor input, Tensor target)
         {
             var diff = input - target;
+
+            Number loss = new(0.0);
             for (int i = 0; i < diff.ElementCount; i++)
             {
-                if (Math.Abs(diff[i].Value) <= Delta)
-                {
-                    diff[i] = 0.5 * (diff[i] ^ 2.0);
-                }
-                else
-                {
-                    diff[i] = Delta * (Number.Abs(diff[i]) - (0.5 * Delta));
-                }
+                loss += Math.Pow(Delta, 2.0) * (((1.0 + ((diff[i] / Delta) ^ 2.0)) ^ 0.5) - 1.0);
             }
 
-            return Tensor.Mean(diff);
+            return loss * (1.0 / diff.ElementCount);
         }
     }
 
@@ -1456,22 +1428,24 @@ namespace NNN
         public double Value { get; set; }
         public double Gradient = 0.0;
         public List<Number> DependsOn = [];
-        public string CreationOp = "";
+        public Func<List<double>, double>? Op;
+        public Func<List<double>, List<double>>? BackwardOp;
         public double FirstMoment = 0.0;
         public double SecondMoment = 0.0;
 
-        public Number(double value, List<Number>? dependsOn = null, string creationOp = "")
+        public Number(double value, List<Number>? dependsOn = null, Func<List<double>, double>? op = null, Func<List<double>, List<double>>? backwardOp = null)
         {
             Value = value;
             DependsOn = dependsOn ?? [];
-            CreationOp = creationOp;
+            Op = op;
+            BackwardOp = backwardOp;
         }
 
         public Number() { }
 
         public static Number operator +(Number a, Number b)
         {
-            return new(value: a.Value + b.Value, dependsOn: [a, b], creationOp: "+");
+            return new(value: a.Value + b.Value, dependsOn: [a, b], op: inputs => inputs[0] + inputs[1], backwardOp: inputs => [1.0, 1.0]);
         }
 
         public static Number operator +(Number a, double b)
@@ -1486,7 +1460,7 @@ namespace NNN
 
         public static Number operator -(Number a, Number b)
         {
-            return new(value: a.Value - b.Value, dependsOn: [a, b], creationOp: "-");
+            return new(value: a.Value - b.Value, dependsOn: [a, b], op: inputs => inputs[0] - inputs[1], backwardOp: inputs => [1.0, -1.0]);
         }
 
         public static Number operator -(Number a, double b)
@@ -1501,7 +1475,7 @@ namespace NNN
 
         public static Number operator *(Number a, Number b)
         {
-            return new(value: a.Value * b.Value, dependsOn: [a, b], creationOp: "*");
+            return new(value: a.Value * b.Value, dependsOn: [a, b], op: inputs => inputs[0] * inputs[1], backwardOp: inputs => [inputs[1], inputs[0]]);
         }
 
         public static Number operator *(Number a, double b)
@@ -1516,7 +1490,8 @@ namespace NNN
 
         public static Number operator /(Number a, Number b)
         {
-            return new(value: a.Value / b.Value, dependsOn: [a, b], creationOp: "/");
+            return new(value: a.Value / b.Value, dependsOn: [a, b], op: inputs => inputs[0] / inputs[1],
+                backwardOp: inputs => [1.0 / inputs[1], -inputs[0] / Math.Pow(inputs[1], 2.0)]);
         }
 
         public static Number operator /(Number a, double b)
@@ -1531,7 +1506,8 @@ namespace NNN
 
         public static Number operator ^(Number a, Number b)
         {
-            return new(value: Math.Pow(a.Value, b.Value), dependsOn: [a, b], creationOp: "^");
+            return new(value: Math.Pow(a.Value, b.Value), dependsOn: [a, b], op: inputs => Math.Pow(inputs[0], inputs[1]),
+                backwardOp: inputs => [inputs[1] * Math.Pow(inputs[0], inputs[1] - 1.0), Math.Pow(inputs[0], inputs[1]) * Math.Log(inputs[0])]);
         }
 
         public static Number operator ^(Number a, double b)
@@ -1546,7 +1522,7 @@ namespace NNN
 
         public static Number Abs(Number a)
         {
-            return new(value: Math.Abs(a.Value), dependsOn: [a], creationOp: "abs");
+            return new(value: Math.Abs(a.Value), dependsOn: [a], op: inputs => Math.Abs(inputs[0]), backwardOp: inputs => [Math.Sign(inputs[0])]);
         }
 
         public void Backward()
@@ -1558,6 +1534,8 @@ namespace NNN
 
             foreach (var node in topography) node.Gradient = 0.0;
             Gradient = 1.0;
+
+            topography.Reverse();
 
             for (int i = topography.Count - 1; i >= 0; i--)
             {
@@ -1582,31 +1560,14 @@ namespace NNN
 
         void ApplyBackward()
         {
-            switch (CreationOp)
+            if (DependsOn.Count > 0 && BackwardOp != null)
             {
-                case "+":
-                    DependsOn[0].Gradient += Gradient;
-                    DependsOn[1].Gradient += Gradient;
-                    break;
-                case "-":
-                    DependsOn[0].Gradient += Gradient;
-                    DependsOn[1].Gradient -= Gradient;
-                    break;
-                case "*":
-                    DependsOn[0].Gradient += Gradient * DependsOn[1].Value;
-                    DependsOn[1].Gradient += Gradient * DependsOn[0].Value;
-                    break;
-                case "/":
-                    DependsOn[0].Gradient += Gradient * (1.0 / DependsOn[1].Value);
-                    DependsOn[1].Gradient += Gradient * (-DependsOn[0].Value / Math.Pow(DependsOn[1].Value, 2.0));
-                    break;
-                case "^":
-                    DependsOn[0].Gradient += Gradient * DependsOn[1].Value * Math.Pow(DependsOn[0].Value, DependsOn[1].Value - 1.0);
-                    DependsOn[1].Gradient += Gradient * Math.Pow(DependsOn[0].Value, DependsOn[1].Value) * Math.Log(DependsOn[0].Value);
-                    break;
-                case "abs":
-                    DependsOn[0].Gradient += Gradient * Math.Sign(DependsOn[0].Value);
-                    break;
+                var grads = BackwardOp(DependsOn.ConvertAll(d => d.Value));
+
+                for (int i = 0; i < DependsOn.Count; i++)
+                {
+                    DependsOn[i].Gradient += Gradient * grads[i];
+                }
             }
         }
 
@@ -1642,17 +1603,47 @@ namespace NNN
             {
                 sum += input;
             }
-            return sum * (1f / inputs.Length);
+            return sum * (1.0 / inputs.Length);
         }
 
         public static Number Tanh(Number x)
         {
-            return ((MathF.E ^ (2 * x)) - 1) / ((MathF.E ^ (2 * x)) + 1);
+            double value = MathUtils.Tanh(x.Value);
+
+            return new(
+                value: value,
+                dependsOn: [x],
+                op: inputs => MathUtils.Tanh(inputs[0]),
+                backwardOp: inputs => [1.0 - Math.Pow(MathUtils.Tanh(inputs[0]), 2.0)]
+            );
         }
 
         public static Number Sigmoid(Number x)
         {
-            return 1 / (1 + (MathF.E ^ (-1 * x)));
+            double value = MathUtils.Sigmoid(x.Value);
+
+            return new(
+                value: value,
+                dependsOn: [x],
+                op: inputs => MathUtils.Sigmoid(inputs[0]),
+                backwardOp: inputs =>
+                {
+                    double sig = MathUtils.Sigmoid(inputs[0]);
+                    return [sig * (1.0 - sig)];
+                }
+            );
+        }
+
+        public static Number LeakyReLU(Number x, double tau)
+        {
+            double value = Math.Max(tau * x.Value, x.Value);
+
+            return new(
+                value: value,
+                dependsOn: [x],
+                op: inputs => Math.Max(tau * inputs[0], inputs[0]),
+                backwardOp: inputs => [inputs[0] > 0.0 ? 1.0 : tau]
+            );
         }
     }
 
@@ -1679,6 +1670,16 @@ namespace NNN
         public static int RoundToInterval(double value, int interval)
         {
             return (int)Math.Round(value / interval, MidpointRounding.AwayFromZero) * interval;
+        }
+
+        public static double Sigmoid(double value)
+        {
+            return 1.0 / (1.0 + Math.Exp(-value));
+        }
+
+        public static double Tanh(double value)
+        {
+            return Math.Tanh(value);
         }
     }
 
