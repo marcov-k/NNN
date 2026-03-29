@@ -10,6 +10,7 @@ Cost cost = new Huber();
 int replayBufferSize = 20000;
 int batchSize = 128;
 double tau = 0.01;
+double maxGradNorm = 2.0;
 int minExperiences = 2000;
 DQNTrainer dqnTrainer;
 
@@ -24,7 +25,7 @@ void InteractionLoop()
     {
         string fileName = GetFileName();
         model = Saver.LoadModel(fileName);
-        dqnTrainer = new DQNTrainer(
+        dqnTrainer = new(
             agent: model,
             environment: env,
             actionCount: actionCount,
@@ -36,18 +37,18 @@ void InteractionLoop()
             replayBufferSize: replayBufferSize,
             batchSize: batchSize,
             tau: tau,
+            maxGradNorm: maxGradNorm,
             minExperiences: minExperiences
         );
     }
     else
     {
         model = new([
-            new Dense(32, new LeakyReLU()),
-            new Dense(32, new LeakyReLU()),
+            new Dense(64, new Tanh()),
             new Dense(4, new Linear())
-        ], new Tensor(0, 4));
+        ], new Tensor(0, 5));
 
-        dqnTrainer = new DQNTrainer(
+        dqnTrainer = new(
             agent: model,
             environment: env,
             actionCount: actionCount,
@@ -58,6 +59,7 @@ void InteractionLoop()
             replayBufferSize: replayBufferSize,
             batchSize: batchSize,
             tau: tau,
+            maxGradNorm: maxGradNorm,
             minExperiences: minExperiences
         );
     }
@@ -240,12 +242,17 @@ namespace NNN
 
         public override Tensor GetNormalizedState()
         {
-            Tensor normalized = new(4);
+            Tensor normalized = new(5);
 
-            normalized[0] = new(2.0 * (State[0].Value - Bounds[0]) / XRange - 1.0);
-            normalized[1] = new(2.0 * (State[1].Value - Bounds[2]) / YRange - 1.0);
-            normalized[2] = new(2.0 * (State[2].Value - Bounds[0]) / XRange - 1.0);
-            normalized[3] = new(2.0 * (State[3].Value - Bounds[2]) / YRange - 1.0);
+            double dx = (State[2].Value - State[0].Value) / XRange;
+            double dy = (State[3].Value - State[1].Value) / YRange;
+            double distance = Math.Sqrt(Math.Pow(dx, 2.0) + Math.Pow(dy, 2.0));
+
+            double normX = 2.0 * (State[0].Value - Bounds[0]) / XRange - 1.0;
+            double normY = 2.0 * (State[1].Value - Bounds[0]) / YRange - 1.0;
+
+            (normalized[0], normalized[1], normalized[2], normalized[3], normalized[4]) =
+                (new(dx), new(dy), new(distance), new(normX), new(normY));
 
             return normalized;
         }
@@ -281,7 +288,7 @@ namespace NNN
             yDiff = State[3].Value - State[1].Value;
             double newDist = Math.Sqrt(Math.Pow(xDiff, 2.0) + Math.Pow(yDiff, 2.0));
 
-            double reward = -0.01 + 4.0 * (prevDist - newDist);
+            double reward = -0.01 + 2.0 * (prevDist - newDist);
 
             bool done = false;
 
@@ -291,7 +298,7 @@ namespace NNN
 
             if (outOfBounds)
             {
-                reward -= 20.0;
+                reward -= 5.0;
                 done = true;
             }
 
