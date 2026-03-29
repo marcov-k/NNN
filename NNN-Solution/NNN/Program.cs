@@ -2,6 +2,15 @@
 
 Model model;
 NNN.Environment env = new MovementGrid2D(-5, 5, -5, 5);
+int actionCount = 4;
+double explorationDecay = 0.997;
+double discount = 0.99;
+Optimizer optimizer = new Adam();
+Cost cost = new Huber();
+int replayBufferSize = 20000;
+int batchSize = 64;
+double tau = 0.01;
+int minExperiences = 2000;
 DQNTrainer dqnTrainer;
 
 InteractionLoop();
@@ -15,6 +24,20 @@ void InteractionLoop()
     {
         string fileName = GetFileName();
         model = Saver.LoadModel(fileName);
+        dqnTrainer = new DQNTrainer(
+            agent: model,
+            environment: env,
+            actionCount: actionCount,
+            exploration: 0.01,
+            explorationDecay: explorationDecay,
+            discount: discount,
+            optimizer: optimizer,
+            cost: cost,
+            replayBufferSize: replayBufferSize,
+            batchSize: batchSize,
+            tau: tau,
+            minExperiences: minExperiences
+        );
     }
     else
     {
@@ -23,21 +46,21 @@ void InteractionLoop()
             new Dense(32, new LeakyReLU()),
             new Dense(4, new Linear())
         ], new Tensor(0, 4));
-    }
 
-    dqnTrainer = new DQNTrainer(
-        agent: model,
-        environment: env,
-        actionCount: 4,
-        explorationDecay: 0.997,
-        discount: 0.99,
-        optimizer: new Adam(),
-        cost: new Huber(),
-        replayBufferSize: 20000,
-        batchSize: 64,
-        tau: 0.01,
-        minExperiences: 2000
-    );
+        dqnTrainer = new DQNTrainer(
+            agent: model,
+            environment: env,
+            actionCount: actionCount,
+            explorationDecay: explorationDecay,
+            discount: discount,
+            optimizer: optimizer,
+            cost: cost,
+            replayBufferSize: replayBufferSize,
+            batchSize: batchSize,
+            tau: tau,
+            minExperiences: minExperiences
+        );
+    }
 
     TrainingLoop();
 
