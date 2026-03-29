@@ -281,7 +281,7 @@ namespace NNN
             yDiff = State[3].Value - State[1].Value;
             double newDist = Math.Sqrt(Math.Pow(xDiff, 2.0) + Math.Pow(yDiff, 2.0));
 
-            double reward = -0.01 + 2.0 * (prevDist - newDist);
+            double reward = -0.01 + 4.0 * (prevDist - newDist);
 
             bool done = false;
 
@@ -291,7 +291,7 @@ namespace NNN
 
             if (outOfBounds)
             {
-                reward -= 5.0;
+                reward -= 20.0;
                 done = true;
             }
 
