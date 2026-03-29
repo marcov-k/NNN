@@ -221,8 +221,8 @@ namespace NNN
         {
             State[0] = new(random.Next(xMin, xMax + 1));
             State[1] = new(random.Next(yMin, yMax + 1));
-            State[2] = new(random.Next(xMin, xMax));
-            State[3] = new(random.Next(yMin, yMax));
+            State[2] = new(random.Next(xMin, xMax + 1));
+            State[3] = new(random.Next(yMin, yMax + 1));
             Bounds = [xMin, xMax, yMin, yMax];
             XRange = xMax - xMin;
             YRange = yMax - yMin;
@@ -280,7 +280,7 @@ namespace NNN
             yDiff = State[3].Value - State[1].Value;
             double newDist = Math.Sqrt(Math.Pow(xDiff, 2.0) + Math.Pow(yDiff, 2.0));
 
-            double reward = -0.01 + 5.0 * (prevDist - newDist);
+            double reward = prevDist - newDist;
 
             bool done = false;
 
@@ -297,13 +297,13 @@ namespace NNN
 
             if (reachedTarget)
             {
-                reward += 20.0;
+                reward += 10.0;
                 done = true;
             }
 
             if (steps >= MaxSteps)
             {
-                reward -= 10.0;
+                reward -= 5.0;
                 done = true;
             }
 
@@ -319,36 +319,92 @@ namespace NNN
         }
     }
 
-    public record Experience(Tensor State, int Action, double Reward, Tensor NextState, bool Done)
+    public record Experience
     {
-        public readonly Tensor State = State.Copy();
-        public readonly int Action = Action;
-        public readonly double Reward = Reward;
-        public readonly Tensor NextState = NextState.Copy();
-        public readonly bool Done = Done;
+        public Tensor State { get; init; }
+        public int Action { get; init; } 
+        public double Reward { get; init; }
+        public Tensor NextState { get; init; }
+        public bool Done { get; init; }
+        public double Priority { get; set; }
+
+        public Experience(Tensor state, int action, double reward, Tensor nextState, bool done, double priority = 1.0)
+        {
+            State = state.Copy();
+            Action = action;
+            Reward = reward;
+            NextState = nextState.Copy();
+            Done = done;
+            Priority = Math.Max(priority, 1e-8);
+        }
     }
 
-    public class ReplayBuffer(int maxSize)
+    public class ReplayBuffer(int maxSize, double alpha = 0.6)
     {
         readonly Random random = new();
         readonly int MaxSize = maxSize;
         readonly List<Experience> Buffer = [];
         int FirstIndex = 0;
         public int Count => Buffer.Count;
+        readonly double Alpha = alpha;
+        double Beta = 0.4;
+        readonly double BetaIncrement = 0.001;
 
         public void AddExperience(Experience experience)
         {
+            double maxPriority = Count > 0 ? Buffer.Max(e => e.Priority) : 1.0;
+            experience.Priority = maxPriority;
+
             if (Count < MaxSize) Buffer.Add(experience);
             else
             {
                 Buffer[FirstIndex] = experience;
-                FirstIndex = FirstIndex < MaxSize - 1 ? FirstIndex + 1 : 0;
+                FirstIndex = (FirstIndex + 1) % MaxSize;
             }
         }
 
-        public List<Experience> GetBatch(int batchSize)
+        public (List<Experience> batch, double[] weights) GetBatch(int batchSize)
         {
-            return [.. Buffer.OrderBy(x => random.Next()).Take(batchSize)];
+            double[] priorities = [.. Buffer.Select(e => Math.Pow(e.Priority, Alpha))];
+            double sum = priorities.Sum();
+
+            List<Experience> batch = [];
+            var weights = new double[batchSize];
+
+            double maxWeight = 0.0;
+
+            double r;
+            double cumulative;
+            for (int i = 0; i < batchSize; i++)
+            {
+                r = random.NextDouble() * sum;
+                cumulative = 0.0;
+
+                for (int j = 0; j < Count; j++)
+                {
+                    cumulative += priorities[j];
+                    if (cumulative >= r)
+                    {
+                        batch.Add(Buffer[j]);
+
+                        double prob = priorities[j] / sum;
+                        double weight = Math.Pow(1.0 / (Count * prob), Beta);
+
+                        weights[i] = weight;
+                        maxWeight = Math.Max(maxWeight, weight);
+                        break;
+                    }
+                }
+            }
+
+            for (int i = 0; i < weights.Length; i++)
+            {
+                weights[i] /= maxWeight;
+            }
+
+            Beta = Math.Min(1.0, Beta + BetaIncrement);
+
+            return (batch, weights);
         }
     }
 
@@ -460,7 +516,7 @@ namespace NNN
         {
             if (ReplayBuffer.Count < MinExperiences) return;
 
-            var batch = ReplayBuffer.GetBatch(BatchSize);
+            var (batch, weights) = ReplayBuffer.GetBatch(BatchSize);
             int stateSize = batch[0].State.Dimensions[0];
 
             Tensor currentBatch = new(BatchSize, stateSize);
@@ -481,17 +537,24 @@ namespace NNN
 
             Agent.ZeroGrad();
 
-            var loss = Cost.CalculateCost(predictedQs, targetQs);
-            loss.Backward();
+            var lossResult = Cost.CalculateCostWithPriority(predictedQs, targetQs, weights);
+            for (int i = 0; i < BatchSize; i++)
+            {
+                batch[i].Priority = lossResult.Priorities[i];
+            }
+            var loss = Tensor.Mean(lossResult.Losses);
 
+            loss.Backward();
             Agent.ClipGradients(MaxNorm);
 
-            double targetParam;
             for (int i = 0; i < Agent.ParameterCount; i++)
             {
                 Optimizer.Step(Agent.Parameters[i], optimizerSteps);
-                targetParam = (Tau * Agent.Parameters[i].Value) + ((1.0 - Tau) * TargetModel.Parameters[i].Value);
-                TargetModel.Parameters[i].Value = targetParam;
+            }
+
+            for (int i = 0; i < TargetModel.ParameterCount; i++)
+            {
+                TargetModel.Parameters[i].Value = (Tau * Agent.Parameters[i].Value) + ((1.0 - Tau) * TargetModel.Parameters[i].Value);
             }
 
             optimizerSteps++;
@@ -954,11 +1017,34 @@ namespace NNN
         }
     }
 
+    public record CostResult(Tensor Losses, double[] Priorities);
+
     public abstract class Cost
     {
         public virtual Number CalculateCost(Tensor input, Tensor target)
         {
             throw new NotImplementedException();
+        }
+
+        public virtual Tensor CalculatePerSampleCost(Tensor input, Tensor target)
+        {
+            throw new NotImplementedException();
+        }
+
+        public virtual CostResult CalculateCostWithPriority(Tensor input, Tensor target, double[]? weights = null)
+        {
+            var losses = CalculatePerSampleCost(input, target);
+            var priorities = new double[losses.ElementCount];
+
+            for (int i = 0; i < losses.ElementCount; i++)
+            {
+                double value = losses[i].Value;
+                priorities[i] = Math.Abs(value) + 1e-8;
+
+                if (weights != null) losses[i] *= weights[i];
+            }
+
+            return new(losses, priorities);
         }
     }
 
@@ -966,9 +1052,14 @@ namespace NNN
     {
         public override Number CalculateCost(Tensor input, Tensor target)
         {
+            return Tensor.Mean(CalculatePerSampleCost(input, target));
+        }
+
+        public override Tensor CalculatePerSampleCost(Tensor input, Tensor target)
+        {
             var diff = input - target;
             diff *= diff;
-            return Tensor.Mean(diff);
+            return diff;
         }
     }
 
@@ -978,15 +1069,20 @@ namespace NNN
 
         public override Number CalculateCost(Tensor input, Tensor target)
         {
+            return Tensor.Mean(CalculatePerSampleCost(input, target));
+        }
+
+        public override Tensor CalculatePerSampleCost(Tensor input, Tensor target)
+        {
             var diff = input - target;
 
-            Number loss = new(0.0);
+            Tensor costs = new(diff.Dimensions);
             for (int i = 0; i < diff.ElementCount; i++)
             {
-                loss += Math.Pow(Delta, 2.0) * (((1.0 + ((diff[i] / Delta) ^ 2.0)) ^ 0.5) - 1.0);
+                costs[i] = Math.Pow(Delta, 2.0) * (((1.0 + ((diff[i] / Delta) ^ 2.0)) ^ 0.5) - 1.0);
             }
 
-            return loss * (1.0 / diff.ElementCount);
+            return costs;
         }
     }
 
