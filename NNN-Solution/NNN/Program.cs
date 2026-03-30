@@ -256,6 +256,9 @@ namespace NNN
             double yDiff = State[3].Value - State[1].Value;
             double prevDist = Math.Sqrt(Math.Pow(xDiff, 2.0) + Math.Pow(yDiff, 2.0));
 
+            bool xAligned = State[0].Value == State[2].Value;
+            bool yAligned = State[1].Value == State[3].Value;
+
             switch (action)
             {
                 case 0: // left
@@ -291,13 +294,21 @@ namespace NNN
                 reward -= 0.1;
             }
 
+            if (!xAligned && State[0].Value == State[2].Value)
+            {
+                reward += 0.6;
+            }
+            if (!yAligned && State[1].Value == State[3].Value)
+            {
+                reward += 0.6;
+            }
+
             if (reachedTarget)
             {
                 reward += 1.0;
                 done = true;
             }
-
-            if (steps >= MaxSteps)
+            else if (steps >= MaxSteps)
             {
                 reward -= 0.5;
                 done = true;
