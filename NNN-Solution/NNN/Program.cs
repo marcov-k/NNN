@@ -298,9 +298,18 @@ namespace NNN
             {
                 reward += 0.6;
             }
+            else if (xAligned)
+            {
+                reward -= 0.6;
+            }
+
             if (!yAligned && State[1].Value == State[3].Value)
             {
                 reward += 0.6;
+            }
+            else if (yAligned)
+            {
+                reward -= 0.6;
             }
 
             if (reachedTarget)
