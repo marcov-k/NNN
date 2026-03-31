@@ -278,8 +278,9 @@ namespace NNN
             xDiff = State[2].Value - State[0].Value;
             yDiff = State[3].Value - State[1].Value;
             double newDist = Math.Sqrt(Math.Pow(xDiff, 2.0) + Math.Pow(yDiff, 2.0));
+            double deltaDist = prevDist - newDist;
 
-            double reward = -0.01 + 0.5 * (prevDist - newDist);
+            double reward = -0.01 + deltaDist < 0.0 ? 1.0 * deltaDist : 0.5 * deltaDist;
 
             bool done = false;
 
