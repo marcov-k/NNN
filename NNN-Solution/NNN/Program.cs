@@ -280,7 +280,7 @@ namespace NNN
             double newDist = Math.Sqrt(Math.Pow(xDiff, 2.0) + Math.Pow(yDiff, 2.0));
             double deltaDist = prevDist - newDist;
 
-            double reward = -0.01 + deltaDist < 0.0 ? 1.0 * deltaDist : 0.5 * deltaDist;
+            double reward = -0.01 + (deltaDist < 0.0 ? 1.0 * deltaDist : 0.5 * deltaDist);
 
             bool done = false;
 
