@@ -6,11 +6,11 @@ int actionCount = 4;
 double exploration = 1.0;
 double explorationDecay = 0.9995;
 double discount = 0.99;
-Optimizer optimizer = new Adam(0.02);
+Optimizer optimizer = new Adam(0.001);
 Cost cost = new Huber();
 int replayBufferSize = 10000;
 int batchSize = 64;
-double tau = 0.1;
+double tau = 0.005;
 double maxGradNorm = 2.0;
 int minExperiences = 3000;
 DQNTrainer dqnTrainer;
@@ -32,7 +32,7 @@ void InteractionLoop()
     {
         model = new([
             new Dense(32, new LeakyReLU()),
-            new Dense(4, new Tanh())
+            new Dense(4, new Linear())
         ], new Tensor(0, 4));
     }
 
@@ -256,8 +256,8 @@ namespace NNN
             double yDiff = State[3].Value - State[1].Value;
             double prevDist = Math.Sqrt(Math.Pow(xDiff, 2.0) + Math.Pow(yDiff, 2.0));
 
-            bool xAligned = State[0].Value == State[2].Value;
-            bool yAligned = State[1].Value == State[3].Value;
+            bool wasXAligned = State[0].Value == State[2].Value;
+            bool wasYAligned = State[1].Value == State[3].Value;
 
             switch (action)
             {
@@ -274,6 +274,9 @@ namespace NNN
                     State[1].Value--;
                     break;
             }
+
+            bool isXAligned = State[0].Value == State[2].Value;
+            bool isYAligned = State[1].Value == State[3].Value;
 
             xDiff = State[2].Value - State[0].Value;
             yDiff = State[3].Value - State[1].Value;
@@ -295,20 +298,20 @@ namespace NNN
                 reward -= 0.1;
             }
 
-            if (!xAligned && State[0].Value == State[2].Value)
+            if (!wasXAligned && isXAligned)
             {
                 reward += 0.6;
             }
-            else if (xAligned)
+            else if (wasXAligned && !isXAligned)
             {
                 reward -= 0.6;
             }
 
-            if (!yAligned && State[1].Value == State[3].Value)
+            if (!wasYAligned && isYAligned)
             {
                 reward += 0.6;
             }
-            else if (yAligned)
+            else if (wasYAligned && !isYAligned)
             {
                 reward -= 0.6;
             }
