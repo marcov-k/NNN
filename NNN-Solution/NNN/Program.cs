@@ -2,7 +2,6 @@
 
 Model model;
 NNN.Environment env = new MovementGrid2D(-5, 5, -5, 5);
-int actionCount = 4;
 double exploration = 1.0;
 double explorationDecay = 0.9995;
 double discount = 0.99;
@@ -33,13 +32,13 @@ void InteractionLoop()
         model = new([
             new Dense(32, new LeakyReLU()),
             new Dense(4, new Linear())
-        ], new Tensor(0, 4));
+        ], new Tensor(0, env.StateSize));
     }
 
     dqnTrainer = new(
         agent: model,
         environment: env,
-        actionCount: actionCount,
+        actionCount: env.ActionCount,
         exploration: exploration,
         explorationDecay: explorationDecay,
         discount: discount,
@@ -187,6 +186,9 @@ namespace NNN
 
     public abstract class Environment
     {
+        public virtual int StateSize => throw new NotImplementedException();
+        public virtual int ActionCount => throw new NotImplementedException();
+
         public virtual Tensor GetNormalizedState()
         {
             throw new NotImplementedException();
@@ -210,6 +212,8 @@ namespace NNN
 
     public class MovementGrid2D : Environment
     {
+        public override int ActionCount => 4;
+        public override int StateSize => 4;
         readonly Random random = new();
         readonly Tensor State = new(4); // current x, current y, target x, target y
         readonly int[] Bounds; // xMin, xMax, yMin, yMax
