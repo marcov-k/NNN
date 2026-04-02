@@ -6,13 +6,13 @@ int actionCount = 4;
 double exploration = 1.0;
 double explorationDecay = 0.9995;
 double discount = 0.99;
-Optimizer optimizer = new Adam(0.01);
+Optimizer optimizer = new Adam(0.02);
 Cost cost = new Huber();
-int replayBufferSize = 5000;
-int batchSize = 32;
-double tau = 0.05;
+int replayBufferSize = 10000;
+int batchSize = 64;
+double tau = 0.1;
 double maxGradNorm = 2.0;
-int minExperiences = 1000;
+int minExperiences = 3000;
 DQNTrainer dqnTrainer;
 
 InteractionLoop();
