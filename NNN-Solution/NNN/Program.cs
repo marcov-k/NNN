@@ -1640,6 +1640,78 @@ namespace NNN
             return new(value: Math.Abs(a.Value), dependsOn: [a], op: inputs => Math.Abs(inputs[0]), backwardOp: inputs => [Math.Sign(inputs[0])]);
         }
 
+        public static Number Max(Number a, Number b)
+        {
+            return (a.Value > b.Value) ? a : b;
+        }
+
+        public static Number Min(Number a, Number b)
+        {
+            return (a.Value < b.Value) ? a : b;
+        }
+
+        public static Number Mean(Number[] inputs)
+        {
+            Number sum = new(0);
+            foreach (var input in inputs)
+            {
+                sum += input;
+            }
+            return sum * (1.0 / inputs.Length);
+        }
+
+        public static Number Tanh(Number x)
+        {
+            double value = MathUtils.Tanh(x.Value);
+
+            return new(
+                value: value,
+                dependsOn: [x],
+                op: inputs => MathUtils.Tanh(inputs[0]),
+                backwardOp: inputs => [1.0 - Math.Pow(MathUtils.Tanh(inputs[0]), 2.0)]
+            );
+        }
+
+        public static Number Sigmoid(Number x)
+        {
+            double value = MathUtils.Sigmoid(x.Value);
+
+            return new(
+                value: value,
+                dependsOn: [x],
+                op: inputs => MathUtils.Sigmoid(inputs[0]),
+                backwardOp: inputs =>
+                {
+                    double sig = MathUtils.Sigmoid(inputs[0]);
+                    return [sig * (1.0 - sig)];
+                }
+            );
+        }
+
+        public static Number LeakyReLU(Number x, double tau)
+        {
+            double value = Math.Max(tau * x.Value, x.Value);
+
+            return new(
+                value: value,
+                dependsOn: [x],
+                op: inputs => Math.Max(tau * inputs[0], inputs[0]),
+                backwardOp: inputs => [inputs[0] > 0.0 ? 1.0 : tau]
+            );
+        }
+
+        public static Number Log(Number logBase, Number arg)
+        {
+            double value = Math.Log(arg.Value, logBase.Value);
+            return new(
+                value: value,
+                dependsOn: [logBase, arg],
+                op: inputs => Math.Log(inputs[1], inputs[0]),
+                backwardOp: inputs => [-(Math.Log(inputs[1]) / (inputs[0] * Math.Pow(Math.Log(inputs[0]), 2.0))),
+                    1.0 / (inputs[1] * Math.Log(inputs[0]))]
+            );
+        }
+
         public void Backward()
         {
             List<Number> topography = [];
@@ -1699,66 +1771,6 @@ namespace NNN
         public Number Copy()
         {
             return new(value: Value);
-        }
-
-        public static Number Max(Number a, Number b)
-        {
-            return (a.Value > b.Value) ? a : b;
-        }
-
-        public static Number Min(Number a, Number b)
-        {
-            return (a.Value < b.Value) ? a : b;
-        }
-
-        public static Number Mean(Number[] inputs)
-        {
-            Number sum = new(0);
-            foreach (var input in inputs)
-            {
-                sum += input;
-            }
-            return sum * (1.0 / inputs.Length);
-        }
-
-        public static Number Tanh(Number x)
-        {
-            double value = MathUtils.Tanh(x.Value);
-
-            return new(
-                value: value,
-                dependsOn: [x],
-                op: inputs => MathUtils.Tanh(inputs[0]),
-                backwardOp: inputs => [1.0 - Math.Pow(MathUtils.Tanh(inputs[0]), 2.0)]
-            );
-        }
-
-        public static Number Sigmoid(Number x)
-        {
-            double value = MathUtils.Sigmoid(x.Value);
-
-            return new(
-                value: value,
-                dependsOn: [x],
-                op: inputs => MathUtils.Sigmoid(inputs[0]),
-                backwardOp: inputs =>
-                {
-                    double sig = MathUtils.Sigmoid(inputs[0]);
-                    return [sig * (1.0 - sig)];
-                }
-            );
-        }
-
-        public static Number LeakyReLU(Number x, double tau)
-        {
-            double value = Math.Max(tau * x.Value, x.Value);
-
-            return new(
-                value: value,
-                dependsOn: [x],
-                op: inputs => Math.Max(tau * inputs[0], inputs[0]),
-                backwardOp: inputs => [inputs[0] > 0.0 ? 1.0 : tau]
-            );
         }
     }
 
