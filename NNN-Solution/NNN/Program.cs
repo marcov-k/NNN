@@ -421,8 +421,9 @@ namespace NNN
 
         public override void Render(Episode episode, int step)
         {
-            step = Math.Clamp(step, 0, episode.Experiences.Count - 1);
-            var exp = episode.Experiences[step];
+            step = Math.Clamp(step, 0, episode.Experiences.Count);
+            var exp = step == episode.Experiences.Count ? episode.Experiences[step - 1] : episode.Experiences[step];
+            var state = step == episode.Experiences.Count ? exp.NextState : exp.State;
             (int action, double reward) = step > 0 ? (episode.Experiences[step - 1].Action, episode.Experiences[step - 1].Reward) : (-1, 0);
 
             for (int y = Bounds[3] + 1; y >= Bounds[2] - 1; y--)
@@ -449,11 +450,11 @@ namespace NNN
                         continue;
                     }
 
-                    if (x == exp.State[0].Value && y == exp.State[1].Value)
+                    if (x == state[0].Value && y == state[1].Value)
                     {
                         Console.Write("A");
                     }
-                    else if (x == exp.State[2].Value && y == exp.State[3].Value)
+                    else if (x == state[2].Value && y == state[3].Value)
                     {
                         Console.Write("T");
                     }
