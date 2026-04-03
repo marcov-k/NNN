@@ -212,8 +212,8 @@ namespace NNN
 
     public class MovementGrid2D : Environment
     {
-        public override int ActionCount => 4;
         public override int StateSize => 4;
+        public override int ActionCount => 4;
         readonly Random random = new();
         readonly Tensor State = new(4); // current x, current y, target x, target y
         readonly int[] Bounds; // xMin, xMax, yMin, yMax
@@ -690,7 +690,7 @@ namespace NNN
             double mHat = parameter.FirstMoment / (1.0 - Math.Pow(Beta1, iteration));
             double vHat = parameter.SecondMoment / (1.0 - Math.Pow(Beta2, iteration));
 
-            parameter.Value -= (LR * mHat) / (Math.Sqrt(vHat) + Epsilon);
+            parameter.Value -= (LR * mHat * parameter.Gradient) / (Math.Sqrt(vHat) + Epsilon);
         }
     }
 
