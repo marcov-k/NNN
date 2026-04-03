@@ -520,7 +520,7 @@ namespace NNN
 
         public T this[int index]
         {
-            get => Buffer[index];
+            get => Buffer[(FirstIndex + index) % Count];
         }
     }
 
