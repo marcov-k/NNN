@@ -12,16 +12,21 @@ int batchSize = 64;
 double tau = 0.005;
 double maxGradNorm = 2.0;
 int minExperiences = 3000;
+int episodeMemorySize = 100;
 DQNTrainer dqnTrainer;
+FIFOBuffer<Episode> episodeBuffer = new(episodeMemorySize);
+
+Dictionary<UserInput, string> userInputs = new() { { UserInput.Yes, "y" }, { UserInput.No, "n" }, { UserInput.Quit, "q" } };
 
 InteractionLoop();
 
+#pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
+#pragma warning disable CS8602 // Dereference of a possibly null reference.
 void InteractionLoop()
 {
     Console.WriteLine("Welcome to the DQN Training Terminal (Enter Q to quit)");
 
-    string input = GetInput("Load model from file? y/n", ["y", "n"]);
-    if (input == "y")
+    if (GetInput("Load model from file? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
     {
         string fileName = GetFileName();
         model = Saver.LoadModel(fileName);
@@ -53,7 +58,7 @@ void InteractionLoop()
 
     TrainingLoop();
 
-    if (GetInput("Save model to a file? y/n", ["y", "n"]) == "y")
+    if (GetInput("Save model to a file? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
     {
         SaveLoop();
     }
@@ -67,14 +72,15 @@ void TrainingLoop()
 {
     while (true)
     {
-        string input = GetInput("Run DQN Training episodes? y/n", ["y", "n"]);
-        if (input == "y")
+        if (GetInput("Run DQN Training episodes? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
         {
             int episodes = GetInteger("Enter number of episodes to train");
             Console.WriteLine($"Training for {episodes} episodes...");
-            dqnTrainer.Train(episodes);
+            dqnTrainer.Train(ref episodeBuffer, episodes);
 
             TestDQNModel();
+
+            ViewEpisodes();
         }
         else break;
     }
@@ -86,14 +92,17 @@ void TestDQNModel()
     env.Reset();
     var state = env.GetNormalizedState();
     var startState = env.GetState();
+    Tensor trueState;
     Tensor batchState = new(1, state.Dimensions[0]);
     bool done = false;
     double totalReward = 0;
     int steps = 0;
 
+    List<Experience> episodeExperiences = [];
     while (!done && steps < 50)
     {
         steps++;
+        trueState = env.GetState();
         batchState.InsertSubArray(0, state);
         int action = model.Forward(batchState).MaxIndex();
         var (reward, nextState, isDone) = env.Step(action, steps);
@@ -101,13 +110,68 @@ void TestDQNModel()
         totalReward += reward;
         state = nextState;
         done = isDone;
+
+        episodeExperiences.Add(new(trueState, action, reward, env.GetState(), done));
     }
+
+    episodeBuffer?.Add(new(episodeExperiences));
 
     var logState = env.GetState();
     Console.WriteLine($"Test Finished in {steps} steps.");
     Console.WriteLine($"Total Reward: {totalReward:F2}");
     Console.WriteLine($"Starting State: ({startState[0].Value}, {startState[1].Value})");
     Console.WriteLine($"Final State: ({logState[0].Value}, {logState[1].Value}), Target: ({logState[2].Value}, {logState[3].Value})");
+}
+
+void ViewEpisodes()
+{
+    if (GetInput("Replay past episodes? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
+    {
+        while (true)
+        {
+            Console.WriteLine();
+            int episode = GetEpisodeSelection();
+
+            int step = 0;
+            bool viewingEpisode = true;
+            while (viewingEpisode)
+            {
+                Console.Clear();
+                env.Render(episodeBuffer[episode], step);
+
+                var input = Console.ReadKey(true).Key;
+
+                switch(input)
+                {
+                    case (ConsoleKey)EpisodeNavigation.Next:
+                        step = Math.Min(step + 1, episodeBuffer[episode].Experiences.Count);
+                        break;
+                    case (ConsoleKey)EpisodeNavigation.Previous:
+                        step = Math.Max(step - 1, 0);
+                        break;
+                    case (ConsoleKey)EpisodeNavigation.Exit:
+                        Console.Clear();
+                        viewingEpisode = false;
+                        break;
+                    case (ConsoleKey)EpisodeNavigation.Quit:
+                        System.Environment.Exit(0);
+                        break;
+                }
+            }
+
+            if (GetInput("View another episode? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.No]) break;
+        }
+    }
+}
+
+int GetEpisodeSelection()
+{
+    while (true)
+    {
+        int index = GetInteger($"Enter episode number ({episodeBuffer.Count} episodes cached)");
+        if (index > 0 && index <= episodeBuffer.Count) return index - 1;
+        else Console.WriteLine("Invalid episode number");
+    }
 }
 
 string GetInput(string prompt, List<string>? options = null)
@@ -124,7 +188,7 @@ string GetInput(string prompt, List<string>? options = null)
         Console.WriteLine($"\n{prompt}");
         input = Console.ReadLine()?.ToLowerInvariant() ?? "";
 
-        if (input == "q") System.Environment.Exit(0);
+        if (input == userInputs[UserInput.Quit]) System.Environment.Exit(0);
         else if (options.Count == 0 || options.Contains(input)) return input;
     }
 }
@@ -142,11 +206,9 @@ string GetFileName()
 
 int GetInteger(string prompt)
 {
-    string input;
     while (true)
     {
-        input = GetInput(prompt);
-        if (int.TryParse(input, out int integer)) return integer;
+        if (int.TryParse(GetInput(prompt), out int integer)) return integer;
         else Console.WriteLine("\nNot a valid number");
     }
 }
@@ -154,15 +216,13 @@ int GetInteger(string prompt)
 void SaveLoop()
 {
     string fileName;
-    string input;
 
     while (true)
     {
         fileName = GetInput("Enter file name");
         if (Saver.FileExists(fileName))
         {
-            input = GetInput($"File with name \"{fileName}\" already exists. Overwrite existing file? y/n", ["y", "n"]);
-            if (input == "y")
+            if (GetInput($"File with name \"{fileName}\" already exists. Overwrite existing file? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
             {
                 Saver.SaveModel(model, fileName);
                 Console.WriteLine("\nModel saved");
@@ -176,6 +236,18 @@ void SaveLoop()
             break;
         }
     }
+}
+#pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.
+#pragma warning restore CS8602 // Dereference of a possibly null reference.
+
+enum UserInput { Yes, No, Quit }
+
+enum EpisodeNavigation
+{
+    Previous = ConsoleKey.LeftArrow,
+    Next = ConsoleKey.RightArrow,
+    Exit = ConsoleKey.Escape,
+    Quit = ConsoleKey.Q
 }
 
 namespace NNN
@@ -208,6 +280,11 @@ namespace NNN
         {
             throw new NotImplementedException();
         }
+
+        public virtual void Render(Episode episode, int step)
+        {
+            throw new NotImplementedException();
+        }
     }
 
     public class MovementGrid2D : Environment
@@ -237,14 +314,14 @@ namespace NNN
         {
             Tensor normalized = new(4);
 
-            double dx = (State[2].Value - State[0].Value) / XRange;
-            double dy = (State[3].Value - State[1].Value) / YRange;
+            double xPos = (State[0].Value - Bounds[0]) / XRange;
+            double yPos = (State[1].Value - Bounds[2]) / YRange;
 
-            double normX = 2.0 * (State[0].Value - Bounds[0]) / XRange - 1.0;
-            double normY = 2.0 * (State[1].Value - Bounds[2]) / YRange - 1.0;
+            double xTarget = (State[2].Value - Bounds[0]) / XRange;
+            double yTarget = (State[3].Value - Bounds[2]) / YRange;
 
             (normalized[0], normalized[1], normalized[2], normalized[3]) =
-                (new(dx), new(dy), new(normX), new(normY));
+                (new(xPos), new(yPos), new(xTarget), new(yTarget));
 
             return normalized;
         }
@@ -265,16 +342,16 @@ namespace NNN
 
             switch (action)
             {
-                case 0: // left
+                case (int)Action.Left: // left
                     State[0].Value--;
                     break;
-                case 1: // right
+                case (int)Action.Right: // right
                     State[0].Value++;
                     break;
-                case 2: // up
+                case (int)Action.Up: // up
                     State[1].Value++;
                     break;
-                case 3: // down
+                case (int)Action.Down: // down
                     State[1].Value--;
                     break;
             }
@@ -304,7 +381,7 @@ namespace NNN
 
             if (!wasXAligned && isXAligned)
             {
-                reward += 0.6;
+                reward += 0.4;
             }
             else if (wasXAligned && !isXAligned)
             {
@@ -313,7 +390,7 @@ namespace NNN
 
             if (!wasYAligned && isYAligned)
             {
-                reward += 0.6;
+                reward += 0.4;
             }
             else if (wasYAligned && !isYAligned)
             {
@@ -341,6 +418,67 @@ namespace NNN
             State[2] = new(random.Next(Bounds[0], Bounds[1] + 1));
             State[3] = new(random.Next(Bounds[2], Bounds[3] + 1));
         }
+
+        public override void Render(Episode episode, int step)
+        {
+            step = Math.Clamp(step, 0, episode.Experiences.Count - 1);
+            var exp = episode.Experiences[step];
+            (int action, double reward) = step > 0 ? (episode.Experiences[step - 1].Action, episode.Experiences[step - 1].Reward) : (-1, 0);
+
+            for (int y = Bounds[3] + 1; y >= Bounds[2] - 1; y--)
+            {
+                bool yEdge = y == Bounds[3] + 1 || y == Bounds[2] - 1;
+
+                for (int x = Bounds[0] - 1; x <= Bounds[1] + 1; x++)
+                {
+                    bool xEdge = x == Bounds[0] - 1 || x == Bounds[1] + 1;
+
+                    if (xEdge && yEdge)
+                    {
+                        Console.Write("+");
+                        continue;
+                    }
+                    else if (xEdge)
+                    {
+                        Console.Write("|");
+                        continue;
+                    }
+                    else if (yEdge)
+                    {
+                        Console.Write("-");
+                        continue;
+                    }
+
+                    if (x == exp.State[0].Value && y == exp.State[1].Value)
+                    {
+                        Console.Write("A");
+                    }
+                    else if (x == exp.State[2].Value && y == exp.State[3].Value)
+                    {
+                        Console.Write("T");
+                    }
+                    else
+                    {
+                        Console.Write(" ");
+                    }
+                }
+                Console.Write("\n");
+            }
+
+            Console.Write($"Step: {step}, Action: {(Enum.IsDefined(typeof(Action), action) ? ((Action)action).ToString() : "None")}, Reward: {reward:F3}");
+        }
+
+        enum Action { Left, Right, Up, Down }
+    }
+
+    public record Episode
+    {
+        public List<Experience> Experiences { get; init; }
+
+        public Episode(List<Experience> experiences)
+        {
+            Experiences = [.. experiences.Select(e => new Experience(e.State.Copy(), e.Action, e.Reward, e.NextState.Copy(), e.Done))];
+        }
     }
 
     public record Experience
@@ -363,28 +501,42 @@ namespace NNN
         }
     }
 
-    public class ReplayBuffer(int maxSize, double alpha = 0.6)
+    public class FIFOBuffer<T>(int maxSize)
+    {
+        readonly protected int MaxSize = maxSize;
+        readonly protected List<T> Buffer = [];
+        protected int FirstIndex = 0;
+        public int Count => Buffer.Count;
+
+        public virtual void Add(T item)
+        {
+            if (Count < MaxSize) Buffer.Add(item);
+            else
+            {
+                Buffer[FirstIndex] = item;
+                FirstIndex = (FirstIndex + 1) % MaxSize;
+            }
+        }
+
+        public T this[int index]
+        {
+            get => Buffer[index];
+        }
+    }
+
+    public class ReplayBuffer(int maxSize, double alpha = 0.6) : FIFOBuffer<Experience>(maxSize)
     {
         readonly Random random = new();
-        readonly int MaxSize = maxSize;
-        readonly List<Experience> Buffer = [];
-        int FirstIndex = 0;
-        public int Count => Buffer.Count;
         readonly double Alpha = alpha;
         double Beta = 0.4;
         readonly double BetaIncrement = 0.001;
 
-        public void AddExperience(Experience experience)
+        public override void Add(Experience item)
         {
             double maxPriority = Count > 0 ? Buffer.Max(e => e.Priority) : 1.0;
-            experience.Priority = maxPriority;
+            item.Priority = maxPriority;
 
-            if (Count < MaxSize) Buffer.Add(experience);
-            else
-            {
-                Buffer[FirstIndex] = experience;
-                FirstIndex = (FirstIndex + 1) % MaxSize;
-            }
+            base.Add(item);
         }
 
         public (List<Experience> batch, double[] weights) GetBatch(int batchSize)
@@ -453,10 +605,12 @@ namespace NNN
         readonly double MaxNorm = maxGradNorm;
         readonly int MinExperiences = minExperiences;
 
-        public void Train(int episodes = 1000)
+        public void Train(ref FIFOBuffer<Episode>? episodeBuffer, int episodes = 1000)
         {
+            List<Experience> episodeExperiences = [];
             Tensor state;
             Tensor initialState;
+            Tensor trueState;
             Tensor logState;
             bool done;
             int action;
@@ -470,6 +624,7 @@ namespace NNN
             stopwatch.Start();
             for (int e = 0; e < episodes; e++)
             {
+                episodeExperiences.Clear();
                 Environment.Reset();
                 (movementMagnitude[0], movementMagnitude[1]) = (0, 0);
                 state = Environment.GetNormalizedState();
@@ -481,6 +636,7 @@ namespace NNN
                 while (!done)
                 {
                     step++;
+                    trueState = Environment.GetState();
                     action = PickNextAction(state);
 
                     switch (action)
@@ -497,12 +653,15 @@ namespace NNN
 
                     (reward, nextState, done) = Environment.Step(action, step);
                     totalReward += reward;
-                    ReplayBuffer.AddExperience(new(state, action, reward, nextState, done));
+                    ReplayBuffer.Add(new(state, action, reward, nextState, done));
+                    episodeExperiences.Add(new(trueState, action, reward, Environment.GetState(), done));
 
                     TrainNetwork();
 
                     state = nextState;
                 }
+
+                episodeBuffer?.Add(new(episodeExperiences));
 
                 Exploration = Math.Max(Exploration * ExplorationDecay, MinExploration);
 
