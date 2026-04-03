@@ -35,6 +35,7 @@ void InteractionLoop()
     else
     {
         model = new([
+            new Dense(64, new LeakyReLU()),
             new Dense(32, new LeakyReLU()),
             new Dense(4, new Linear())
         ], new Tensor(0, env.StateSize));
