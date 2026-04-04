@@ -3,7 +3,7 @@
 Model model;
 NNN.Environment env = new MovementGrid2D(-5, 5, -5, 5);
 double exploration = 1.0;
-double explorationDecay = 0.9995;
+double explorationDecay = 0.999;
 double discount = 0.99;
 Optimizer optimizer = new Adam(0.001);
 Cost cost = new Huber();
@@ -35,8 +35,8 @@ void InteractionLoop()
     else
     {
         model = new([
-            new Dense(64, new LeakyReLU()),
-            new Dense(32, new LeakyReLU()),
+            new Dense(16, new LeakyReLU()),
+            new Dense(16, new LeakyReLU()),
             new Dense(4, new Linear())
         ], new Tensor(0, env.StateSize));
     }
@@ -365,7 +365,7 @@ namespace NNN
             double newDist = Math.Sqrt(Math.Pow(xDiff, 2.0) + Math.Pow(yDiff, 2.0));
             double deltaDist = prevDist - newDist;
 
-            double reward = -0.01 + (deltaDist < 0.0 ? 1.0 * deltaDist : 0.5 * deltaDist);
+            double reward = 1.0 * deltaDist;
 
             bool done = false;
 
@@ -400,7 +400,7 @@ namespace NNN
 
             if (reachedTarget)
             {
-                reward += 1.0;
+                reward += 5.0;
                 done = true;
             }
             else if (steps >= MaxSteps)
@@ -851,7 +851,7 @@ namespace NNN
             double mHat = parameter.FirstMoment / (1.0 - Math.Pow(Beta1, iteration));
             double vHat = parameter.SecondMoment / (1.0 - Math.Pow(Beta2, iteration));
 
-            parameter.Value -= (LR * mHat * parameter.Gradient) / (Math.Sqrt(vHat) + Epsilon);
+            parameter.Value -= (LR * mHat) / (Math.Sqrt(vHat) + Epsilon);
         }
     }
 
