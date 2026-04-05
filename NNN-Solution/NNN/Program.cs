@@ -411,7 +411,7 @@ namespace NNN
                 done = true;
             }
 
-            reward = Math.Tanh(reward);
+            if (!done) reward = Math.Tanh(reward);
 
             return (reward, GetNormalizedState(), done);
         }
