@@ -36,8 +36,8 @@ void InteractionLoop()
     else
     {
         model = new([
-            new Dense(16, new LeakyReLU()),
-            new Dense(16, new LeakyReLU()),
+            new Dense(64, new LeakyReLU()),
+            new Dense(32, new LeakyReLU()),
             new Dense(4, new Linear())
         ], new Tensor(1, env.StateSize));
     }
@@ -367,7 +367,7 @@ namespace NNN
             double newDist = Math.Sqrt(Math.Pow(xDiff, 2.0) + Math.Pow(yDiff, 2.0));
             double deltaDist = prevDist - newDist;
 
-            double reward = Math.Tanh(1.0 * deltaDist);
+            double reward = 2.0 * Math.Tanh(1.0 * deltaDist);
 
             bool done = false;
 
@@ -410,8 +410,6 @@ namespace NNN
                 reward -= 0.5;
                 done = true;
             }
-
-            if (!done) reward = Math.Tanh(reward);
 
             return (reward, GetNormalizedState(), done);
         }
