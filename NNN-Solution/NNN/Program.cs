@@ -6,7 +6,7 @@ double exploration = 1.0;
 double explorationDecay = 0.995;
 double minExploration = 0.1;
 double discount = 0.99;
-Optimizer optimizer = new Adam(0.001);
+Optimizer optimizer = new Adam(0.0001);
 Cost cost = new Huber();
 int replayBufferSize = 10000;
 int batchSize = 64;
@@ -356,9 +356,6 @@ namespace NNN
                     break;
             }
 
-            bool isXAligned = State[0].Value == State[2].Value;
-            bool isYAligned = State[1].Value == State[3].Value;
-
             xDiff = State[2].Value - State[0].Value;
             yDiff = State[3].Value - State[1].Value;
             double newDist = Math.Sqrt(Math.Pow(xDiff, 2.0) + Math.Pow(yDiff, 2.0));
@@ -378,9 +375,7 @@ namespace NNN
             bool done = reachedTarget || outOfSteps;
 
             double reward = 2.0 * deltaDist;
-            reward += isXAligned && !outOfBounds ? 3.0 : 0.0;
-            reward += isYAligned && !outOfBounds ? 3.0 : 0.0;
-            reward += reachedTarget ? 15.0 : 0.0;
+            reward += reachedTarget ? 20.0 : 0.0;
             reward -= outOfBounds ? 2.0 : 0.0;
             reward -= outOfSteps ? 5.0 : 0.0;
 
