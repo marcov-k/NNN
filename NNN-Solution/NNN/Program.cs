@@ -364,8 +364,6 @@ namespace NNN
             double newDist = Math.Sqrt(Math.Pow(xDiff, 2.0) + Math.Pow(yDiff, 2.0));
             double deltaDist = prevDist - newDist;
 
-            bool done = false;
-
             bool reachedTarget = (State[0].Value == State[2].Value && State[1].Value == State[3].Value);
             bool outOfBounds = (State[0].Value < Bounds[0]) || (State[0].Value > Bounds[1]) ||
                                (State[1].Value < Bounds[2]) || (State[1].Value > Bounds[3]);
@@ -377,11 +375,11 @@ namespace NNN
                 State[1].Value = Math.Clamp(State[1].Value, Bounds[2], Bounds[3]);
             }
 
-            done = reachedTarget || outOfSteps;
+            bool done = reachedTarget || outOfSteps;
 
             double reward = 2.0 * deltaDist;
-            reward += isXAligned ? 3.0 : 0.0;
-            reward += isYAligned ? 3.0 : 0.0;
+            reward += isXAligned && !outOfBounds ? 3.0 : 0.0;
+            reward += isYAligned && !outOfBounds ? 3.0 : 0.0;
             reward += reachedTarget ? 15.0 : 0.0;
             reward -= outOfBounds ? 2.0 : 0.0;
             reward -= outOfSteps ? 5.0 : 0.0;
