@@ -367,7 +367,7 @@ namespace NNN
             double newDist = Math.Sqrt(Math.Pow(xDiff, 2.0) + Math.Pow(yDiff, 2.0));
             double deltaDist = prevDist - newDist;
 
-            double reward = 1.0 * deltaDist;
+            double reward = Math.Tanh(1.0 * deltaDist);
 
             bool done = false;
 
@@ -379,7 +379,7 @@ namespace NNN
             {
                 State[0].Value = Math.Clamp(State[0].Value, Bounds[0], Bounds[1]);
                 State[1].Value = Math.Clamp(State[1].Value, Bounds[2], Bounds[3]);
-                reward -= 0.1;
+                reward -= 1.0;
             }
 
             if (!wasXAligned && isXAligned)
@@ -402,7 +402,7 @@ namespace NNN
 
             if (reachedTarget)
             {
-                reward += 5.0;
+                reward += 10.0;
                 done = true;
             }
             else if (steps >= MaxSteps)
