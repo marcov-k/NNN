@@ -3,15 +3,16 @@
 Model model;
 NNN.Environment env = new MovementGrid2D(-5, 5, -5, 5);
 double exploration = 1.0;
-double explorationDecay = 0.999;
+double explorationDecay = 0.995;
+double minExploration = 0.05;
 double discount = 0.99;
-Optimizer optimizer = new Adam(0.001);
+Optimizer optimizer = new Adam(0.0005);
 Cost cost = new Huber();
 int replayBufferSize = 10000;
 int batchSize = 64;
-double tau = 0.005;
-double maxGradNorm = 2.0;
-int minExperiences = 3000;
+double tau = 0.01;
+double maxGradNorm = 1.0;
+int minExperiences = 1000;
 int episodeMemorySize = 100;
 DQNTrainer dqnTrainer;
 FIFOBuffer<Episode> episodeBuffer = new(episodeMemorySize);
@@ -38,7 +39,7 @@ void InteractionLoop()
             new Dense(16, new LeakyReLU()),
             new Dense(16, new LeakyReLU()),
             new Dense(4, new Linear())
-        ], new Tensor(0, env.StateSize));
+        ], new Tensor(1, env.StateSize));
     }
 
     dqnTrainer = new(
@@ -47,6 +48,7 @@ void InteractionLoop()
         actionCount: env.ActionCount,
         exploration: exploration,
         explorationDecay: explorationDecay,
+        minExploration: minExploration,
         discount: discount,
         optimizer: optimizer,
         cost: cost,
@@ -409,6 +411,8 @@ namespace NNN
                 done = true;
             }
 
+            reward = Math.Tanh(reward);
+
             return (reward, GetNormalizedState(), done);
         }
 
@@ -587,7 +591,8 @@ namespace NNN
     }
 
     public class DQNTrainer(Model agent, Environment environment, int actionCount, Optimizer optimizer, Cost cost, double discount = 0.995, double exploration = 1.0,
-        double explorationDecay = 0.99, int replayBufferSize = 10000, int batchSize = 64, double tau = 0.005, double maxGradNorm = 1.0, int minExperiences = 1000)
+        double explorationDecay = 0.99, double minExploration = 0.01, int replayBufferSize = 10000, int batchSize = 64, double tau = 0.005, double maxGradNorm = 1.0,
+           int minExperiences = 1000)
     {
         readonly Random random = new();
         readonly Model Agent = agent;
@@ -601,11 +606,12 @@ namespace NNN
         readonly double Discount = discount;
         double Exploration = exploration;
         readonly double ExplorationDecay = explorationDecay;
-        readonly double MinExploration = 0.01;
+        readonly double MinExploration = minExploration;
         int optimizerSteps = 0;
         readonly double Tau = tau;
         readonly double MaxNorm = maxGradNorm;
         readonly int MinExperiences = minExperiences;
+        double totalLoss = 0.0;
 
         public void Train(ref FIFOBuffer<Episode>? episodeBuffer, int episodes = 1000)
         {
@@ -626,6 +632,7 @@ namespace NNN
             stopwatch.Start();
             for (int e = 0; e < episodes; e++)
             {
+                totalLoss = 0.0;
                 episodeExperiences.Clear();
                 Environment.Reset();
                 (movementMagnitude[0], movementMagnitude[1]) = (0, 0);
@@ -675,7 +682,7 @@ namespace NNN
                 Console.WriteLine($"\nEpisode {e + 1}/{episodes} finished...");
                 Console.WriteLine($"Initial State: ({initialState[0].Value}, {initialState[1].Value}), Final State: ({logState[0].Value}, {logState[1].Value}), Target: (" +
                     $"{initialState[2].Value}, {initialState[3].Value}), Steps Taken: {step}, Total Reward: {totalReward:F2},");
-                Console.WriteLine($"Total Movement Magnitude: ({movementMagnitude[0]}, {movementMagnitude[1]})");
+                Console.WriteLine($"Total Movement Magnitude: ({movementMagnitude[0]}, {movementMagnitude[1]}), Average Loss: {(totalLoss / step):F3}");
                 Console.WriteLine($"Exploration Rate: {Exploration:F2}, Experience Count: {ReplayBuffer.Count}");
                 Console.WriteLine($"Episode Duration: {elapsed}, Estimated Time Remaining: {eta}");
                 stopwatch.Restart();
@@ -728,6 +735,7 @@ namespace NNN
                 batch[i].Priority = lossResult.Priorities[i];
             }
             var loss = Tensor.Mean(lossResult.Losses);
+            totalLoss += loss.Value;
 
             loss.Backward();
             Agent.ClipGradients(MaxNorm);
