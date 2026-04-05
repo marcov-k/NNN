@@ -4,13 +4,13 @@ Model model;
 NNN.Environment env = new MovementGrid2D(-5, 5, -5, 5);
 double exploration = 1.0;
 double explorationDecay = 0.995;
-double minExploration = 0.05;
+double minExploration = 0.1;
 double discount = 0.99;
-Optimizer optimizer = new Adam(0.0005);
+Optimizer optimizer = new Adam(0.001);
 Cost cost = new Huber();
 int replayBufferSize = 10000;
 int batchSize = 64;
-double tau = 0.01;
+double tau = 0.005;
 double maxGradNorm = 1.0;
 int minExperiences = 1000;
 int episodeMemorySize = 100;
@@ -36,7 +36,7 @@ void InteractionLoop()
     else
     {
         model = new([
-            new Dense(64, new LeakyReLU()),
+            new Dense(32, new LeakyReLU()),
             new Dense(32, new LeakyReLU()),
             new Dense(4, new Linear())
         ], new Tensor(1, env.StateSize));
@@ -340,9 +340,6 @@ namespace NNN
             double yDiff = State[3].Value - State[1].Value;
             double prevDist = Math.Sqrt(Math.Pow(xDiff, 2.0) + Math.Pow(yDiff, 2.0));
 
-            bool wasXAligned = State[0].Value == State[2].Value;
-            bool wasYAligned = State[1].Value == State[3].Value;
-
             switch (action)
             {
                 case (int)Action.Left: // left
@@ -367,49 +364,27 @@ namespace NNN
             double newDist = Math.Sqrt(Math.Pow(xDiff, 2.0) + Math.Pow(yDiff, 2.0));
             double deltaDist = prevDist - newDist;
 
-            double reward = 2.0 * Math.Tanh(1.0 * deltaDist);
-
             bool done = false;
 
             bool reachedTarget = (State[0].Value == State[2].Value && State[1].Value == State[3].Value);
             bool outOfBounds = (State[0].Value < Bounds[0]) || (State[0].Value > Bounds[1]) ||
                                (State[1].Value < Bounds[2]) || (State[1].Value > Bounds[3]);
+            bool outOfSteps = steps >= MaxSteps && !reachedTarget;
 
             if (outOfBounds)
             {
                 State[0].Value = Math.Clamp(State[0].Value, Bounds[0], Bounds[1]);
                 State[1].Value = Math.Clamp(State[1].Value, Bounds[2], Bounds[3]);
-                reward -= 1.0;
             }
 
-            if (!wasXAligned && isXAligned)
-            {
-                reward += 0.4;
-            }
-            else if (wasXAligned && !isXAligned)
-            {
-                reward -= 0.6;
-            }
+            done = reachedTarget || outOfSteps;
 
-            if (!wasYAligned && isYAligned)
-            {
-                reward += 0.4;
-            }
-            else if (wasYAligned && !isYAligned)
-            {
-                reward -= 0.6;
-            }
-
-            if (reachedTarget)
-            {
-                reward += 10.0;
-                done = true;
-            }
-            else if (steps >= MaxSteps)
-            {
-                reward -= 0.5;
-                done = true;
-            }
+            double reward = 2.0 * deltaDist;
+            reward += isXAligned ? 3.0 : 0.0;
+            reward += isYAligned ? 3.0 : 0.0;
+            reward += reachedTarget ? 15.0 : 0.0;
+            reward -= outOfBounds ? 2.0 : 0.0;
+            reward -= outOfSteps ? 5.0 : 0.0;
 
             return (reward, GetNormalizedState(), done);
         }
