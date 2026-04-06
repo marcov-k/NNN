@@ -370,7 +370,7 @@ namespace NNN
 
             double reward = 5.0 * deltaDist;
             reward += reachedTarget ? 100.0 : 0.0;
-            reward -= outOfBounds ? 50.0 : 0.0;
+            reward -= outOfBounds ? 100.0 : 0.0;
             reward -= outOfSteps ? 5.0 : 0.0;
 
             return (reward, GetNormalizedState(), done);
