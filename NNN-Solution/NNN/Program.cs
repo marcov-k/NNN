@@ -3,7 +3,7 @@
 Model model;
 NNN.Environment env = new MovementGrid2D(-5, 5, -5, 5);
 double exploration = 1.0;
-double explorationDecay = 0.995;
+double explorationDecay = 0.997;
 double minExploration = 0.1;
 double discount = 0.99;
 Optimizer optimizer = new Adam(0.0001);
@@ -366,17 +366,11 @@ namespace NNN
                                (State[1].Value < Bounds[2]) || (State[1].Value > Bounds[3]);
             bool outOfSteps = steps >= MaxSteps && !reachedTarget;
 
-            if (outOfBounds)
-            {
-                State[0].Value = Math.Clamp(State[0].Value, Bounds[0], Bounds[1]);
-                State[1].Value = Math.Clamp(State[1].Value, Bounds[2], Bounds[3]);
-            }
-
             bool done = reachedTarget || outOfBounds || outOfSteps;
 
             double reward = 2.0 * deltaDist;
-            reward += reachedTarget ? 50.0 : 0.0;
-            reward -= outOfBounds ? 5.0 : 0.0;
+            reward += reachedTarget ? 75.0 : 0.0;
+            reward -= outOfBounds ? 15.0 : 0.0;
             reward -= outOfSteps ? 5.0 : 0.0;
 
             return (reward, GetNormalizedState(), done);
