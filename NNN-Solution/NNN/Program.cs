@@ -368,9 +368,9 @@ namespace NNN
 
             bool done = reachedTarget || outOfBounds || outOfSteps;
 
-            double reward = 2.0 * deltaDist;
-            reward += reachedTarget ? 75.0 : 0.0;
-            reward -= outOfBounds ? 15.0 : 0.0;
+            double reward = 5.0 * deltaDist;
+            reward += reachedTarget ? 100.0 : 0.0;
+            reward -= outOfBounds ? 50.0 : 0.0;
             reward -= outOfSteps ? 5.0 : 0.0;
 
             return (reward, GetNormalizedState(), done);
