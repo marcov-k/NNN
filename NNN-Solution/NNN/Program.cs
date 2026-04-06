@@ -317,11 +317,11 @@ namespace NNN
         {
             Tensor normalized = new(4);
 
-            double xPos = (State[0].Value - Bounds[0]) / XRange;
-            double yPos = (State[1].Value - Bounds[2]) / YRange;
+            double xPos = State[0].Value / (XRange / 2.0);
+            double yPos = State[1].Value / (YRange / 2.0);
 
-            double xTarget = (State[2].Value - Bounds[0]) / XRange;
-            double yTarget = (State[3].Value - Bounds[2]) / YRange;
+            double xTarget = State[2].Value / (XRange / 2.0);
+            double yTarget = State[3].Value / (YRange / 2.0);
 
             (normalized[0], normalized[1], normalized[2], normalized[3]) =
                 (new(xPos), new(yPos), new(xTarget), new(yTarget));
@@ -372,11 +372,11 @@ namespace NNN
                 State[1].Value = Math.Clamp(State[1].Value, Bounds[2], Bounds[3]);
             }
 
-            bool done = reachedTarget || outOfSteps;
+            bool done = reachedTarget || outOfBounds || outOfSteps;
 
             double reward = 2.0 * deltaDist;
-            reward += reachedTarget ? 20.0 : 0.0;
-            reward -= outOfBounds ? 2.0 : 0.0;
+            reward += reachedTarget ? 50.0 : 0.0;
+            reward -= outOfBounds ? 5.0 : 0.0;
             reward -= outOfSteps ? 5.0 : 0.0;
 
             return (reward, GetNormalizedState(), done);
