@@ -3,10 +3,10 @@
 Model model;
 NNN.Environment env = new MovementGrid2D(-5, 5, -5, 5);
 double exploration = 1.0;
-double explorationDecay = 0.999;
+double explorationDecay = 0.9995;
 double minExploration = 0.1;
 double discount = 0.99;
-Optimizer optimizer = new Adam(0.001);
+Optimizer optimizer = new Adam(0.0001);
 Cost cost = new Huber();
 int replayBufferSize = 10000;
 int batchSize = 64;
@@ -502,7 +502,13 @@ namespace NNN
             double maxPriority = Count > 0 ? Buffer.Max(e => e.Priority) : 1.0;
             item.Priority = maxPriority;
 
-            base.Add(item);
+            if (Count >= MaxSize)
+            {
+                var minPriority = Buffer.MinBy(e => e.Priority);
+                if (minPriority != null) Buffer.Remove(minPriority);
+            }
+
+            Buffer.Add(item);
         }
 
         public (List<Experience> batch, double[] weights) GetBatch(int batchSize)
