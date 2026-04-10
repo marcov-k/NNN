@@ -36,8 +36,8 @@ void InteractionLoop()
     else
     {
         model = new([
-            new Dense(32, new LeakyReLU()),
-            new Dense(32, new LeakyReLU()),
+            new Dense(16, new LeakyReLU()),
+            new Dense(16, new LeakyReLU()),
             new Dense(4, new Linear())
         ], new Tensor(1, env.StateSize));
     }
@@ -501,14 +501,7 @@ namespace NNN
         {
             double maxPriority = Count > 0 ? Buffer.Max(e => e.Priority) : 1.0;
             item.Priority = maxPriority;
-
-            if (Count >= MaxSize)
-            {
-                var minPriority = Buffer.MinBy(e => e.Priority);
-                if (minPriority != null) Buffer.Remove(minPriority);
-            }
-
-            Buffer.Add(item);
+            base.Add(item);
         }
 
         public (List<Experience> batch, double[] weights) GetBatch(int batchSize)
