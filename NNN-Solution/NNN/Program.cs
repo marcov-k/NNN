@@ -6,7 +6,7 @@ double exploration = 1.0;
 double explorationDecay = 0.9995;
 double minExploration = 0.1;
 double discount = 0.99;
-Optimizer optimizer = new Adam(0.0001);
+Optimizer optimizer = new Adam(0.001);
 Cost cost = new Huber();
 int replayBufferSize = 10000;
 int batchSize = 64;
@@ -1856,8 +1856,6 @@ namespace NNN
 
             foreach (var node in topography) node.Gradient = 0.0;
             Gradient = 1.0;
-
-            topography.Reverse();
 
             for (int i = topography.Count - 1; i >= 0; i--)
             {
