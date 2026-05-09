@@ -31,7 +31,7 @@ void InteractionLoop()
     {
         string fileName = GetFileName();
         model = Saver.LoadModel(fileName);
-        exploration = 0.01;
+        exploration = minExploration;
     }
     else
     {
