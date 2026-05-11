@@ -437,6 +437,43 @@ namespace NNN
         enum Action { Left, Right, Up, Down }
     }
 
+    public class TicTacToe : Environment
+    {
+        public override int StateSize => 9;
+        public override int ActionCount => 9;
+        readonly Tensor State = new(9);
+
+        public TicTacToe() { }
+
+        public override Tensor GetNormalizedState()
+        {
+            return base.GetNormalizedState();
+        }
+
+        public override Tensor GetState()
+        {
+            return State.Copy();
+        }
+
+        public override (double reward, Tensor nextState, bool done) Step(int action, int steps)
+        {
+            return base.Step(action, steps);
+        }
+
+        public override void Reset()
+        {
+            foreach (var pos in State.Data)
+            {
+                pos.Value = 0.0;
+            }
+        }
+
+        public override void Render(Episode episode, int step)
+        {
+            base.Render(episode, step);
+        }
+    }
+
     public record Episode
     {
         public List<Experience> Experiences { get; init; }
