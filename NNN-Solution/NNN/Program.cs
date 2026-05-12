@@ -6,7 +6,7 @@ double exploration = 1.0;
 double explorationDecay = 0.9977;
 double minExploration = 0.1;
 double discount = 0.99;
-Optimizer optimizer = new Adam(0.0005);
+Optimizer optimizer = new Adam(0.001);
 Cost cost = new Huber();
 int replayBufferSize = 2000;
 int batchSize = 64;
@@ -441,12 +441,13 @@ namespace NNN
         public override int ActionCount => 9;
         public override bool SelfPlay => true;
         readonly Tensor State = new(9);
+        readonly int MaxSteps = 18;
         bool xTurn = true;
         static readonly int[][] WinOrients = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
         const double WinRewardBase = 4.0;
-        const double BlockRewardBase = 6.0;
-        const double Penalty = -10.0;
-        const double InvalidPenalty = -50.0;
+        const double BlockRewardBase = 7.0;
+        const double Penalty = -1.0;
+        const double InvalidPenalty = -15.0;
 
         public TicTacToe() { }
 
@@ -469,7 +470,7 @@ namespace NNN
 
         public override (double reward, Tensor nextState, bool done) Step(int action, int steps)
         {
-            if (!ValidAction(action)) return (InvalidPenalty, GetNormalizedState(), true);
+            if (!ValidAction(action)) return (InvalidPenalty, GetNormalizedState(), BoardFilled() || steps >= MaxSteps);
 
             State[action] = new(xTurn ? 1.0 : -1.0);
             var (reward, done) = EvaluateAction(action);
@@ -477,7 +478,7 @@ namespace NNN
 
             var nextState = GetNormalizedState();
 
-            done = done || BoardFilled();
+            done = done || BoardFilled() || steps >= MaxSteps;
 
             return (reward, nextState, done);
         }
@@ -550,7 +551,7 @@ namespace NNN
 
             foreach (var orient in blockOrients)
             {
-                reward += Math.Pow(BlockRewardBase, orient.Count(p => p == oppValue));
+                reward += Math.Pow(BlockRewardBase, orient.Count(p => p == oppValue) + 1);
             }
 
             return (reward, won);
