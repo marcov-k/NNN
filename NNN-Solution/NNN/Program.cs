@@ -446,6 +446,7 @@ namespace NNN
         const double WinRewardBase = 4.0;
         const double BlockRewardBase = 3.5;
         const double Penalty = -10.0;
+        const double InvalidPenalty = -25.0;
 
         public TicTacToe() { }
 
@@ -468,7 +469,7 @@ namespace NNN
 
         public override (double reward, Tensor nextState, bool done) Step(int action, int steps)
         {
-            if (!ValidAction(action)) return (-25.0, GetNormalizedState(), true);
+            if (!ValidAction(action)) return (InvalidPenalty, GetNormalizedState(), true);
 
             State[action] = new(xTurn ? 1.0 : -1.0);
             var (reward, done) = EvaluateAction(action);
@@ -511,7 +512,8 @@ namespace NNN
                 Console.Write(fill);
             }
 
-            Console.WriteLine($"\n\nPosition Taken: {action}, Reward: {reward}");
+            string player = xTurn ? "X" : "O";
+            Console.WriteLine($"\n\nPlayer Acting: {player}, Position Taken: {action}, Reward: {reward}");
         }
 
         bool ValidAction(int action) => State[action].Value == 0.0;
