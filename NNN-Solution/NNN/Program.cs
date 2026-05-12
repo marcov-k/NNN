@@ -259,6 +259,7 @@ namespace NNN
     {
         public virtual int StateSize => throw new NotImplementedException();
         public virtual int ActionCount => throw new NotImplementedException();
+        public virtual bool SelfPlay => throw new NotImplementedException();
 
         public virtual Tensor GetNormalizedState()
         {
@@ -290,6 +291,7 @@ namespace NNN
     {
         public override int StateSize => 4;
         public override int ActionCount => 4;
+        public override bool SelfPlay => false;
         readonly Random random = new();
         readonly Tensor State = new(4); // current x, current y, target x, target y
         readonly int[] Bounds; // xMin, xMax, yMin, yMax
@@ -437,7 +439,7 @@ namespace NNN
     {
         public override int StateSize => 9;
         public override int ActionCount => 9;
-        readonly Random random = new();
+        public override bool SelfPlay => true;
         readonly Tensor State = new(9);
         bool xTurn = true;
         static readonly int[][] WinOrients = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
@@ -466,14 +468,14 @@ namespace NNN
 
         public override (double reward, Tensor nextState, bool done) Step(int action, int steps)
         {
-            if (!ValidAction(action)) action = PickRandomAction();
-
-            var (reward, done) = EvaluateAction(action);
+            if (!ValidAction(action)) return (-25.0, GetNormalizedState(), true);
 
             State[action] = new(xTurn ? 1.0 : -1.0);
+            var (reward, done) = EvaluateAction(action);
+            xTurn = !xTurn;
+
             var nextState = GetNormalizedState();
 
-            xTurn = !xTurn;
             done = done || BoardFilled();
 
             return (reward, nextState, done);
@@ -514,19 +516,6 @@ namespace NNN
 
         bool ValidAction(int action) => State[action].Value == 0.0;
 
-        int PickRandomAction()
-        {
-            List<int> validActions = [];
-            for (int i = 0; i < State.ElementCount; i++)
-            {
-                if (State[i].Value == 0.0) validActions.Add(i);
-            }
-
-            int index = random.Next(validActions.Count);
-
-            return validActions[index];
-        }
-
         (double reward, bool won) EvaluateAction(int action)
         {
             var relevantOrients = WinOrients.Where(o => o.Contains(action)).ToArray();
@@ -553,7 +542,7 @@ namespace NNN
 
             foreach (var orient in advantOrients)
             {
-                int ownPositions = orient.Count(p => p == ownValue) + 1;
+                int ownPositions = orient.Count(p => p == ownValue);
                 reward += Math.Pow(WinRewardBase, ownPositions);
                 won = won || ownPositions == 3;
             }
@@ -689,9 +678,9 @@ namespace NNN
         }
     }
 
-    public class DQNTrainer(Model agent, Environment environment, int actionCount, Optimizer optimizer, Cost cost, double discount = 0.995, double exploration = 1.0,
-        double explorationDecay = 0.99, double minExploration = 0.01, int replayBufferSize = 10000, int batchSize = 64, double tau = 0.005, double maxGradNorm = 1.0,
-        int minExperiences = 1000)
+    public class DQNTrainer(Model agent, Environment environment, int actionCount, Optimizer optimizer, Cost cost, double discount = 0.995,
+        double exploration = 1.0, double explorationDecay = 0.99, double minExploration = 0.01, int replayBufferSize = 10000, int batchSize = 64,
+        double tau = 0.005, double maxGradNorm = 1.0, int minExperiences = 1000)
     {
         readonly Random random = new();
         readonly Model Agent = agent;
@@ -700,6 +689,7 @@ namespace NNN
         readonly int ActionCount = actionCount;
         readonly Optimizer Optimizer = optimizer;
         readonly Cost Cost = cost;
+        readonly bool SelfPlay = environment.SelfPlay;
         readonly ReplayBuffer ReplayBuffer = new(replayBufferSize);
         readonly int BatchSize = batchSize;
         readonly double Discount = discount;
@@ -716,9 +706,7 @@ namespace NNN
         {
             List<Experience> episodeExperiences = [];
             Tensor state;
-            Tensor initialState;
             Tensor trueState;
-            Tensor logState;
             bool done;
             int action;
             double reward;
@@ -734,7 +722,6 @@ namespace NNN
                 episodeExperiences.Clear();
                 Environment.Reset();
                 state = Environment.GetNormalizedState();
-                initialState = Environment.GetState();
 
                 done = false;
                 step = 0;
@@ -763,7 +750,6 @@ namespace NNN
                 avgElapsed += (elapsed - avgElapsed) / (e + 1);
                 var eta = avgElapsed * (episodes - e - 1);
 
-                logState = Environment.GetState();
                 Console.WriteLine($"\nEpisode {e + 1}/{episodes} finished...");
                 Console.WriteLine($"Total Reward: {totalReward:F2},");
                 Console.WriteLine($"Average Loss: {(totalLoss / step):F3}");
@@ -866,7 +852,7 @@ namespace NNN
                 {
                     int bestAction = agentQs[i].MaxIndex();
                     double evalQ = targetQs[i][bestAction].Value;
-                    qTarget += Discount * evalQ;
+                    qTarget += Discount * evalQ * (SelfPlay ? -1.0 : 1.0);
                 }
 
                 maskedQs[i] = new(qTarget);
