@@ -539,7 +539,7 @@ namespace NNN
             var blockOrients = orientValues.Where(o => o.Contains(oppValue) && !o.Contains(ownValue));
             var falseOrients = orientValues.Where(o => o.Contains(ownValue) && o.Contains(oppValue));
 
-            double reward = Penalty * falseOrients.Count();
+            double reward = BoardFilled() ? 0.0 : Penalty * falseOrients.Count();
             bool won = false;
 
             foreach (var orient in advantOrients)
