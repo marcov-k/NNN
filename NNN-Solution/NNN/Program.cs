@@ -444,7 +444,7 @@ namespace NNN
         bool xTurn = true;
         static readonly int[][] WinOrients = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
         const double WinRewardBase = 4.0;
-        const double BlockRewardBase = 5.0;
+        const double BlockRewardBase = 6.0;
         const double Penalty = -10.0;
         const double InvalidPenalty = -50.0;
 
@@ -512,8 +512,7 @@ namespace NNN
                 Console.Write(fill);
             }
 
-            string player = xTurn ? "X" : "O";
-            Console.WriteLine($"\n\nPlayer Acting: {player}, Position Taken: {action}, Reward: {reward}");
+            Console.WriteLine($"\n\nPosition Taken: {action}, Reward: {reward}");
         }
 
         bool ValidAction(int action) => State[action].Value == 0.0;
