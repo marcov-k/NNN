@@ -611,20 +611,7 @@ namespace NNN
         {
             Tensor batchState = new(1, State.Dimensions[0]);
             batchState.InsertSubArray(0, GetNormalizedState());
-            int action = agent.Forward(batchState).MaxIndex();
-
-            if (ValidAction(action)) return action;
-            else
-            {
-                List<int> validActions = [];
-                for (int i = 0; i < State.ElementCount; i++)
-                {
-                    if (State[i].Value == 0.0) validActions.Add(i);
-                }
-
-                int index = random.Next(validActions.Count);
-                return validActions[index];
-            }
+            return PickAction(agent.Forward(batchState));
         }
 
         bool CheckWin() => WinOrients.Any(o => o.All(p => State[p].Value == (xTurn ? 1.0 : -1.0)));
