@@ -3,12 +3,12 @@
 Model model;
 NNN.Environment env = new TicTacToe();
 double exploration = 1.0;
-double explorationDecay = 0.9977;
+double explorationDecay = 0.999;
 double minExploration = 0.1;
 double discount = 0.99;
 Optimizer optimizer = new Adam(0.001);
 Cost cost = new Huber();
-int replayBufferSize = 2000;
+int replayBufferSize = 5000;
 int batchSize = 64;
 double tau = 0.005;
 double maxGradNorm = 1.0;
@@ -36,8 +36,8 @@ void InteractionLoop()
     else
     {
         model = new([
-            new Dense(32, new LeakyReLU()),
-            new Dense(32, new LeakyReLU()),
+            new Dense(16, new LeakyReLU()),
+            new Dense(16, new LeakyReLU()),
             new Dense(env.ActionCount, new Linear())
         ], new Tensor(1, env.StateSize));
     }
@@ -120,6 +120,8 @@ void TestDQNModel()
 
     Console.WriteLine($"Total Reward: {totalReward:F2}");
     env.Render(episodeBuffer[^1], steps);
+
+    if (env is TicTacToe ticTacToe) ticTacToe.Play(model);
 }
 
 void ViewEpisodes()
@@ -442,6 +444,7 @@ namespace NNN
         public override bool SelfPlay => true;
         readonly Tensor State = new(9);
         readonly int MaxSteps = 18;
+        readonly Random random = new();
         bool xTurn = true;
         static readonly int[][] WinOrients = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
         const double WinRewardBase = 4.0;
@@ -500,18 +503,7 @@ namespace NNN
             var state = step == episode.Experiences.Count ? exp.NextState : exp.State;
             (int action, double reward) = step > 0 ? (episode.Experiences[step - 1].Action, episode.Experiences[step - 1].Reward) : (-1, 0);
 
-            for (int i = 0; i < state.ElementCount; i++)
-            {
-                if (i % 3 == 0) Console.WriteLine();
-
-                string fill = state[i].Value switch
-                {
-                    1.0 => " X ",
-                    -1.0 => " O ",
-                    _ => "   "
-                };
-                Console.Write(fill);
-            }
+            DrawState(state);
 
             Console.WriteLine($"\n\nPosition Taken: {action}, Reward: {reward}");
         }
@@ -557,14 +549,96 @@ namespace NNN
             return (reward, won);
         }
 
-        bool BoardFilled()
+        bool BoardFilled() => !State.Data.Any(p => p.Value == 0.0);
+
+        public void Play(Model agent)
         {
-            foreach (var pos in State.Data)
+            Reset();
+            bool playerTurn = random.Next(2) == 0;
+            string winner = "Draw";
+            bool done = false;
+            while (!done)
             {
-                if (pos.Value == 0.0) return false;
+                Console.Clear();
+                DrawState(State);
+
+                int action = playerTurn ? GetPlayerAction() : GetAgentAction(agent);
+                if (action == -1) break;
+
+                State[action].Value = xTurn ? 1.0 : -1.0;
+
+                if (CheckWin())
+                {
+                    winner = xTurn ? "X" : "O";
+                    break;
+                }
+
+                done = BoardFilled();
+
+                xTurn = !xTurn;
+                playerTurn = !playerTurn;
             }
 
-            return true;
+            Console.Clear();
+            DrawState(State);
+            Console.WriteLine($"\n\nWinner: {winner}");
+        }
+
+#pragma warning disable CS8602 // Dereference of a possibly null reference.
+        int GetPlayerAction()
+        {
+            string input = string.Empty;
+            Console.WriteLine();
+            while (input != "q")
+            {
+                Console.WriteLine("\nEnter desired position:");
+                input = Console.ReadLine().ToLowerInvariant();
+
+                if (int.TryParse(input, out int action) && ValidAction(action)) return action;
+                else if (input == "q") break;
+
+                Console.WriteLine("Invalid position...");
+            }
+            return -1;
+        }
+#pragma warning restore CS8602 // Dereference of a possibly null reference.
+
+        int GetAgentAction(Model agent)
+        {
+            Tensor batchState = new(1, State.Dimensions[0]);
+            batchState.InsertSubArray(0, GetNormalizedState());
+            int action = agent.Forward(batchState).MaxIndex();
+
+            if (ValidAction(action)) return action;
+            else
+            {
+                List<int> validActions = [];
+                for (int i = 0; i < State.ElementCount; i++)
+                {
+                    if (State[i].Value == 0.0) validActions.Add(i);
+                }
+
+                int index = random.Next(validActions.Count);
+                return validActions[index];
+            }
+        }
+
+        bool CheckWin() => WinOrients.Any(o => o.All(p => State[p].Value == (xTurn ? 1.0 : -1.0)));
+
+        static void DrawState(Tensor state)
+        {
+            for (int i = 0; i < state.ElementCount; i++)
+            {
+                if (i % 3 == 0) Console.WriteLine();
+
+                string fill = state[i].Value switch
+                {
+                    1.0 => " X ",
+                    -1.0 => " O ",
+                    _ => "   "
+                };
+                Console.Write(fill);
+            }
         }
     }
 
