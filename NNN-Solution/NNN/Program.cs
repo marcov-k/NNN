@@ -45,7 +45,6 @@ void InteractionLoop()
     dqnTrainer = new(
         agent: model,
         environment: env,
-        actionCount: env.ActionCount,
         exploration: exploration,
         explorationDecay: explorationDecay,
         minExploration: minExploration,
@@ -288,7 +287,12 @@ namespace NNN
             throw new NotImplementedException();
         }
 
-        public virtual int PickAction(Tensor qValues)
+        public virtual int PickAgentAction(Tensor qValues)
+        {
+            throw new NotImplementedException();
+        }
+
+        public virtual int PickRandomAction()
         {
             throw new NotImplementedException();
         }
@@ -439,7 +443,9 @@ namespace NNN
             Console.Write($"Step: {step}, Action: {(Enum.IsDefined(typeof(Action), action) ? ((Action)action).ToString() : "None")}, Reward: {reward:F3}");
         }
 
-        public override int PickAction(Tensor qValues) => qValues.MaxIndex();
+        public override int PickAgentAction(Tensor qValues) => qValues.MaxIndex();
+
+        public override int PickRandomAction() => random.Next(ActionCount);
 
         enum Action { Left, Right, Up, Down }
     }
@@ -611,7 +617,7 @@ namespace NNN
         {
             Tensor batchState = new(1, State.Dimensions[0]);
             batchState.InsertSubArray(0, GetNormalizedState());
-            return PickAction(agent.Forward(batchState));
+            return PickAgentAction(agent.Forward(batchState));
         }
 
         bool CheckWin() => WinOrients.Any(o => o.All(p => State[p].Value == (xTurn ? 1.0 : -1.0)));
@@ -632,7 +638,7 @@ namespace NNN
             }
         }
 
-        public override int PickAction(Tensor qValues)
+        public override int PickAgentAction(Tensor qValues)
         {
             int action = qValues.MaxIndex();
             while (!ValidAction(action) && !BoardFilled())
@@ -641,6 +647,16 @@ namespace NNN
                 action = qValues.MaxIndex();
             }
             return action;
+        }
+
+        public override int PickRandomAction()
+        {
+            List<int> validActions = [];
+            for (int i = 0; i < State.ElementCount; i++)
+            {
+                if (State[i].Value == 0.0) validActions.Add(i);
+            }
+            return validActions[random.Next(validActions.Count)];
         }
     }
 
@@ -756,7 +772,7 @@ namespace NNN
         }
     }
 
-    public class DQNTrainer(Model agent, Environment environment, int actionCount, Optimizer optimizer, Cost cost, double discount = 0.995,
+    public class DQNTrainer(Model agent, Environment environment, Optimizer optimizer, Cost cost, double discount = 0.995,
         double exploration = 1.0, double explorationDecay = 0.99, double minExploration = 0.01, int replayBufferSize = 10000, int batchSize = 64,
         double tau = 0.005, double maxGradNorm = 1.0, int minExperiences = 1000)
     {
@@ -764,7 +780,6 @@ namespace NNN
         readonly Model Agent = agent;
         readonly Model TargetModel = agent.Copy();
         readonly Environment Environment = environment;
-        readonly int ActionCount = actionCount;
         readonly Optimizer Optimizer = optimizer;
         readonly Cost Cost = cost;
         readonly bool SelfPlay = environment.SelfPlay;
@@ -843,14 +858,14 @@ namespace NNN
         {
             if (random.NextDouble() < Exploration)
             {
-                return random.Next(0, ActionCount);
+                return Environment.PickRandomAction();
             }
             else
             {
                 Tensor batchState = new(1, state.Dimensions[0]);
                 batchState.InsertSubArray(0, state);
 
-                return Environment.PickAction(Agent.Forward(batchState));
+                return Environment.PickAgentAction(Agent.Forward(batchState));
             }
         }
 
