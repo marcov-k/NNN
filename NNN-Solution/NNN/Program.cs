@@ -863,7 +863,7 @@ namespace NNN
                 Tensor batchState = new(1, state.Dimensions[0]);
                 batchState.InsertSubArray(0, state);
 
-                return Environment.PickAction(Agent.Forward(state));
+                return Environment.PickAction(Agent.Forward(batchState));
             }
         }
 
