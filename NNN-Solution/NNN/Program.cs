@@ -287,6 +287,11 @@ namespace NNN
         {
             throw new NotImplementedException();
         }
+
+        public virtual int PickAction(Tensor qValues)
+        {
+            throw new NotImplementedException();
+        }
     }
 
     public class MovementGrid2D : Environment
@@ -434,6 +439,8 @@ namespace NNN
             Console.Write($"Step: {step}, Action: {(Enum.IsDefined(typeof(Action), action) ? ((Action)action).ToString() : "None")}, Reward: {reward:F3}");
         }
 
+        public override int PickAction(Tensor qValues) => qValues.MaxIndex();
+
         enum Action { Left, Right, Up, Down }
     }
 
@@ -447,10 +454,9 @@ namespace NNN
         readonly Random random = new();
         bool xTurn = true;
         static readonly int[][] WinOrients = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
-        const double WinRewardBase = 4.0;
-        const double BlockRewardBase = 7.0;
-        const double Penalty = -1.0;
-        const double InvalidPenalty = -15.0;
+        const double WinRewardBase = 3.0;
+        const double BlockRewardBase = 5.0;
+        const double Penalty = -2.0;
 
         public TicTacToe() { }
 
@@ -473,8 +479,6 @@ namespace NNN
 
         public override (double reward, Tensor nextState, bool done) Step(int action, int steps)
         {
-            if (!ValidAction(action)) return (InvalidPenalty, GetNormalizedState(), BoardFilled() || steps >= MaxSteps);
-
             State[action] = new(xTurn ? 1.0 : -1.0);
             var (reward, done) = EvaluateAction(action);
             xTurn = !xTurn;
@@ -639,6 +643,17 @@ namespace NNN
                 };
                 Console.Write(fill);
             }
+        }
+
+        public override int PickAction(Tensor qValues)
+        {
+            int action = qValues.MaxIndex();
+            while (!ValidAction(action) && !BoardFilled())
+            {
+                qValues.Max().Value = double.MinValue;
+                action = qValues.MaxIndex();
+            }
+            return action;
         }
     }
 
@@ -848,7 +863,7 @@ namespace NNN
                 Tensor batchState = new(1, state.Dimensions[0]);
                 batchState.InsertSubArray(0, state);
 
-                return Agent.Forward(batchState).MaxIndex();
+                return Environment.PickAction(Agent.Forward(state));
             }
         }
 
