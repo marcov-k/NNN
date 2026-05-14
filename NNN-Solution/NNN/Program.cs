@@ -3,7 +3,7 @@
 Model model;
 NNN.Environment env = new TicTacToe();
 double exploration = 1.0;
-double explorationDecay = 0.999;
+double explorationDecay = 0.9995;
 double minExploration = 0.1;
 double discount = 0.99;
 Optimizer optimizer = new Adam(0.001);
@@ -36,8 +36,8 @@ void InteractionLoop()
     else
     {
         model = new([
-            new Dense(16, new LeakyReLU()),
-            new Dense(16, new LeakyReLU()),
+            new Dense(32, new LeakyReLU()),
+            new Dense(32, new LeakyReLU()),
             new Dense(env.ActionCount, new Linear())
         ], new Tensor(1, env.StateSize));
     }
