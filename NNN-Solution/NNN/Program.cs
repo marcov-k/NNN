@@ -3,7 +3,7 @@
 Model model;
 NNN.Environment env = new TicTacToe();
 double exploration = 1.0;
-double explorationDecay = 0.999;
+double explorationDecay = 0.9995;
 double minExploration = 0.1;
 double discount = 0.99;
 Optimizer optimizer = new Adam(0.001);
@@ -44,7 +44,6 @@ void InteractionLoop()
     dqnTrainer = new(
         agent: model,
         environment: env,
-        actionCount: env.ActionCount,
         exploration: exploration,
         explorationDecay: explorationDecay,
         minExploration: minExploration,
@@ -286,6 +285,16 @@ namespace NNN
         {
             throw new NotImplementedException();
         }
+
+        public virtual int PickAgentAction(Tensor qValues)
+        {
+            throw new NotImplementedException();
+        }
+
+        public virtual int PickRandomAction()
+        {
+            throw new NotImplementedException();
+        }
     }
 
     public class MovementGrid2D : Environment
@@ -433,6 +442,10 @@ namespace NNN
             Console.Write($"Step: {step}, Action: {(Enum.IsDefined(typeof(Action), action) ? ((Action)action).ToString() : "None")}, Reward: {reward:F3}");
         }
 
+        public override int PickAgentAction(Tensor qValues) => qValues.MaxIndex();
+
+        public override int PickRandomAction() => random.Next(ActionCount);
+
         enum Action { Left, Right, Up, Down }
     }
 
@@ -446,10 +459,9 @@ namespace NNN
         readonly Random random = new();
         bool xTurn = true;
         static readonly int[][] WinOrients = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
-        const double WinRewardBase = 4.0;
-        const double BlockRewardBase = 7.0;
-        const double Penalty = -1.0;
-        const double InvalidPenalty = -15.0;
+        const double WinRewardBase = 3.0;
+        const double BlockRewardBase = 5.0;
+        const double Penalty = -2.0;
 
         public TicTacToe() { }
 
@@ -472,8 +484,6 @@ namespace NNN
 
         public override (double reward, Tensor nextState, bool done) Step(int action, int steps)
         {
-            if (!ValidAction(action)) return (InvalidPenalty, GetNormalizedState(), BoardFilled() || steps >= MaxSteps);
-
             State[action] = new(xTurn ? 1.0 : -1.0);
             var (reward, done) = EvaluateAction(action);
             xTurn = !xTurn;
@@ -606,20 +616,7 @@ namespace NNN
         {
             Tensor batchState = new(1, State.Dimensions[0]);
             batchState.InsertSubArray(0, GetNormalizedState());
-            int action = agent.Forward(batchState).MaxIndex();
-
-            if (ValidAction(action)) return action;
-            else
-            {
-                List<int> validActions = [];
-                for (int i = 0; i < State.ElementCount; i++)
-                {
-                    if (State[i].Value == 0.0) validActions.Add(i);
-                }
-
-                int index = random.Next(validActions.Count);
-                return validActions[index];
-            }
+            return PickAgentAction(agent.Forward(batchState));
         }
 
         bool CheckWin() => WinOrients.Any(o => o.All(p => State[p].Value == (xTurn ? 1.0 : -1.0)));
@@ -638,6 +635,27 @@ namespace NNN
                 };
                 Console.Write(fill);
             }
+        }
+
+        public override int PickAgentAction(Tensor qValues)
+        {
+            int action = qValues.MaxIndex();
+            while (!ValidAction(action) && !BoardFilled())
+            {
+                qValues.Max().Value = double.MinValue;
+                action = qValues.MaxIndex();
+            }
+            return action;
+        }
+
+        public override int PickRandomAction()
+        {
+            List<int> validActions = [];
+            for (int i = 0; i < State.ElementCount; i++)
+            {
+                if (State[i].Value == 0.0) validActions.Add(i);
+            }
+            return validActions[random.Next(validActions.Count)];
         }
     }
 
@@ -753,7 +771,7 @@ namespace NNN
         }
     }
 
-    public class DQNTrainer(Model agent, Environment environment, int actionCount, Optimizer optimizer, Cost cost, double discount = 0.995,
+    public class DQNTrainer(Model agent, Environment environment, Optimizer optimizer, Cost cost, double discount = 0.995,
         double exploration = 1.0, double explorationDecay = 0.99, double minExploration = 0.01, int replayBufferSize = 10000, int batchSize = 64,
         double tau = 0.005, double maxGradNorm = 1.0, int minExperiences = 1000)
     {
@@ -761,7 +779,6 @@ namespace NNN
         readonly Model Agent = agent;
         readonly Model TargetModel = agent.Copy();
         readonly Environment Environment = environment;
-        readonly int ActionCount = actionCount;
         readonly Optimizer Optimizer = optimizer;
         readonly Cost Cost = cost;
         readonly bool SelfPlay = environment.SelfPlay;
@@ -840,14 +857,14 @@ namespace NNN
         {
             if (random.NextDouble() < Exploration)
             {
-                return random.Next(0, ActionCount);
+                return Environment.PickRandomAction();
             }
             else
             {
                 Tensor batchState = new(1, state.Dimensions[0]);
                 batchState.InsertSubArray(0, state);
 
-                return Agent.Forward(batchState).MaxIndex();
+                return Environment.PickAgentAction(Agent.Forward(batchState));
             }
         }
 
