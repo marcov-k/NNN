@@ -36,8 +36,7 @@ void InteractionLoop()
     else
     {
         model = new([
-            new Dense(16, new LeakyReLU()),
-            new Dense(16, new LeakyReLU()),
+            new Dense(32, new LeakyReLU()),
             new Dense(env.ActionCount, new Linear())
         ], new Tensor(1, env.StateSize));
     }
@@ -537,13 +536,13 @@ namespace NNN
             foreach (var orient in advantOrients)
             {
                 int ownPositions = orient.Count(p => p == ownValue);
-                reward += Math.Pow(WinRewardBase, ownPositions);
+                reward += WinRewardBase * ownPositions;
                 won = won || ownPositions == 3;
             }
 
             foreach (var orient in blockOrients)
             {
-                reward += Math.Pow(BlockRewardBase, orient.Count(p => p == oppValue) + 1);
+                reward += BlockRewardBase * (orient.Count(p => p == oppValue) + 1);
             }
 
             return (reward, won);
