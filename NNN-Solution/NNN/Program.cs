@@ -12,6 +12,7 @@ int replayBufferSize = 5000;
 int batchSize = 64;
 int agentBufferSize = 5;
 int opponentCopyRate = 100;
+int minRandomOpponentEpisodes = 200;
 double tau = 0.005;
 double maxGradNorm = 1.0;
 int minExperiences = 100;
@@ -56,6 +57,7 @@ void InteractionLoop()
         agentBufferSize: agentBufferSize,
         batchSize: batchSize,
         opponentCopyRate: opponentCopyRate,
+        minRandomOpponentEpisodes: minRandomOpponentEpisodes,
         tau: tau,
         maxGradNorm: maxGradNorm,
         minExperiences: minExperiences
@@ -818,7 +820,8 @@ namespace NNN
 
     public class DQNTrainer(Model agent, Environment environment, Optimizer optimizer, Cost cost, double discount = 0.995,
         double exploration = 1.0, double explorationDecay = 0.99, double minExploration = 0.01, int replayBufferSize = 10000, int batchSize = 64,
-        int agentBufferSize = 5, int opponentCopyRate = 100, double tau = 0.005, double maxGradNorm = 1.0, int minExperiences = 1000)
+        int agentBufferSize = 5, int opponentCopyRate = 100, int minRandomOpponentEpisodes = 200, double tau = 0.005, double maxGradNorm = 1.0,
+        int minExperiences = 1000)
     {
         readonly Random random = new();
         readonly Model Agent = agent;
@@ -830,6 +833,7 @@ namespace NNN
         readonly FIFOBuffer<Model> AgentBuffer = new(agentBufferSize);
         readonly int BatchSize = batchSize;
         readonly int OpponentCopyRate = opponentCopyRate;
+        readonly int MinRandomOppEpisodes = minRandomOpponentEpisodes;
         readonly double Discount = discount;
         double Exploration = exploration;
         readonly double ExplorationDecay = explorationDecay;
@@ -857,7 +861,7 @@ namespace NNN
             stopwatch.Start();
             for (int e = 0; e < episodes; e++)
             {
-                if (e % OpponentCopyRate == 0) AgentBuffer.Add(Agent.Copy());
+                if (((e + 1) >= MinRandomOppEpisodes) && ((e + 1) % OpponentCopyRate == 0)) AgentBuffer.Add(Agent.Copy());
 
                 totalLoss = 0.0;
                 episodeExperiences.Clear();
