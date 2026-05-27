@@ -5,7 +5,7 @@ NNN.Environment env = new TicTacToe();
 double exploration = 1.0;
 double explorationDecay = 0.999;
 double minExploration = 0.1;
-double discount = 0.95;
+double discount = 0.99;
 Optimizer optimizer = new Adam(0.001);
 Cost cost = new Huber();
 int replayBufferSize = 5000;
@@ -468,8 +468,8 @@ namespace NNN
         public Random Random { get; init; } = new();
         bool xTurn = true;
         static readonly int[][] WinOrients = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
-        const double WinRewardBase = 4.0;
-        const double BlockRewardBase = 5.0;
+        const double WinRewardBase = 3.0;
+        const double BlockRewardBase = 6.0;
         const double Penalty = 1.0;
 
         public TicTacToe() { }
