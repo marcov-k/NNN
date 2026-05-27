@@ -942,7 +942,7 @@ namespace NNN
 
                 if (!batch[i].Done)
                 {
-                    int bestAction = agentQs[i].MaxIndex();
+                    int bestAction = Environment.PickAgentAction(agentQs[i]);
                     double evalQ = targetQs[i][bestAction].Value;
                     qTarget += Discount * evalQ * (SelfPlay ? -1.0 : 1.0);
                 }
