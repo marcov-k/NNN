@@ -459,9 +459,9 @@ namespace NNN
         readonly Random random = new();
         bool xTurn = true;
         static readonly int[][] WinOrients = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
-        const double WinRewardBase = 3.0;
-        const double BlockRewardBase = 5.0;
-        const double Penalty = -2.0;
+        const double WinRewardBase = 5.0;
+        const double BlockRewardBase = 0.0;
+        const double Penalty = -5.0;
 
         public TicTacToe() { }
 
