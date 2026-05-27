@@ -898,7 +898,7 @@ namespace NNN
                 if (Environment is ISelfPlay selfPlayEnv)
                 {
                     Console.WriteLine($"Opponent agent: {(selfPlayEnv.OpponentIndex < selfPlayEnv.OpponentCount ?
-                        $"{selfPlayEnv.OpponentIndex}/{selfPlayEnv.OpponentCount}" : "Random")}");
+                        $"{selfPlayEnv.OpponentIndex + 1}/{selfPlayEnv.OpponentCount}" : "Random")}");
                 }
                 Console.WriteLine($"Final State:");
                 if (episodeBuffer is not null) Environment.Render(episodeBuffer[^1], step);
