@@ -468,9 +468,9 @@ namespace NNN
         public Random Random { get; init; } = new();
         bool xTurn = true;
         static readonly int[][] WinOrients = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
-        const double WinRewardBase = 100.0;
-        const double BlockRewardBase = 0.0;
-        const double Penalty = 0.0;
+        const double WinRewardBase = 5.0;
+        const double BlockRewardBase = 2.0;
+        const double Penalty = 1.0;
 
         public TicTacToe() { }
 
@@ -564,7 +564,7 @@ namespace NNN
             foreach (var orient in advantOrients)
             {
                 int ownPositions = orient.Count(p => p == ownValue);
-                reward += ownPositions == 3 ? WinRewardBase : 0.0;
+                reward += WinRewardBase * ownPositions;
                 won = won || ownPositions == 3;
             }
 
