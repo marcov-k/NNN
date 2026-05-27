@@ -110,7 +110,7 @@ void TestDQNModel()
         steps++;
         trueState = env.GetState();
         batchState.InsertSubArray(0, state);
-        int action = model.Forward(batchState).MaxIndex();
+        int action = env.PickAgentAction(model.Forward(batchState));
         var (reward, nextState, isDone) = env.Step(action, steps);
 
         totalReward += reward;
@@ -125,7 +125,10 @@ void TestDQNModel()
     Console.WriteLine($"Total Reward: {totalReward:F2}");
     env.Render(episodeBuffer[^1], steps);
 
-    if (env is TicTacToe ticTacToe) ticTacToe.Play(model);
+    if (env is TicTacToe ticTacToe && GetInput("Play against model? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
+    {
+        ticTacToe.Play(model);
+    }
 }
 
 void ViewEpisodes()
@@ -861,7 +864,7 @@ namespace NNN
             stopwatch.Start();
             for (int e = 0; e < episodes; e++)
             {
-                if (((e + 1) >= MinRandomOppEpisodes) && ((e + 1) % OpponentCopyRate == 0)) AgentBuffer.Add(Agent.Copy());
+                if (SelfPlay && ((e + 1) >= MinRandomOppEpisodes) && ((e + 1) % OpponentCopyRate == 0)) AgentBuffer.Add(Agent.Copy());
 
                 totalLoss = 0.0;
                 episodeExperiences.Clear();
