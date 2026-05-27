@@ -2247,12 +2247,16 @@ namespace NNN
 
     public static class Saver
     {
+        const string DirectoryName = "Models";
+        static string DirectoryPath = string.Empty;
         const string Extension = ".nnn";
 
 #pragma warning disable CS8604 // Possible null reference argument.
         public static void SaveModel(Model model, string fileName)
         {
-            fileName += Extension;
+            InitDirectory();
+
+            string filePath = Path.Combine(DirectoryPath, fileName + Extension);
 
             var layers = new LayerData[model.Layers.Length];
             for (int i = 0; i < layers.Length; i++)
@@ -2274,14 +2278,16 @@ namespace NNN
 
             string json = JsonSerializer.Serialize(modelData);
 
-            File.WriteAllText(fileName, json);
+            File.WriteAllText(filePath, json);
         }
 
         public static Model LoadModel(string fileName)
         {
-            fileName += Extension;
+            InitDirectory();
 
-            string json = File.ReadAllText(fileName);
+            string filePath = Path.Combine(DirectoryPath, fileName + Extension);
+
+            string json = File.ReadAllText(filePath);
 
             var modelData = JsonSerializer.Deserialize<ModelData>(json);
 
@@ -2293,10 +2299,26 @@ namespace NNN
 
         public static bool FileExists(string fileName)
         {
-            fileName += Extension;
+            InitDirectory();
 
-            if (File.Exists(fileName)) return true;
+            string filePath = Path.Combine(DirectoryPath, fileName + Extension);
+
+            if (File.Exists(filePath)) return true;
             else return false;
+        }
+
+        static void InitDirectory()
+        {
+            if (string.IsNullOrEmpty(DirectoryPath))
+            {
+                string? exePath = System.Environment.ProcessPath;
+                string? exeDirPath = Path.GetDirectoryName(exePath);
+                if (!string.IsNullOrEmpty(exeDirPath))
+                {
+                    DirectoryPath = Path.Combine(exeDirPath, DirectoryName);
+                    if (!Directory.Exists(DirectoryPath)) Directory.CreateDirectory(DirectoryPath);
+                }
+            }
         }
 
         [Serializable]
