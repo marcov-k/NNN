@@ -5,11 +5,13 @@ NNN.Environment env = new TicTacToe();
 double exploration = 1.0;
 double explorationDecay = 0.995;
 double minExploration = 0.1;
-double discount = 0.99;
+double discount = 0.95;
 Optimizer optimizer = new Adam(0.001);
 Cost cost = new Huber();
 int replayBufferSize = 5000;
 int batchSize = 64;
+int agentBufferSize = 5;
+int opponentCopyRate = 100;
 double tau = 0.005;
 double maxGradNorm = 1.0;
 int minExperiences = 100;
@@ -51,7 +53,9 @@ void InteractionLoop()
         optimizer: optimizer,
         cost: cost,
         replayBufferSize: replayBufferSize,
+        agentBufferSize: agentBufferSize,
         batchSize: batchSize,
+        opponentCopyRate: opponentCopyRate,
         tau: tau,
         maxGradNorm: maxGradNorm,
         minExperiences: minExperiences
@@ -259,7 +263,6 @@ namespace NNN
     {
         public virtual int StateSize => throw new NotImplementedException();
         public virtual int ActionCount => throw new NotImplementedException();
-        public virtual bool SelfPlay => throw new NotImplementedException();
 
         public virtual Tensor GetNormalizedState()
         {
@@ -301,7 +304,6 @@ namespace NNN
     {
         public override int StateSize => 4;
         public override int ActionCount => 4;
-        public override bool SelfPlay => false;
         readonly Random random = new();
         readonly Tensor State = new(4); // current x, current y, target x, target y
         readonly int[] Bounds; // xMin, xMax, yMin, yMax
@@ -449,17 +451,19 @@ namespace NNN
         enum Action { Left, Right, Up, Down }
     }
 
-    public class TicTacToe : Environment
+    public class TicTacToe : Environment, ISelfPlay
     {
         public override int StateSize => 9;
         public override int ActionCount => 9;
-        public override bool SelfPlay => true;
-        readonly Tensor State = new(9);
-        readonly int MaxSteps = 18;
-        readonly Random random = new();
+        public bool AgentTurn { get; set; } = true;
+        public int OpponentCount { get; set; }
+        public int OpponentIndex { get; set; }
+        public Tensor State { get; init; } = new(9);
+        readonly int MaxSteps = 9;
+        public Random Random { get; init; } = new();
         bool xTurn = true;
         static readonly int[][] WinOrients = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
-        const double WinRewardBase = 5.0;
+        const double WinRewardBase = 100.0;
         const double BlockRewardBase = 0.0;
         const double Penalty = 0.0;
 
@@ -484,9 +488,12 @@ namespace NNN
 
         public override (double reward, Tensor nextState, bool done) Step(int action, int steps)
         {
+            if (!ValidAction(action)) throw new ArgumentException("Invalid Action");
+
             State[action] = new(xTurn ? 1.0 : -1.0);
             var (reward, done) = EvaluateAction(action);
             xTurn = !xTurn;
+            AgentTurn = !AgentTurn;
 
             var nextState = GetNormalizedState();
 
@@ -498,6 +505,8 @@ namespace NNN
         public override void Reset()
         {
             xTurn = true;
+            AgentTurn = Random.Next(2) == 1;
+            OpponentIndex = Random.Next(OpponentCount + 1);
 
             foreach (var pos in State.Data)
             {
@@ -563,7 +572,7 @@ namespace NNN
         public void Play(Model agent)
         {
             Reset();
-            bool playerTurn = random.Next(2) == 0;
+            bool playerTurn = Random.Next(2) == 0;
             string winner = "Draw";
             bool done = false;
             while (!done)
@@ -612,7 +621,7 @@ namespace NNN
         }
 #pragma warning restore CS8602 // Dereference of a possibly null reference.
 
-        int GetAgentAction(Model agent)
+        public int GetAgentAction(Model agent)
         {
             Tensor batchState = new(1, State.Dimensions[0]);
             batchState.InsertSubArray(0, GetNormalizedState());
@@ -637,8 +646,9 @@ namespace NNN
             }
         }
 
-        public override int PickAgentAction(Tensor qValues)
+        public override int PickAgentAction(Tensor agentQValues)
         {
+            var qValues = agentQValues.Copy();
             int action = qValues.MaxIndex();
             while (!ValidAction(action) && !BoardFilled())
             {
@@ -655,7 +665,42 @@ namespace NNN
             {
                 if (State[i].Value == 0.0) validActions.Add(i);
             }
-            return validActions[random.Next(validActions.Count)];
+            return validActions[Random.Next(validActions.Count)];
+        }
+    }
+
+    public interface ISelfPlay
+    {
+        public bool AgentTurn { get; set; }
+        public int OpponentCount { get; set; }
+        public int OpponentIndex { get; set; }
+        public Random Random { get; init; }
+        public Tensor State { get; init; }
+
+        public int PickOpponentAction(FIFOBuffer<Model> agents)
+        {
+            if (agents.Count != OpponentCount) UpdateOpponentIndex(agents.Count);
+
+            if (OpponentIndex >= OpponentCount)
+            {
+                return PickRandomAction();
+            }
+            else
+            {
+                return GetAgentAction(agents[OpponentIndex]);
+            }
+        }
+
+        public int GetAgentAction(Model agent);
+
+        public int PickAgentAction(Tensor qValues);
+
+        public int PickRandomAction();
+
+        void UpdateOpponentIndex(int newOpponentCount)
+        {
+            OpponentCount = newOpponentCount;
+            OpponentIndex = Random.Next(OpponentCount + 1);
         }
     }
 
@@ -691,7 +736,7 @@ namespace NNN
 
     public class FIFOBuffer<T>(int maxSize)
     {
-        readonly protected int MaxSize = maxSize;
+        public int MaxSize { get; init; } = maxSize;
         readonly protected List<T> Buffer = [];
         protected int FirstIndex = 0;
         public int Count => Buffer.Count;
@@ -773,7 +818,7 @@ namespace NNN
 
     public class DQNTrainer(Model agent, Environment environment, Optimizer optimizer, Cost cost, double discount = 0.995,
         double exploration = 1.0, double explorationDecay = 0.99, double minExploration = 0.01, int replayBufferSize = 10000, int batchSize = 64,
-        double tau = 0.005, double maxGradNorm = 1.0, int minExperiences = 1000)
+        int agentBufferSize = 5, int opponentCopyRate = 100, double tau = 0.005, double maxGradNorm = 1.0, int minExperiences = 1000)
     {
         readonly Random random = new();
         readonly Model Agent = agent;
@@ -781,9 +826,10 @@ namespace NNN
         readonly Environment Environment = environment;
         readonly Optimizer Optimizer = optimizer;
         readonly Cost Cost = cost;
-        readonly bool SelfPlay = environment.SelfPlay;
         readonly ReplayBuffer ReplayBuffer = new(replayBufferSize);
+        readonly FIFOBuffer<Model> AgentBuffer = new(agentBufferSize);
         readonly int BatchSize = batchSize;
+        readonly int OpponentCopyRate = opponentCopyRate;
         readonly double Discount = discount;
         double Exploration = exploration;
         readonly double ExplorationDecay = explorationDecay;
@@ -792,6 +838,7 @@ namespace NNN
         readonly double Tau = tau;
         readonly double MaxNorm = maxGradNorm;
         readonly int MinExperiences = minExperiences;
+        readonly bool SelfPlay = environment is ISelfPlay;
         double totalLoss = 0.0;
 
         public void Train(ref FIFOBuffer<Episode>? episodeBuffer, int episodes = 1000)
@@ -810,6 +857,8 @@ namespace NNN
             stopwatch.Start();
             for (int e = 0; e < episodes; e++)
             {
+                if (e % OpponentCopyRate == 0) AgentBuffer.Add(Agent.Copy());
+
                 totalLoss = 0.0;
                 episodeExperiences.Clear();
                 Environment.Reset();
@@ -855,6 +904,18 @@ namespace NNN
 
         int PickNextAction(Tensor state)
         {
+            if (Environment is ISelfPlay selfPlayEnv && !selfPlayEnv.AgentTurn)
+            {
+                return PickOpponentAction();
+            }
+            else
+            {
+                return PickAgentAction(state);
+            }
+        }
+
+        int PickAgentAction(Tensor state)
+        {
             if (random.NextDouble() < Exploration)
             {
                 return Environment.PickRandomAction();
@@ -866,6 +927,15 @@ namespace NNN
 
                 return Environment.PickAgentAction(Agent.Forward(batchState));
             }
+        }
+
+        int PickOpponentAction()
+        {
+            if (Environment is ISelfPlay selfPlayEnv)
+            {
+                return selfPlayEnv.PickOpponentAction(AgentBuffer);
+            }
+            else throw new Exception("Environment not self-play");
         }
 
         void TrainNetwork()
