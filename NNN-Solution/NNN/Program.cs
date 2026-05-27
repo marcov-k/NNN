@@ -895,6 +895,11 @@ namespace NNN
                 Console.WriteLine($"Total Reward: {totalReward:F2},");
                 Console.WriteLine($"Average Loss: {(totalLoss / step):F3}");
                 Console.WriteLine($"Exploration Rate: {Exploration:F2}, Experience Count: {ReplayBuffer.Count}");
+                if (Environment is ISelfPlay selfPlayEnv)
+                {
+                    Console.WriteLine($"Opponent agent: {(selfPlayEnv.OpponentIndex < selfPlayEnv.OpponentCount ?
+                        $"{selfPlayEnv.OpponentIndex}/{selfPlayEnv.OpponentCount}" : "Random")}");
+                }
                 Console.WriteLine($"Final State:");
                 if (episodeBuffer is not null) Environment.Render(episodeBuffer[^1], step);
                 Console.WriteLine($"Episode Duration: {elapsed}, Estimated Time Remaining: {eta}");
