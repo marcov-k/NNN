@@ -468,9 +468,10 @@ namespace NNN
         public Random Random { get; init; } = new();
         bool xTurn = true;
         static readonly int[][] WinOrients = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
-        const double WinRewardBase = 6.0;
-        const double BlockRewardBase = 2.0;
-        const double Penalty = 1.0;
+        const double WinRewardBase = 1.0;
+        const double BlockRewardBase = 0.1;
+        const double DrawRewardBase = 0.2;
+        const double Penalty = 0.0;
 
         public TicTacToe() { }
 
@@ -558,21 +559,29 @@ namespace NNN
             var blockOrients = orientValues.Where(o => o.Contains(oppValue) && !o.Contains(ownValue));
             var falseOrients = orientValues.Where(o => o.Contains(ownValue) && o.Contains(oppValue));
 
-            double reward = BoardFilled() ? 0.0 : Penalty * falseOrients.Count();
+            bool boardFilled = BoardFilled();
+            double reward = boardFilled ? 0.0 : Penalty * falseOrients.Count();
             bool won = false;
 
             foreach (var orient in advantOrients)
             {
                 int ownPositions = orient.Count(p => p == ownValue);
-                reward += WinRewardBase * ownPositions;
+                reward += ownPositions switch
+                {
+                    2 => 0.05 * WinRewardBase,
+                    3 => WinRewardBase,
+                    _ => 0.0
+                };
                 won = won || ownPositions == 3;
             }
 
             foreach (var orient in blockOrients)
             {
                 int oppPositions = orient.Count(p => p == oppValue);
-                reward += oppPositions == 2 ? BlockRewardBase * (oppPositions + 1) : 0.0;
+                reward += oppPositions == 2 ? BlockRewardBase : 0.0;
             }
+
+            reward += (boardFilled && !won) ? DrawRewardBase : 0.0;
 
             return (reward, won);
         }
