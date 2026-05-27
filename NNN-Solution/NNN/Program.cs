@@ -570,7 +570,8 @@ namespace NNN
 
             foreach (var orient in blockOrients)
             {
-                reward += BlockRewardBase * (orient.Count(p => p == oppValue) + 1);
+                int oppPositions = orient.Count(p => p == oppValue);
+                reward += oppPositions == 2 ? BlockRewardBase * (oppPositions + 1) : 0.0;
             }
 
             return (reward, won);
@@ -869,6 +870,7 @@ namespace NNN
             Tensor state;
             Tensor trueState;
             bool done;
+            bool learnerTurn;
             int action;
             double reward;
             double totalReward;
@@ -893,11 +895,12 @@ namespace NNN
                 {
                     step++;
                     trueState = Environment.GetState();
+                    learnerTurn = Environment is not ISelfPlay sp || sp.AgentTurn;
                     action = PickNextAction(state);
 
                     (reward, nextState, done) = Environment.Step(action, step);
                     totalReward += reward;
-                    ReplayBuffer.Add(new(state, action, reward, nextState, done));
+                    if (learnerTurn) ReplayBuffer.Add(new(state, action, reward, nextState, done));
                     episodeExperiences.Add(new(trueState, action, reward, Environment.GetState(), done));
 
                     TrainNetwork();
