@@ -458,15 +458,14 @@ namespace NNN
 
     public class TicTacToe : Environment, ISelfPlay
     {
-        public override int StateSize => 9;
+        public override int StateSize => 10;
         public override int ActionCount => 9;
         public bool AgentTurn { get; set; } = true;
         public int OpponentCount { get; set; }
         public int OpponentIndex { get; set; }
-        public Tensor State { get; init; } = new(9);
+        public Tensor State { get; init; } = new(10);
         readonly int MaxSteps = 9;
         public Random Random { get; init; } = new();
-        bool xTurn = true;
         static readonly int[][] WinOrients = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
         const double WinRewardBase = 1.0;
         const double BlockRewardBase = 0.1;
@@ -477,14 +476,7 @@ namespace NNN
 
         public override Tensor GetNormalizedState()
         {
-            Tensor normState = new(State.Dimensions);
-
-            for (int i = 0; i < State.ElementCount; i++)
-            {
-                normState[i] = new(State[i].Value * (xTurn ? 1.0 : -1.0));
-            }
-
-            return normState;
+            return GetState();
         }
 
         public override Tensor GetState()
@@ -496,10 +488,10 @@ namespace NNN
         {
             if (!ValidAction(action)) throw new ArgumentException("Invalid Action");
 
-            State[action] = new(xTurn ? 1.0 : -1.0);
+            State[action] = new(State[9].Value == 1.0 ? 1.0 : -1.0);
             var (reward, done) = EvaluateAction(action);
-            xTurn = !xTurn;
             AgentTurn = !AgentTurn;
+            State[9].Value *= -1.0;
 
             var nextState = GetNormalizedState();
 
@@ -510,14 +502,14 @@ namespace NNN
 
         public override void Reset()
         {
-            xTurn = true;
             AgentTurn = Random.Next(2) == 1;
             OpponentIndex = Random.Next(OpponentCount + 1);
 
-            foreach (var pos in State.Data)
+            for (int i = 0; i < State.ElementCount - 1; i++)
             {
-                pos.Value = 0.0;
+                State[i].Value = 0.0;
             }
+            State[9].Value = 1.0;
         }
 
         public override void Render(Episode episode, int step)
@@ -535,7 +527,7 @@ namespace NNN
         bool ValidAction(int action, Tensor? state = null)
         {
             state ??= State;
-            return state[action].Value == 0.0;
+            return (action != state.ElementCount - 1) && (state[action].Value == 0.0);
         }
 
         (double reward, bool won) EvaluateAction(int action)
@@ -552,7 +544,7 @@ namespace NNN
                 }
             }
 
-            double ownValue = xTurn ? 1.0 : -1.0;
+            double ownValue = State[9].Value == 1.0 ? 1.0 : -1.0;
             double oppValue = -ownValue;
 
             var advantOrients = orientValues.Where(o => !o.Contains(oppValue));
@@ -606,17 +598,17 @@ namespace NNN
                 int action = playerTurn ? GetPlayerAction() : GetAgentAction(agent);
                 if (action == -1) break;
 
-                State[action].Value = xTurn ? 1.0 : -1.0;
+                State[action].Value = State[9].Value == 1.0 ? 1.0 : -1.0;
 
                 if (CheckWin())
                 {
-                    winner = xTurn ? "X" : "O";
+                    winner = State[9].Value == 1.0 ? "X" : "O";
                     break;
                 }
 
                 done = BoardFilled();
 
-                xTurn = !xTurn;
+                State[9].Value *= -1.0;
                 playerTurn = !playerTurn;
             }
 
@@ -648,20 +640,19 @@ namespace NNN
         {
             state ??= State;
             Tensor batchState = new(1, state.Dimensions[0]);
-            batchState.InsertSubArray(0, GetNormalizedState());
+            batchState.InsertSubArray(0, state);
             return PickAgentAction(agent.Forward(batchState), state);
         }
 
-        bool CheckWin(Tensor? state = null, bool? stateXTurn = null)
+        bool CheckWin(Tensor? state = null)
         {
             state ??= State;
-            stateXTurn ??= xTurn;
-            return WinOrients.Any(o => o.All(p => state[p].Value == (stateXTurn.Value ? 1.0 : -1.0)));
+            return WinOrients.Any(o => o.All(p => state[p].Value == (state[9].Value == 1.0 ? 1.0 : -1.0)));
         }
 
         static void DrawState(Tensor state)
         {
-            for (int i = 0; i < state.ElementCount; i++)
+            for (int i = 0; i < state.ElementCount - 1; i++)
             {
                 if (i % 3 == 0) Console.WriteLine();
 
@@ -691,7 +682,7 @@ namespace NNN
         public override int PickRandomAction()
         {
             List<int> validActions = [];
-            for (int i = 0; i < State.ElementCount; i++)
+            for (int i = 0; i < State.ElementCount - 1; i++)
             {
                 if (State[i].Value == 0.0) validActions.Add(i);
             }
