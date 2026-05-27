@@ -294,7 +294,7 @@ namespace NNN
             throw new NotImplementedException();
         }
 
-        public virtual int PickAgentAction(Tensor qValues)
+        public virtual int PickAgentAction(Tensor qValues, Tensor? state = null)
         {
             throw new NotImplementedException();
         }
@@ -449,7 +449,7 @@ namespace NNN
             Console.Write($"Step: {step}, Action: {(Enum.IsDefined(typeof(Action), action) ? ((Action)action).ToString() : "None")}, Reward: {reward:F3}");
         }
 
-        public override int PickAgentAction(Tensor qValues) => qValues.MaxIndex();
+        public override int PickAgentAction(Tensor qValues, Tensor? state = null) => qValues.MaxIndex();
 
         public override int PickRandomAction() => random.Next(ActionCount);
 
@@ -531,7 +531,11 @@ namespace NNN
             Console.WriteLine($"\n\nPosition Taken: {action}, Reward: {reward}");
         }
 
-        bool ValidAction(int action) => State[action].Value == 0.0;
+        bool ValidAction(int action, Tensor? state = null)
+        {
+            state ??= State;
+            return state[action].Value == 0.0;
+        }
 
         (double reward, bool won) EvaluateAction(int action)
         {
@@ -572,7 +576,11 @@ namespace NNN
             return (reward, won);
         }
 
-        bool BoardFilled() => !State.Data.Any(p => p.Value == 0.0);
+        bool BoardFilled(Tensor? state = null)
+        {
+            state ??= State;
+            return !state.Data.Any(p => p.Value == 0.0);
+        }
 
         public void Play(Model agent)
         {
@@ -626,14 +634,20 @@ namespace NNN
         }
 #pragma warning restore CS8602 // Dereference of a possibly null reference.
 
-        public int GetAgentAction(Model agent)
+        public int GetAgentAction(Model agent, Tensor? state = null)
         {
-            Tensor batchState = new(1, State.Dimensions[0]);
+            state ??= State;
+            Tensor batchState = new(1, state.Dimensions[0]);
             batchState.InsertSubArray(0, GetNormalizedState());
-            return PickAgentAction(agent.Forward(batchState));
+            return PickAgentAction(agent.Forward(batchState), state);
         }
 
-        bool CheckWin() => WinOrients.Any(o => o.All(p => State[p].Value == (xTurn ? 1.0 : -1.0)));
+        bool CheckWin(Tensor? state = null, bool? stateXTurn = null)
+        {
+            state ??= State;
+            stateXTurn ??= xTurn;
+            return WinOrients.Any(o => o.All(p => state[p].Value == (stateXTurn.Value ? 1.0 : -1.0)));
+        }
 
         static void DrawState(Tensor state)
         {
@@ -651,11 +665,12 @@ namespace NNN
             }
         }
 
-        public override int PickAgentAction(Tensor agentQValues)
+        public override int PickAgentAction(Tensor agentQValues, Tensor? state = null)
         {
+            state ??= State;
             var qValues = agentQValues.Copy();
             int action = qValues.MaxIndex();
-            while (!ValidAction(action) && !BoardFilled())
+            while (!ValidAction(action, state) && !BoardFilled(state))
             {
                 qValues.Max().Value = double.MinValue;
                 action = qValues.MaxIndex();
@@ -696,9 +711,9 @@ namespace NNN
             }
         }
 
-        public int GetAgentAction(Model agent);
+        public int GetAgentAction(Model agent, Tensor? state = null);
 
-        public int PickAgentAction(Tensor qValues);
+        public int PickAgentAction(Tensor qValues, Tensor? state = null);
 
         public int PickRandomAction();
 
