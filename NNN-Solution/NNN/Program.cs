@@ -3,7 +3,7 @@
 Model model;
 NNN.Environment env = new TicTacToe();
 double exploration = 1.0;
-double explorationDecay = 0.9995;
+double explorationDecay = 0.999;
 double minExploration = 0.1;
 double discount = 0.99;
 Optimizer optimizer = new Adam(0.001);
@@ -461,7 +461,7 @@ namespace NNN
         static readonly int[][] WinOrients = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
         const double WinRewardBase = 5.0;
         const double BlockRewardBase = 0.0;
-        const double Penalty = -5.0;
+        const double Penalty = 0.0;
 
         public TicTacToe() { }
 
@@ -546,7 +546,7 @@ namespace NNN
             foreach (var orient in advantOrients)
             {
                 int ownPositions = orient.Count(p => p == ownValue);
-                reward += WinRewardBase * ownPositions;
+                reward += ownPositions == 3 ? WinRewardBase : 0.0;
                 won = won || ownPositions == 3;
             }
 
