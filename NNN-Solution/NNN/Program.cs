@@ -41,7 +41,7 @@ void InteractionLoop()
         model = new([
             new Dense(32, new LeakyReLU()),
             new Dense(env.ActionCount, new Linear())
-        ], new Tensor(1, env.StateSize));
+        ], env.StateFormat);
     }
 
     dqnTrainer = new(
@@ -99,7 +99,6 @@ void TestDQNModel()
     env.Reset();
     var state = env.GetNormalizedState();
     Tensor trueState;
-    Tensor batchState = new(1, state.Dimensions[0]);
     bool done = false;
     double totalReward = 0;
     int steps = 0;
@@ -109,8 +108,7 @@ void TestDQNModel()
     {
         steps++;
         trueState = env.GetState();
-        batchState.InsertSubArray(0, state);
-        int action = env.PickAgentAction(model.Forward(batchState));
+        int action = env.PickAgentAction(model.Forward(Tensor.WrapBatch(state)));
         var (reward, nextState, isDone) = env.Step(action, steps);
 
         totalReward += reward;
@@ -266,7 +264,8 @@ namespace NNN
 
     public abstract class Environment
     {
-        public virtual int StateSize => throw new NotImplementedException();
+        public int StateSize => StateFormat.FlatSize;
+        public virtual Tensor StateFormat => throw new NotImplementedException();
         public virtual int ActionCount => throw new NotImplementedException();
 
         public virtual Tensor GetNormalizedState()
@@ -307,7 +306,7 @@ namespace NNN
 
     public class MovementGrid2D : Environment
     {
-        public override int StateSize => 4;
+        public override Tensor StateFormat => new(1, 4);
         public override int ActionCount => 4;
         readonly Random random = new();
         readonly Tensor State = new(4); // current x, current y, target x, target y
@@ -458,7 +457,7 @@ namespace NNN
 
     public class TicTacToe : Environment, ISelfPlay
     {
-        public override int StateSize => 10;
+        public override Tensor StateFormat => new(1, 10);
         public override int ActionCount => 9;
         public bool AgentTurn { get; set; } = true;
         public int OpponentCount { get; set; }
@@ -639,9 +638,7 @@ namespace NNN
         public int GetAgentAction(Model agent, Tensor? state = null)
         {
             state ??= State;
-            Tensor batchState = new(1, state.Dimensions[0]);
-            batchState.InsertSubArray(0, state);
-            return PickAgentAction(agent.Forward(batchState), state);
+            return PickAgentAction(agent.Forward(Tensor.WrapBatch(state)), state);
         }
 
         bool CheckWin(Tensor? state = null)
@@ -952,10 +949,7 @@ namespace NNN
             }
             else
             {
-                Tensor batchState = new(1, state.Dimensions[0]);
-                batchState.InsertSubArray(0, state);
-
-                return Environment.PickAgentAction(Agent.Forward(batchState));
+                return Environment.PickAgentAction(Agent.Forward(Tensor.WrapBatch(state)));
             }
         }
 
@@ -973,10 +967,14 @@ namespace NNN
             if (ReplayBuffer.Count < MinExperiences) return;
 
             var (batch, weights) = ReplayBuffer.GetBatch(BatchSize);
-            int stateSize = batch[0].State.Dimensions[0];
 
-            Tensor currentBatch = new(BatchSize, stateSize);
-            Tensor nextBatch = new(BatchSize, stateSize);
+            var stateDims = batch[0].State.Dimensions;
+            var batchDims = new int[stateDims.Length + 1];
+            batchDims[0] = BatchSize;
+            stateDims.CopyTo(batchDims, 1);
+
+            Tensor currentBatch = new(batchDims);
+            Tensor nextBatch = new(batchDims);
             
             for (int i = 0; i < BatchSize; i++)
             {
@@ -1180,7 +1178,12 @@ namespace NNN
 
         public void SetUpLayers(Tensor inputFormat)
         {
-            int inputs = inputFormat.GetLength(1);
+            int inputs = 1;
+            for (int i = 1; i < inputFormat.Rank; i++)
+            {
+                inputs *= inputFormat.GetLength(i);
+            }
+
             foreach (var layer in Layers)
             {
                 layer.SetUpLayer(inputs);
@@ -1329,7 +1332,8 @@ namespace NNN
 
         public override Tensor Forward(Tensor input)
         {
-            var output = input ^ Weights;
+            var flatInput = input.Rank > 2 ? input.Flatten() : input;
+            var output = flatInput ^ Weights;
             output += Tensor.Broadcast(Biases, output.GetLength(0));
             output = Activation.Forward(output);
             return output;
@@ -1552,6 +1556,7 @@ namespace NNN
 
         public int Rank => Dimensions.Length;
         public int ElementCount => Data.Length;
+        public int FlatSize => ElementCount / Dimensions[0];
 
         public static Tensor operator +(Tensor a, Tensor b)
         {
@@ -1723,6 +1728,18 @@ namespace NNN
             return output;
         }
 
+        public Tensor Flatten()
+        {
+            int batchSize = Dimensions[0];
+            int flatSize = ElementCount / batchSize;
+            Tensor output = new(batchSize, flatSize);
+            for (int i = 0; i < ElementCount; i++)
+            {
+                output[i] = this[i];
+            }
+            return output;
+        }
+
         public Tensor(params int[] dimensions)
         {
             Dimensions = (int[])dimensions.Clone();
@@ -1782,6 +1799,16 @@ namespace NNN
             return output;
         }
 
+        public static Tensor WrapBatch(Tensor state)
+        {
+            var dims = new int[state.Rank + 1];
+            dims[0] = 1;
+            state.Dimensions.CopyTo(dims, 1);
+            Tensor batch = new(dims);
+            batch.InsertSubArray(0, state);
+            return batch;
+        }
+
         public Tensor[] ReduceDimensions()
         {
             var output = new Tensor[Dimensions[0]];
@@ -1813,10 +1840,7 @@ namespace NNN
                 parentIndices = new int[extractIndices.Length + 1];
 
                 parentIndices[0] = firstDimIndex;
-                for (int j = 1; j < parentIndices.Length; j++)
-                {
-                    parentIndices[j] = extractIndices[j - 1];
-                }
+                extractIndices.CopyTo(parentIndices, 1);
 
                 output[extractIndices] = this[parentIndices];
             }
@@ -1835,10 +1859,7 @@ namespace NNN
                 parentIndices = new int[subIndices.Length + 1];
 
                 parentIndices[0] = firstDimIndex;
-                for (int j = 1; j < parentIndices.Length; j++)
-                {
-                    parentIndices[j] = subIndices[j - 1];
-                }
+                subIndices.CopyTo(parentIndices, 1);
 
                 this[parentIndices] = subArray[subIndices];
             }
