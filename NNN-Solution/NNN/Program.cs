@@ -39,7 +39,7 @@ void InteractionLoop()
     else
     {
         model = new([
-            new Dense(64, new LeakyReLU()),
+            new Dense(32, new LeakyReLU()),
             new Dense(env.ActionCount, new Linear())
         ], env.StateFormat);
     }
@@ -708,6 +708,7 @@ namespace NNN
         const double CollisionPenalty = -1.0;
         const double StepPenalty = -0.01;
         const int FrameTime = 100;
+        const int MaxSteps = 10000;
 
         public Snake(int width = 20, int height = 20)
         {
@@ -800,12 +801,15 @@ namespace NNN
                 node = node.Child;
                 state[node.Position.Y, node.Position.X].Value = (node.Child is not null) ? BoardEncoding.Body : BoardEncoding.Tail;
             }
+            state[ApplePosition.Y, ApplePosition.X].Value = BoardEncoding.Apple;
 
             return state;
         }
 
         public override (double reward, Tensor nextState, bool done) Step(int action, int steps)
         {
+            if (steps >= MaxSteps) return (0.0, GetNormalizedState(), true);
+
             double xDiff = ApplePosition.X - SnakeHead.Position.X;
             double yDiff = ApplePosition.Y - SnakeHead.Position.Y;
             double prevDist = Math.Sqrt(Math.Pow(xDiff, 2) + Math.Pow(yDiff, 2));
