@@ -1,7 +1,7 @@
 ﻿using NNN;
 
 Model model;
-NNN.Environment env = new TicTacToe();
+NNN.Environment env = new Snake();
 double exploration = 1.0;
 double explorationDecay = 0.999;
 double minExploration = 0.1;
@@ -126,6 +126,11 @@ void TestDQNModel()
     if (env is TicTacToe ticTacToe && GetInput("Play against model? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
     {
         ticTacToe.Play(model);
+    }
+
+    if (env is Snake snake && GetInput("Watch agent play? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
+    {
+        snake.Play(model);
     }
 }
 
@@ -259,8 +264,8 @@ enum EpisodeNavigation
 namespace NNN
 {
     using System.Diagnostics;
-    using System.Text.Json;
     using System.Linq;
+    using System.Text.Json;
 
     public abstract class Environment
     {
@@ -684,6 +689,352 @@ namespace NNN
                 if (State[i].Value == 0.0) validActions.Add(i);
             }
             return validActions[Random.Next(validActions.Count)];
+        }
+    }
+
+    public class Snake : Environment
+    {
+        public override Tensor StateFormat => new(1, 20, 20, 2);
+        static int MinX => 0;
+        int MaxX => StateFormat.GetLength(2) - 1;
+        static int MinY => 0;
+        int MaxY => StateFormat.GetLength(1) - 1;
+        public override int ActionCount => 3;
+        readonly Random Random = new();
+        SnakeNode SnakeHead = new();
+        Int2 ApplePosition = new();
+        int StepsWithoutApple = 0;
+        const int MaxStepsWithoutApple = 50;
+        const double AppleReward = 1.0;
+        const double DistRewardMult = 0.05;
+        const double TimeoutPenalty = -1.0;
+        const double CollisionPenalty = -1.0;
+        const double StepPenalty = -0.01;
+        const int FrameTime = 100;
+
+        public override Tensor GetNormalizedState()
+        {
+            return GetState();
+        }
+
+        public override Tensor GetState()
+        {
+            Tensor state = new(StateFormat.GetLength(1), StateFormat.GetLength(2), StateFormat.GetLength(3));
+
+            SnakeNode? node = SnakeHead;
+            while (node is not null)
+            {
+                EncodeNode(ref state, node);
+                node = node.Child;
+            }
+
+            state[ApplePosition.Y, ApplePosition.X, 0].Value = BoardEncoding.Apple;
+
+            return state;
+        }
+
+        static void EncodeNode(ref Tensor state, SnakeNode node)
+        {
+            double typeEncoding = node switch
+            {
+                SnakeNode n when n.Parent == null => BoardEncoding.Head,
+                SnakeNode n when n.Child == null => BoardEncoding.Tail,
+                _ => BoardEncoding.Body
+            };
+            state[node.Position.Y, node.Position.X, 0].Value = typeEncoding;
+
+            double dirEncoding = node.Direction switch
+            {
+                (int)Movements.Left => MoveEncoding.Left,
+                (int)Movements.Up => MoveEncoding.Up,
+                (int)Movements.Right => MoveEncoding.Right,
+                (int)Movements.Down => MoveEncoding.Down,
+                _ => throw new ArgumentException("Invalid Direction")
+            };
+            state[node.Position.Y, node.Position.X, 1].Value = dirEncoding;
+        }
+
+        public override void Reset()
+        {
+            StepsWithoutApple = 0;
+            int startX = Random.Next(MinX + 1, MaxX);
+            int startY = Random.Next(MinY + 1, MaxY);
+            int startDir = Random.Next(1, 5);
+
+            SnakeHead = new(x: startX, y: startY) { Direction = startDir };
+
+            GenerateApple();
+        }
+
+        void GenerateApple()
+        {
+            var state = GetBoardState();
+
+            List<int> validPositions = [];
+            for (int i = 0; i < state.ElementCount; i++)
+            {
+                if (state[i].Value == BoardEncoding.Empty) validPositions.Add(i);
+            }
+
+            int linearPos = validPositions[Random.Next(validPositions.Count)];
+            var arrayPos = state.GetFullIndices(linearPos);
+
+            ApplePosition = new(arrayPos[0], arrayPos[1]);
+        }
+
+        Tensor GetBoardState()
+        {
+            Tensor state = new(StateFormat.GetLength(1), StateFormat.GetLength(2));
+
+            SnakeNode node = SnakeHead;
+            state[node.Position.Y, node.Position.X].Value = BoardEncoding.Head;
+            while (node.Child is not null)
+            {
+                node = node.Child;
+                state[node.Position.Y, node.Position.X].Value = (node.Child is not null) ? BoardEncoding.Body : BoardEncoding.Tail;
+            }
+
+            return state;
+        }
+
+        public override (double reward, Tensor nextState, bool done) Step(int action, int steps)
+        {
+            double xDiff = ApplePosition.X - SnakeHead.Position.X;
+            double yDiff = ApplePosition.Y - SnakeHead.Position.Y;
+            double prevDist = Math.Sqrt(Math.Pow(xDiff, 2) + Math.Pow(yDiff, 2));
+
+            int dir = MapAction(action);
+            SnakeHead.Move(dir);
+
+            double reward = StepPenalty;
+            if (AteApple())
+            {
+                reward += AppleReward;
+                StepsWithoutApple = 0;
+                return (reward, GetNormalizedState(), false);
+            }
+            else if (Collided())
+            {
+                reward += CollisionPenalty;
+                return (reward, GetNormalizedState(), true);
+            }
+
+            StepsWithoutApple++;
+            if (StepsWithoutApple >= MaxStepsWithoutApple) return (TimeoutPenalty, GetNormalizedState(), true);
+
+            xDiff = ApplePosition.X - SnakeHead.Position.X;
+            yDiff = ApplePosition.Y - SnakeHead.Position.Y;
+            double newDist = Math.Sqrt(Math.Pow(xDiff, 2) + Math.Pow(yDiff, 2));
+
+            reward += DistRewardMult * (prevDist - newDist);
+
+            return (reward, GetNormalizedState(), false);
+        }
+
+        int MapAction(int action)
+        {
+            return action switch
+            {
+                (int)Actions.Forward => SnakeHead.Direction,
+                (int)Actions.Left => (SnakeHead.Direction + 3) % 4,
+                (int)Actions.Right => (SnakeHead.Direction + 1) % 4,
+                _ => throw new ArgumentException("Invalid Action")
+            };
+        }
+
+        bool AteApple()
+        {
+            if (SnakeHead.Position == ApplePosition)
+            {
+                SnakeHead.Grow();
+                GenerateApple();
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        bool Collided()
+        {
+            return HitWall() || HitBody();
+        }
+
+        bool HitWall()
+        {
+            return SnakeHead.Position.X < MinX || SnakeHead.Position.X > MaxX || SnakeHead.Position.Y < MinY || SnakeHead.Position.Y > MaxY;
+        }
+
+        bool HitBody()
+        {
+            SnakeNode? node = SnakeHead.Child;
+            while (node is not null)
+            {
+                if (SnakeHead.Position == node.Position) return true;
+                node = node.Child;
+            }
+            return false;
+        }
+
+        public override int PickAgentAction(Tensor qValues, Tensor? state = null) => qValues.MaxIndex();
+
+        public override int PickRandomAction() => Random.Next(ActionCount);
+
+        public override void Render(Episode episode, int step)
+        {
+            step = Math.Clamp(step, 0, episode.Experiences.Count);
+            var exp = step == episode.Experiences.Count ? episode.Experiences[step - 1] : episode.Experiences[step];
+            var state = step == episode.Experiences.Count ? exp.NextState : exp.State;
+            (int action, double reward) = step > 0 ? (episode.Experiences[step - 1].Action, episode.Experiences[step - 1].Reward) : (-1, 0);
+            string dirMoved = action switch
+            {
+                (int)Actions.Forward => "Forward",
+                (int)Actions.Left => "Left",
+                (int)Actions.Right => "Right",
+                _ => "Invalid Action Made"
+            };
+
+            DrawState(state);
+
+            Console.WriteLine($"\nDirection Moved: {dirMoved}, Reward: {reward}");
+        }
+
+        static void DrawState(Tensor state)
+        {
+            int rowMax = state.GetLength(0);
+            int colMax = state.GetLength(1);
+            for (int row = -1; row <= rowMax; row++)
+            {
+                for (int col = -1; col <= colMax; col++)
+                {
+                    bool rowEdge = row == -1 || row == rowMax;
+                    bool colEdge = col == -1 || col == colMax;
+
+                    if (rowEdge && colEdge) Console.Write("+");
+                    else if (rowEdge) Console.Write("-");
+                    else if (colEdge) Console.Write("|");
+                    else
+                    {
+                        string chara = state[row, col, 0].Value switch
+                        {
+                            BoardEncoding.Head => "H",
+                            BoardEncoding.Body => "B",
+                            BoardEncoding.Tail => "T",
+                            BoardEncoding.Apple => "A",
+                            _ => " "
+                        };
+
+                        Console.Write(chara);
+                    }
+                }
+
+                Console.Write("\n");
+            }
+        }
+
+        public void Play(Model agent)
+        {
+            Reset();
+
+            while (!Collided())
+            {
+                Console.Clear();
+                int action = PickAgentAction(agent.Forward(Tensor.WrapBatch(GetNormalizedState())));
+                SnakeHead.Move(MapAction(action));
+
+                if (Collided()) break;
+
+                AteApple();
+
+                DrawState(GetNormalizedState());
+                Thread.Sleep(FrameTime);
+            }
+
+            Console.WriteLine("\nAgent collided!");
+        }
+
+        class SnakeNode(SnakeNode? parent = null, int x = 0, int y = 0)
+        {
+            public SnakeNode? Parent { get; } = parent;
+            public int Direction { get; set; }
+            public Int2 Position { get; set; } = new(x, y);
+            Int2 PrevPosition { get; set; } = new();
+            public SnakeNode? Child { get; private set; } = null;
+
+            public void Move(int dir)
+            {
+                PrevPosition = Position;
+
+                Position = dir switch
+                {
+                    (int)Movements.Left => new(Position.X - 1, Position.Y),
+                    (int)Movements.Up => new(Position.X, Position.Y - 1),
+                    (int)Movements.Right => new(Position.X + 1, Position.Y),
+                    (int)Movements.Down => new(Position.X, Position.Y + 1),
+                    _ => throw new ArgumentException("Invalid Movement")
+                };
+
+                Child?.Move(Direction);
+
+                Direction = dir;
+            }
+
+            public void Grow()
+            {
+                if (Child is not null)
+                {
+                    Child.Grow();
+                }
+                else
+                {
+                    Child = new(this, PrevPosition.X, PrevPosition.Y);
+                }
+            }
+        }
+
+        struct Int2(int x = 0, int y = 0)
+        {
+            public int X { get; set; } = x;
+            public int Y { get; set; } = y;
+
+            public static bool operator ==(Int2 a, Int2 b)
+            {
+                return a.X == b.X && a.Y == b.Y;
+            }
+
+            public static bool operator !=(Int2 a, Int2 b)
+            {
+                return !(a == b);
+            }
+
+            public override readonly bool Equals(object? obj) => obj is Int2 other && Equals(other);
+
+            public readonly bool Equals(Int2 other) => this == other;
+
+            public override readonly int GetHashCode() => HashCode.Combine(X, Y);
+        }
+
+        enum Actions { Left, Forward, Right }
+
+        enum Movements { Left, Up, Right, Down }
+
+        struct BoardEncoding
+        {
+            public const double Empty = 0.0;
+            public const double Body = 1.0;
+            public const double Tail = 2.0;
+            public const double Apple = 3.0;
+            public const double Head = 4.0;
+        }
+
+        struct MoveEncoding
+        {
+            public const double Nothing = 0.0;
+            public const double Left = 1.0;
+            public const double Up = 2.0;
+            public const double Right = 3.0;
+            public const double Down = 4.0;
         }
     }
 
