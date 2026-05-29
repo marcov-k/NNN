@@ -943,6 +943,7 @@ namespace NNN
         {
             Reset();
 
+            int stepsWithoutApple = 0;
             while (!Collided())
             {
                 Console.Clear();
@@ -951,13 +952,17 @@ namespace NNN
 
                 if (Collided()) break;
 
-                AteApple();
+                if (AteApple()) stepsWithoutApple = 0;
+                else stepsWithoutApple++;
 
                 DrawSnake();
+
+                if (stepsWithoutApple >= MaxStepsWithoutApple) break;
+
                 Thread.Sleep(FrameTime);
             }
 
-            Console.WriteLine("\nAgent collided!");
+            Console.WriteLine("\nAgent collided or timed out!");
         }
 
         class SnakeNode(SnakeNode? parent = null, int x = 0, int y = 0)
