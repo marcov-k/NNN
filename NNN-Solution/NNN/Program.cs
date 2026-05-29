@@ -8,14 +8,14 @@ double minExploration = 0.1;
 double discount = 0.99;
 Optimizer optimizer = new Adam(0.001);
 Cost cost = new Huber();
-int replayBufferSize = 5000;
+int replayBufferSize = 20000;
 int batchSize = 64;
 int agentBufferSize = 3;
 int opponentCopyRate = 50;
 int minRandomOpponentEpisodes = 100;
 double tau = 0.005;
 double maxGradNorm = 1.0;
-int minExperiences = 100;
+int minExperiences = 2000;
 int episodeMemorySize = 100;
 DQNTrainer dqnTrainer;
 FIFOBuffer<Episode> episodeBuffer = new(episodeMemorySize);
@@ -39,8 +39,8 @@ void InteractionLoop()
     else
     {
         model = new([
-            new Dense(256, new LeakyReLU()),
-            new Dense(128, new LeakyReLU()),
+            new Dense(64, new LeakyReLU()),
+            new Dense(32, new LeakyReLU()),
             new Dense(env.ActionCount, new Linear())
         ], env.StateFormat);
     }
