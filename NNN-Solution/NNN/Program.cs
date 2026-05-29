@@ -694,7 +694,7 @@ namespace NNN
 
     public class Snake : Environment
     {
-        public override Tensor StateFormat => new(1, 6); // x dist to apple, y dist to apple, snakehead dir, dist to obstacle forward, dist to obstacle left, dist to obstacle right
+        public override Tensor StateFormat => new(1, 7); // x apple dist, y apple dist, dir, obst dist f, obst dist l, obst dist r, reachable pos
         Int2 GridDims;
         public override int ActionCount => 3;
         readonly Random Random = new();
@@ -702,8 +702,8 @@ namespace NNN
         Int2 ApplePosition = new();
         int StepsWithoutApple = 0;
         const int MaxStepsWithoutApple = 50;
-        const double AppleReward = 1.0;
-        const double DistRewardMult = 0.05;
+        const double AppleReward = 2.0;
+        const double DistRewardMult = 0.2;
         const double TimeoutPenalty = -1.0;
         const double CollisionPenalty = -1.0;
         const double StepPenalty = -0.01;
@@ -727,6 +727,7 @@ namespace NNN
             state[3].Value /= maxDim;
             state[4].Value /= maxDim;
             state[5].Value /= maxDim;
+            state[6].Value /= GridDims.X * GridDims.Y;
 
             return state;
         }
@@ -743,6 +744,7 @@ namespace NNN
             state[3].Value = NearestObstacle(SnakeHead.Direction);
             state[4].Value = NearestObstacle((SnakeHead.Direction + 3) % 4);
             state[5].Value = NearestObstacle((SnakeHead.Direction + 1) % 4);
+            state[6].Value = ReachablePositions(SnakeHead.Position, BlockedCells());
 
             return state;
         }
@@ -772,6 +774,55 @@ namespace NNN
 
             return steps;
         }
+
+        int ReachablePositions(Int2 from, HashSet<Int2> blocked)
+        {
+            HashSet<Int2> visited = [];
+            Queue<Int2> queue = [];
+
+            queue.Enqueue(from);
+            while (queue.Count > 0)
+            {
+                var pos = queue.Dequeue();
+                if (!visited.Add(pos)) continue;
+                foreach (var neighbor in GetNeighbors(pos))
+                {
+                    if (!blocked.Contains(neighbor)) queue.Enqueue(neighbor);
+                }
+            }
+
+            return visited.Count;
+        }
+
+        HashSet<Int2> BlockedCells()
+        {
+            HashSet<Int2> blocked = [];
+
+            SnakeNode? node = SnakeHead.Child;
+            while (node is not null)
+            {
+                if (node.Child is not null) blocked.Add(node.Position);
+                else break;
+
+                node = node.Child;
+            }
+
+            return blocked;
+        }
+
+        List<Int2> GetNeighbors(Int2 pos)
+        {
+            List<Int2> neighbors = [ new(pos.X - 1, pos.Y), new(pos.X, pos.Y - 1), new(pos.X + 1, pos.Y), new(pos.X, pos.Y + 1) ];
+
+            foreach (var neighbor in neighbors.ToList())
+            {
+                if (!ValidPosition(neighbor)) neighbors.Remove(neighbor);
+            }
+
+            return neighbors;
+        }
+
+        bool ValidPosition(Int2 pos) => pos.X >= 0 && pos.X < GridDims.X && pos.Y >= 0 && pos.Y < GridDims.Y;
 
         public override void Reset()
         {
