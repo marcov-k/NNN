@@ -739,8 +739,10 @@ namespace NNN
             return state;
         }
 
-        static void EncodeNode(ref Tensor state, SnakeNode node)
+        void EncodeNode(ref Tensor state, SnakeNode node)
         {
+            if (node.Position.X < MinX || node.Position.X > MaxX || node.Position.Y < MinY || node.Position.Y > MaxY) return;
+
             double typeEncoding = node switch
             {
                 SnakeNode n when n.Parent == null => BoardEncoding.Head,
