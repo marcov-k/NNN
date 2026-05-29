@@ -695,11 +695,8 @@ namespace NNN
 
     public class Snake : Environment
     {
-        public override Tensor StateFormat => new(1, 20, 20, 2);
-        static int MinX => 0;
-        int MaxX => StateFormat.GetLength(2) - 1;
-        static int MinY => 0;
-        int MaxY => StateFormat.GetLength(1) - 1;
+        public override Tensor StateFormat => new(1, 6); // x dist to apple, y dist to apple, snakehead dir, dist to obstacle forward, dist to obstacle left, dist to obstacle right
+        Int2 GridDims;
         public override int ActionCount => 3;
         readonly Random Random = new();
         SnakeNode SnakeHead = new();
@@ -713,8 +710,9 @@ namespace NNN
         const double StepPenalty = -0.01;
         const int FrameTime = 100;
 
-        public Snake()
+        public Snake(int width = 20, int height = 20)
         {
+            GridDims = new(width, height);
             Reset();
         }
 
@@ -725,48 +723,50 @@ namespace NNN
 
         public override Tensor GetState()
         {
-            Tensor state = new(StateFormat.GetLength(1), StateFormat.GetLength(2), StateFormat.GetLength(3));
+            Tensor state = new(StateFormat.GetLength(1));
 
-            SnakeNode? node = SnakeHead;
-            while (node is not null)
-            {
-                EncodeNode(ref state, node);
-                node = node.Child;
-            }
+            state[0].Value = ApplePosition.X - SnakeHead.Position.X;
+            state[1].Value = ApplePosition.Y - SnakeHead.Position.Y;
 
-            state[ApplePosition.Y, ApplePosition.X, 0].Value = BoardEncoding.Apple;
+            state[2].Value = SnakeHead.Direction;
+
+            state[3].Value = NearestObstacle(SnakeHead.Direction);
+            state[4].Value = NearestObstacle((SnakeHead.Direction + 3) % 4);
+            state[5].Value = NearestObstacle((SnakeHead.Direction + 1) % 4);
 
             return state;
         }
 
-        void EncodeNode(ref Tensor state, SnakeNode node)
+        int NearestObstacle(int dir)
         {
-            if (node.Position.X < MinX || node.Position.X > MaxX || node.Position.Y < MinY || node.Position.Y > MaxY) return;
-
-            double typeEncoding = node switch
+            List<Int2> filledPositions = [];
+            SnakeNode? node = SnakeHead;
+            while (node is not null)
             {
-                SnakeNode n when n.Parent == null => BoardEncoding.Head,
-                SnakeNode n when n.Child == null => BoardEncoding.Tail,
-                _ => BoardEncoding.Body
-            };
-            state[node.Position.Y, node.Position.X, 0].Value = typeEncoding;
+                filledPositions.Add(node.Position);
+                node = node.Child;
+            }
 
-            double dirEncoding = node.Direction switch
+            int steps = 0;
+            bool xDir = dir % 2 == 0;
+            bool posDir = dir >= 2;
+            int pos = xDir ? SnakeHead.Position.X : SnakeHead.Position.Y;
+            bool hit = false;
+            while (!hit)
             {
-                (int)Movements.Left => MoveEncoding.Left,
-                (int)Movements.Up => MoveEncoding.Up,
-                (int)Movements.Right => MoveEncoding.Right,
-                (int)Movements.Down => MoveEncoding.Down,
-                _ => throw new ArgumentException("Invalid Direction")
-            };
-            state[node.Position.Y, node.Position.X, 1].Value = dirEncoding;
+                steps++;
+                pos += posDir ? 1 : -1;
+                hit = pos < 0 || pos >= (xDir ? GridDims.X : GridDims.Y) || filledPositions.Any(p => xDir ? p.X == pos : p.Y == pos);
+            }
+
+            return steps;
         }
 
         public override void Reset()
         {
             StepsWithoutApple = 0;
-            int startX = Random.Next(MinX + 1, MaxX);
-            int startY = Random.Next(MinY + 1, MaxY);
+            int startX = Random.Next(0, GridDims.X);
+            int startY = Random.Next(0, GridDims.Y);
             int startDir = Random.Next(0, 4);
 
             SnakeHead = new(x: startX, y: startY) { Direction = startDir };
@@ -792,7 +792,7 @@ namespace NNN
 
         Tensor GetBoardState()
         {
-            Tensor state = new(StateFormat.GetLength(1), StateFormat.GetLength(2));
+            Tensor state = new(GridDims.Y, GridDims.X);
 
             SnakeNode node = SnakeHead;
             state[node.Position.Y, node.Position.X].Value = BoardEncoding.Head;
@@ -873,7 +873,7 @@ namespace NNN
 
         bool HitWall()
         {
-            return SnakeHead.Position.X < MinX || SnakeHead.Position.X > MaxX || SnakeHead.Position.Y < MinY || SnakeHead.Position.Y > MaxY;
+            return SnakeHead.Position.X < 0 || SnakeHead.Position.X >= GridDims.X || SnakeHead.Position.Y < 0 || SnakeHead.Position.Y >= GridDims.Y;
         }
 
         bool HitBody()
@@ -894,8 +894,6 @@ namespace NNN
         public override void Render(Episode episode, int step)
         {
             step = Math.Clamp(step, 0, episode.Experiences.Count);
-            var exp = step == episode.Experiences.Count ? episode.Experiences[step - 1] : episode.Experiences[step];
-            var state = step == episode.Experiences.Count ? exp.NextState : exp.State;
             (int action, double reward) = step > 0 ? (episode.Experiences[step - 1].Action, episode.Experiences[step - 1].Reward) : (-1, 0);
             string dirMoved = action switch
             {
@@ -905,28 +903,24 @@ namespace NNN
                 _ => "Invalid Action Made"
             };
 
-            DrawState(state);
-
-            Console.WriteLine($"\nDirection Moved: {dirMoved}, Reward: {reward}");
+            Console.WriteLine($"\nDirection Moved: {dirMoved}, Step: {step}, Reward: {reward}");
         }
 
-        static void DrawState(Tensor state)
+        void DrawSnake()
         {
-            int rowMax = state.GetLength(0);
-            int colMax = state.GetLength(1);
-            for (int row = -1; row <= rowMax; row++)
+            var state = GetBoardState();
+            for (int row = -1; row <= GridDims.Y; row++)
             {
-                for (int col = -1; col <= colMax; col++)
+                for (int col = -1; col <= GridDims.X; col++)
                 {
-                    bool rowEdge = row == -1 || row == rowMax;
-                    bool colEdge = col == -1 || col == colMax;
-
+                    bool rowEdge = row == -1 || row == GridDims.Y;
+                    bool colEdge = col == -1 || col == GridDims.X;
                     if (rowEdge && colEdge) Console.Write("+");
                     else if (rowEdge) Console.Write("-");
                     else if (colEdge) Console.Write("|");
                     else
                     {
-                        string chara = state[row, col, 0].Value switch
+                        string fill = state[row, col].Value switch
                         {
                             BoardEncoding.Head => "H",
                             BoardEncoding.Body => "B",
@@ -934,8 +928,7 @@ namespace NNN
                             BoardEncoding.Apple => "A",
                             _ => " "
                         };
-
-                        Console.Write(chara);
+                        Console.Write(fill);
                     }
                 }
 
@@ -957,7 +950,7 @@ namespace NNN
 
                 AteApple();
 
-                DrawState(GetNormalizedState());
+                DrawSnake();
                 Thread.Sleep(FrameTime);
             }
 
@@ -1032,19 +1025,10 @@ namespace NNN
         struct BoardEncoding
         {
             public const double Empty = 0.0;
-            public const double Body = 1.0;
-            public const double Tail = 2.0;
-            public const double Apple = 3.0;
-            public const double Head = 4.0;
-        }
-
-        struct MoveEncoding
-        {
-            public const double Nothing = 0.0;
-            public const double Left = 1.0;
-            public const double Up = 2.0;
-            public const double Right = 3.0;
-            public const double Down = 4.0;
+            public const double Head = 1.0;
+            public const double Body = 2.0;
+            public const double Tail = 3.0;
+            public const double Apple = 4.0;
         }
     }
 
