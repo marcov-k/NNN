@@ -718,7 +718,17 @@ namespace NNN
 
         public override Tensor GetNormalizedState()
         {
-            return GetState();
+            var state = GetState();
+
+            double maxDim = Math.Max(GridDims.X, GridDims.Y);
+
+            state[0].Value /= GridDims.X;
+            state[1].Value /= GridDims.Y;
+            state[3].Value /= maxDim;
+            state[4].Value /= maxDim;
+            state[5].Value /= maxDim;
+
+            return state;
         }
 
         public override Tensor GetState()
@@ -756,7 +766,8 @@ namespace NNN
             {
                 steps++;
                 pos += posDir ? 1 : -1;
-                hit = pos < 0 || pos >= (xDir ? GridDims.X : GridDims.Y) || filledPositions.Any(p => xDir ? p.X == pos : p.Y == pos);
+                hit = pos < 0 || pos >= (xDir ? GridDims.X : GridDims.Y) ||
+                    filledPositions.Any(p => xDir ? (p.X == pos && p.Y == SnakeHead.Position.Y) : (p.X == SnakeHead.Position.X && p.Y == pos));
             }
 
             return steps;
