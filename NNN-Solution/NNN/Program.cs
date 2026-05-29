@@ -713,6 +713,11 @@ namespace NNN
         const double StepPenalty = -0.01;
         const int FrameTime = 100;
 
+        public Snake()
+        {
+            Reset();
+        }
+
         public override Tensor GetNormalizedState()
         {
             return GetState();
@@ -760,7 +765,7 @@ namespace NNN
             StepsWithoutApple = 0;
             int startX = Random.Next(MinX + 1, MaxX);
             int startY = Random.Next(MinY + 1, MaxY);
-            int startDir = Random.Next(1, 5);
+            int startDir = Random.Next(0, 4);
 
             SnakeHead = new(x: startX, y: startY) { Direction = startDir };
 
@@ -804,6 +809,8 @@ namespace NNN
             double yDiff = ApplePosition.Y - SnakeHead.Position.Y;
             double prevDist = Math.Sqrt(Math.Pow(xDiff, 2) + Math.Pow(yDiff, 2));
 
+            var prevState = GetNormalizedState();
+
             int dir = MapAction(action);
             SnakeHead.Move(dir);
 
@@ -817,7 +824,7 @@ namespace NNN
             else if (Collided())
             {
                 reward += CollisionPenalty;
-                return (reward, GetNormalizedState(), true);
+                return (reward, prevState, true);
             }
 
             StepsWithoutApple++;
