@@ -39,7 +39,8 @@ void InteractionLoop()
     else
     {
         model = new([
-            new Dense(32, new LeakyReLU()),
+            new Dense(256, new LeakyReLU()),
+            new Dense(128, new LeakyReLU()),
             new Dense(env.ActionCount, new Linear())
         ], env.StateFormat);
     }
