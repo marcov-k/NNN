@@ -1,21 +1,21 @@
 ﻿using NNN;
 
 Model model;
-NNN.Environment env = new Snake();
+NNN.Environment env = new TicTacToe();
 double exploration = 1.0;
 double explorationDecay = 0.999;
 double minExploration = 0.1;
 double discount = 0.99;
 Optimizer optimizer = new Adam(0.001);
 Cost cost = new Huber();
-int replayBufferSize = 20000;
+int replayBufferSize = 5000;
 int batchSize = 64;
 int agentBufferSize = 3;
 int opponentCopyRate = 50;
 int minRandomOpponentEpisodes = 100;
 double tau = 0.005;
 double maxGradNorm = 1.0;
-int minExperiences = 2000;
+int minExperiences = 100;
 int episodeMemorySize = 100;
 DQNTrainer dqnTrainer;
 FIFOBuffer<Episode> episodeBuffer = new(episodeMemorySize);
@@ -269,7 +269,7 @@ namespace NNN
 
     public abstract class Environment
     {
-        public int StateSize => StateFormat.FlatSize;
+        public int StateSize => StateFormat.ElementCount;
         public virtual Tensor StateFormat => throw new NotImplementedException();
         public virtual int ActionCount => throw new NotImplementedException();
 
@@ -311,10 +311,10 @@ namespace NNN
 
     public class MovementGrid2D : Environment
     {
-        public override Tensor StateFormat => new(1, 4);
+        public override Tensor StateFormat => new([1, 4]);
         public override int ActionCount => 4;
         readonly Random random = new();
-        readonly Tensor State = new(4); // current x, current y, target x, target y
+        readonly Tensor State = new([4]); // current x, current y, target x, target y
         readonly int[] Bounds; // xMin, xMax, yMin, yMax
         readonly int MaxSteps;
         readonly double XRange;
@@ -322,10 +322,10 @@ namespace NNN
 
         public MovementGrid2D(int xMin, int xMax, int yMin, int yMax, int maxSteps = 50)
         {
-            State[0] = new(random.Next(xMin, xMax + 1));
-            State[1] = new(random.Next(yMin, yMax + 1));
-            State[2] = new(random.Next(xMin, xMax + 1));
-            State[3] = new(random.Next(yMin, yMax + 1));
+            State[0] = random.Next(xMin, xMax + 1);
+            State[1] = random.Next(yMin, yMax + 1);
+            State[2] = random.Next(xMin, xMax + 1);
+            State[3] = random.Next(yMin, yMax + 1);
             Bounds = [xMin, xMax, yMin, yMax];
             XRange = xMax - xMin;
             YRange = yMax - yMin;
@@ -334,16 +334,16 @@ namespace NNN
 
         public override Tensor GetNormalizedState()
         {
-            Tensor normalized = new(4);
+            Tensor normalized = new([4]);
 
-            double xPos = State[0].Value / (XRange / 2.0);
-            double yPos = State[1].Value / (YRange / 2.0);
+            double xPos = State[0] / (XRange / 2.0);
+            double yPos = State[1] / (YRange / 2.0);
 
-            double xTarget = State[2].Value / (XRange / 2.0);
-            double yTarget = State[3].Value / (YRange / 2.0);
+            double xTarget = State[2] / (XRange / 2.0);
+            double yTarget = State[3] / (YRange / 2.0);
 
             (normalized[0], normalized[1], normalized[2], normalized[3]) =
-                (new(xPos), new(yPos), new(xTarget), new(yTarget));
+                (xPos, yPos, xTarget, yTarget);
 
             return normalized;
         }
@@ -355,34 +355,34 @@ namespace NNN
 
         public override (double reward, Tensor nextState, bool done) Step(int action, int steps)
         {
-            double xDiff = State[2].Value - State[0].Value;
-            double yDiff = State[3].Value - State[1].Value;
+            double xDiff = State[2] - State[0];
+            double yDiff = State[3] - State[1];
             double prevDist = Math.Sqrt(Math.Pow(xDiff, 2.0) + Math.Pow(yDiff, 2.0));
 
             switch (action)
             {
                 case (int)Action.Left: // left
-                    State[0].Value--;
+                    State[0]--;
                     break;
                 case (int)Action.Right: // right
-                    State[0].Value++;
+                    State[0]++;
                     break;
                 case (int)Action.Up: // up
-                    State[1].Value++;
+                    State[1]++;
                     break;
                 case (int)Action.Down: // down
-                    State[1].Value--;
+                    State[1]--;
                     break;
             }
 
-            xDiff = State[2].Value - State[0].Value;
-            yDiff = State[3].Value - State[1].Value;
+            xDiff = State[2] - State[0];
+            yDiff = State[3] - State[1];
             double newDist = Math.Sqrt(Math.Pow(xDiff, 2.0) + Math.Pow(yDiff, 2.0));
             double deltaDist = prevDist - newDist;
 
-            bool reachedTarget = (State[0].Value == State[2].Value && State[1].Value == State[3].Value);
-            bool outOfBounds = (State[0].Value < Bounds[0]) || (State[0].Value > Bounds[1]) ||
-                               (State[1].Value < Bounds[2]) || (State[1].Value > Bounds[3]);
+            bool reachedTarget = (State[0] == State[2] && State[1] == State[3]);
+            bool outOfBounds = (State[0] < Bounds[0]) || (State[0] > Bounds[1]) ||
+                               (State[1] < Bounds[2]) || (State[1] > Bounds[3]);
             bool outOfSteps = steps >= MaxSteps && !reachedTarget;
 
             bool done = reachedTarget || outOfBounds || outOfSteps;
@@ -397,10 +397,10 @@ namespace NNN
 
         public override void Reset()
         {
-            State[0] = new(random.Next(Bounds[0], Bounds[1] + 1));
-            State[1] = new(random.Next(Bounds[2], Bounds[3] + 1));
-            State[2] = new(random.Next(Bounds[0], Bounds[1] + 1));
-            State[3] = new(random.Next(Bounds[2], Bounds[3] + 1));
+            State[0] = random.Next(Bounds[0], Bounds[1] + 1);
+            State[1] = random.Next(Bounds[2], Bounds[3] + 1);
+            State[2] = random.Next(Bounds[0], Bounds[1] + 1);
+            State[3] = random.Next(Bounds[2], Bounds[3] + 1);
         }
 
         public override void Render(Episode episode, int step)
@@ -434,11 +434,11 @@ namespace NNN
                         continue;
                     }
 
-                    if (x == state[0].Value && y == state[1].Value)
+                    if (x == state[0] && y == state[1])
                     {
                         Console.Write("A");
                     }
-                    else if (x == state[2].Value && y == state[3].Value)
+                    else if (x == state[2] && y == state[3])
                     {
                         Console.Write("T");
                     }
@@ -453,7 +453,7 @@ namespace NNN
             Console.Write($"Step: {step}, Action: {(Enum.IsDefined(typeof(Action), action) ? ((Action)action).ToString() : "None")}, Reward: {reward:F3}");
         }
 
-        public override int PickAgentAction(Tensor qValues, Tensor? state = null) => qValues.MaxIndex();
+        public override int PickAgentAction(Tensor qValues, Tensor? state = null) => Tensor.ArgMax(qValues);
 
         public override int PickRandomAction() => random.Next(ActionCount);
 
@@ -462,12 +462,12 @@ namespace NNN
 
     public class TicTacToe : Environment, ISelfPlay
     {
-        public override Tensor StateFormat => new(1, 10);
+        public override Tensor StateFormat => new([1, 10]);
         public override int ActionCount => 9;
         public bool AgentTurn { get; set; } = true;
         public int OpponentCount { get; set; }
         public int OpponentIndex { get; set; }
-        public Tensor State { get; init; } = new(10);
+        public Tensor State { get; init; } = new([10]);
         readonly int MaxSteps = 9;
         public Random Random { get; init; } = new();
         static readonly int[][] WinOrients = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
@@ -492,10 +492,10 @@ namespace NNN
         {
             if (!ValidAction(action)) throw new ArgumentException("Invalid Action");
 
-            State[action] = new(State[9].Value == 1.0 ? 1.0 : -1.0);
+            State[action] = State[9] == 1.0 ? 1.0 : -1.0;
             var (reward, done) = EvaluateAction(action);
             AgentTurn = !AgentTurn;
-            State[9].Value *= -1.0;
+            State[9] *= -1.0;
 
             var nextState = GetNormalizedState();
 
@@ -511,9 +511,9 @@ namespace NNN
 
             for (int i = 0; i < State.ElementCount - 1; i++)
             {
-                State[i].Value = 0.0;
+                State[i] = 0.0;
             }
-            State[9].Value = 1.0;
+            State[9] = 1.0;
         }
 
         public override void Render(Episode episode, int step)
@@ -531,7 +531,7 @@ namespace NNN
         bool ValidAction(int action, Tensor? state = null)
         {
             state ??= State;
-            return (action != state.ElementCount - 1) && (state[action].Value == 0.0);
+            return (action != state.ElementCount - 1) && (state[action] == 0.0);
         }
 
         (double reward, bool won) EvaluateAction(int action)
@@ -544,11 +544,11 @@ namespace NNN
                 orientValues[orient] = new double[relevantOrients[orient].Length];
                 for (int pos = 0; pos < relevantOrients[orient].Length; pos++)
                 {
-                    orientValues[orient][pos] = State[relevantOrients[orient][pos]].Value;
+                    orientValues[orient][pos] = State[relevantOrients[orient][pos]];
                 }
             }
 
-            double ownValue = State[9].Value == 1.0 ? 1.0 : -1.0;
+            double ownValue = State[9] == 1.0 ? 1.0 : -1.0;
             double oppValue = -ownValue;
 
             var advantOrients = orientValues.Where(o => !o.Contains(oppValue));
@@ -585,7 +585,7 @@ namespace NNN
         bool BoardFilled(Tensor? state = null)
         {
             state ??= State;
-            return !state.Data.Any(p => p.Value == 0.0);
+            return !state.Data.Any(p => p == 0.0);
         }
 
         public void Play(Model agent)
@@ -602,17 +602,17 @@ namespace NNN
                 int action = playerTurn ? GetPlayerAction() : GetAgentAction(agent);
                 if (action == -1) break;
 
-                State[action].Value = State[9].Value == 1.0 ? 1.0 : -1.0;
+                State[action] = State[9] == 1.0 ? 1.0 : -1.0;
 
                 if (CheckWin())
                 {
-                    winner = State[9].Value == 1.0 ? "X" : "O";
+                    winner = State[9] == 1.0 ? "X" : "O";
                     break;
                 }
 
                 done = BoardFilled();
 
-                State[9].Value *= -1.0;
+                State[9] *= -1.0;
                 playerTurn = !playerTurn;
             }
 
@@ -649,7 +649,7 @@ namespace NNN
         bool CheckWin(Tensor? state = null)
         {
             state ??= State;
-            return WinOrients.Any(o => o.All(p => state[p].Value == (state[9].Value == 1.0 ? 1.0 : -1.0)));
+            return WinOrients.Any(o => o.All(p => state[p] == (state[9] == 1.0 ? 1.0 : -1.0)));
         }
 
         static void DrawState(Tensor state)
@@ -658,7 +658,7 @@ namespace NNN
             {
                 if (i % 3 == 0) Console.WriteLine();
 
-                string fill = state[i].Value switch
+                string fill = state[i] switch
                 {
                     1.0 => " X ",
                     -1.0 => " O ",
@@ -672,11 +672,11 @@ namespace NNN
         {
             state ??= State;
             var qValues = agentQValues.Copy();
-            int action = qValues.MaxIndex();
+            int action = Tensor.ArgMax(qValues);
             while (!ValidAction(action, state) && !BoardFilled(state))
             {
-                qValues.Max().Value = double.MinValue;
-                action = qValues.MaxIndex();
+                qValues[action] = double.MinValue;
+                action = Tensor.ArgMax(qValues);
             }
             return action;
         }
@@ -686,7 +686,7 @@ namespace NNN
             List<int> validActions = [];
             for (int i = 0; i < State.ElementCount - 1; i++)
             {
-                if (State[i].Value == 0.0) validActions.Add(i);
+                if (State[i] == 0.0) validActions.Add(i);
             }
             return validActions[Random.Next(validActions.Count)];
         }
@@ -694,7 +694,7 @@ namespace NNN
 
     public class Snake : Environment
     {
-        public override Tensor StateFormat => new(1, 7); // x apple dist, y apple dist, dir, obst dist f, obst dist l, obst dist r, reachable pos
+        public override Tensor StateFormat => new([1, 7]); // x apple dist, y apple dist, dir, obst dist f, obst dist l, obst dist r, reachable pos
         Int2 GridDims;
         public override int ActionCount => 3;
         readonly Random Random = new();
@@ -722,29 +722,29 @@ namespace NNN
 
             double maxDim = Math.Max(GridDims.X, GridDims.Y);
 
-            state[0].Value /= GridDims.X;
-            state[1].Value /= GridDims.Y;
-            state[3].Value /= maxDim;
-            state[4].Value /= maxDim;
-            state[5].Value /= maxDim;
-            state[6].Value /= GridDims.X * GridDims.Y;
+            state[0] /= GridDims.X;
+            state[1] /= GridDims.Y;
+            state[3] /= maxDim;
+            state[4] /= maxDim;
+            state[5] /= maxDim;
+            state[6] /= GridDims.X * GridDims.Y;
 
             return state;
         }
 
         public override Tensor GetState()
         {
-            Tensor state = new(StateFormat.GetLength(1));
+            Tensor state = new([StateFormat.Dimensions[1]]);
 
-            state[0].Value = ApplePosition.X - SnakeHead.Position.X;
-            state[1].Value = ApplePosition.Y - SnakeHead.Position.Y;
+            state[0] = ApplePosition.X - SnakeHead.Position.X;
+            state[1] = ApplePosition.Y - SnakeHead.Position.Y;
 
-            state[2].Value = SnakeHead.Direction;
+            state[2] = SnakeHead.Direction;
 
-            state[3].Value = NearestObstacle(SnakeHead.Direction);
-            state[4].Value = NearestObstacle((SnakeHead.Direction + 3) % 4);
-            state[5].Value = NearestObstacle((SnakeHead.Direction + 1) % 4);
-            state[6].Value = ReachablePositions(SnakeHead.Position, BlockedCells());
+            state[3] = NearestObstacle(SnakeHead.Direction);
+            state[4] = NearestObstacle((SnakeHead.Direction + 3) % 4);
+            state[5] = NearestObstacle((SnakeHead.Direction + 1) % 4);
+            state[6] = ReachablePositions(SnakeHead.Position, BlockedCells());
 
             return state;
         }
@@ -843,7 +843,7 @@ namespace NNN
             List<int> validPositions = [];
             for (int i = 0; i < state.ElementCount; i++)
             {
-                if (state[i].Value == BoardEncoding.Empty) validPositions.Add(i);
+                if (state[i] == BoardEncoding.Empty) validPositions.Add(i);
             }
 
             int linearPos = validPositions[Random.Next(validPositions.Count)];
@@ -854,16 +854,16 @@ namespace NNN
 
         Tensor GetBoardState()
         {
-            Tensor state = new(GridDims.Y, GridDims.X);
+            Tensor state = new([GridDims.Y, GridDims.X]);
 
             SnakeNode node = SnakeHead;
-            state[node.Position.Y, node.Position.X].Value = BoardEncoding.Head;
+            state[[node.Position.Y, node.Position.X]] = BoardEncoding.Head;
             while (node.Child is not null)
             {
                 node = node.Child;
-                state[node.Position.Y, node.Position.X].Value = (node.Child is not null) ? BoardEncoding.Body : BoardEncoding.Tail;
+                state[[node.Position.Y, node.Position.X]] = (node.Child is not null) ? BoardEncoding.Body : BoardEncoding.Tail;
             }
-            state[ApplePosition.Y, ApplePosition.X].Value = BoardEncoding.Apple;
+            state[[ApplePosition.Y, ApplePosition.X]] = BoardEncoding.Apple;
 
             return state;
         }
@@ -952,7 +952,7 @@ namespace NNN
             return false;
         }
 
-        public override int PickAgentAction(Tensor qValues, Tensor? state = null) => qValues.MaxIndex();
+        public override int PickAgentAction(Tensor qValues, Tensor? state = null) => Tensor.ArgMax(qValues);
 
         public override int PickRandomAction() => Random.Next(ActionCount);
 
@@ -985,7 +985,7 @@ namespace NNN
                     else if (colEdge) Console.Write("|");
                     else
                     {
-                        string fill = state[row, col].Value switch
+                        string fill = state[[row, col]] switch
                         {
                             BoardEncoding.Head => "H",
                             BoardEncoding.Body => "B",
@@ -1339,7 +1339,8 @@ namespace NNN
                 }
                 Console.WriteLine($"Final State:");
                 if (episodeBuffer is not null) Environment.Render(episodeBuffer[^1], step);
-                Console.WriteLine($"Episode Duration: {elapsed}, Estimated Time Remaining: {eta}");
+                Console.WriteLine($"Ended on step: {step}");
+                Console.WriteLine($"Episode Duration: {MathUtils.RoundToMS(elapsed):g}, Estimated Time Remaining: {MathUtils.RoundToMS(eta):g}");
                 stopwatch.Restart();
             }
         }
@@ -1390,11 +1391,15 @@ namespace NNN
 
             Tensor currentBatch = new(batchDims);
             Tensor nextBatch = new(batchDims);
-            
-            for (int i = 0; i < BatchSize; i++)
+
+            int stateSize = batch[0].State.ElementCount;
+            for (int b = 0; b < BatchSize; b++)
             {
-                currentBatch.InsertSubArray(i, batch[i].State);
-                nextBatch.InsertSubArray(i, batch[i].NextState);
+                for (int i = 0; i < stateSize; i++)
+                {
+                    currentBatch[b * stateSize + i] = batch[b].State[i];
+                    nextBatch[b * stateSize + i] = batch[b].NextState[i];
+                }
             }
 
             var predictions = Agent.Forward(currentBatch);
@@ -1412,7 +1417,7 @@ namespace NNN
                 batch[i].Priority = lossResult.Priorities[i];
             }
             var loss = Tensor.Mean(lossResult.Losses);
-            totalLoss += loss.Value;
+            totalLoss += loss[0];
 
             loss.Backward();
             Agent.ClipGradients(MaxNorm);
@@ -1424,7 +1429,11 @@ namespace NNN
 
             for (int i = 0; i < TargetModel.ParameterCount; i++)
             {
-                TargetModel.Parameters[i].Value = (Tau * Agent.Parameters[i].Value) + ((1.0 - Tau) * TargetModel.Parameters[i].Value);
+                for (int j = 0; j < TargetModel.Parameters[i].ElementCount; j++)
+                {
+                    TargetModel.Parameters[i][j] = Tau * Agent.Parameters[i][j]
+                        + (1.0 - Tau) * TargetModel.Parameters[i][j];
+                }
             }
 
             optimizerSteps++;
@@ -1432,11 +1441,11 @@ namespace NNN
 
         Tensor MaskQValues(Tensor qValues, List<Experience> batch)
         {
-            Tensor maskedQs = new(BatchSize, 1);
+            Tensor maskedQs = new([BatchSize, 1]);
 
             for (int i = 0; i < BatchSize; i++)
             {
-                maskedQs[i] = qValues[i, batch[i].Action];
+                maskedQs[i] = qValues[[i, batch[i].Action]];
             }
 
             return maskedQs;
@@ -1444,10 +1453,8 @@ namespace NNN
 
         Tensor MaskQValuesDouble(Tensor agentQValues, Tensor targetQValues, List<Experience> batch)
         {
-            var agentQs = agentQValues.ReduceDimensions();
-            var targetQs = targetQValues.ReduceDimensions();
-
-            Tensor maskedQs = new(BatchSize, 1);
+            int actionCount = agentQValues.Dimensions[^1];
+            Tensor maskedQs = new([BatchSize, 1]);
 
             for (int i = 0; i < BatchSize; i++)
             {
@@ -1455,12 +1462,19 @@ namespace NNN
 
                 if (!batch[i].Done)
                 {
-                    int bestAction = Environment.PickAgentAction(agentQs[i], batch[i].NextState);
-                    double evalQ = targetQs[i][bestAction].Value;
+                    int bestAction = 0;
+                    double bestQ = agentQValues[i * actionCount];
+                    for (int a = 1; a < actionCount; a++)
+                    {
+                        double q = agentQValues[i * actionCount + a];
+                        if (q > bestQ) { bestQ = q; bestAction = a; }
+                    }
+
+                    double evalQ = targetQValues[i * actionCount + bestAction];
                     qTarget += Discount * evalQ * (SelfPlay ? -1.0 : 1.0);
                 }
 
-                maskedQs[i] = new(qTarget);
+                maskedQs[i] = qTarget;
             }
 
             return maskedQs;
@@ -1479,7 +1493,7 @@ namespace NNN
 
             int logEvery = Math.Max(100, MathUtils.RoundToInterval(epochs / 500f, 100));
             Tensor predictions;
-            Number loss;
+            Tensor loss;
 
             timer.Start();
             for (int e = 0; e < epochs; e++)
@@ -1496,7 +1510,7 @@ namespace NNN
 
                 if (e % logEvery == 0 || e == epochs - 1)
                 {
-                    Console.WriteLine($"Epoch {e} : Loss = {loss.Value} : Time elapsed = {timer.ElapsedMilliseconds}ms : Time per epoch = {((float)timer.ElapsedMilliseconds / logEvery):F2}ms");
+                    Console.WriteLine($"Epoch {e} : Loss = {loss[0]} : Time elapsed = {timer.ElapsedMilliseconds}ms : Time per epoch = {((float)timer.ElapsedMilliseconds / logEvery):F2}ms");
                     timer.Restart();
                 }
             }
@@ -1507,17 +1521,17 @@ namespace NNN
     {
         protected readonly double LR = learningRate;
 
-        public virtual void Step(Number parameter, int iterations)
-        {
-            throw new NotImplementedException();
-        }
+        public abstract void Step(Tensor parameter, int iterations);
     }
 
     public class SGD(double learningRate) : Optimizer(learningRate)
     {
-        public override void Step(Number parameter, int iterations)
+        public override void Step(Tensor parameter, int iterations)
         {
-            parameter.Value -= parameter.Gradient * LR;
+            for (int i = 0; i < parameter.ElementCount; i++)
+            {
+                parameter[i] -= parameter.Grad[i] * LR;
+            }
         }
     }
 
@@ -1527,23 +1541,36 @@ namespace NNN
         readonly double Beta2 = beta2;
         readonly double Epsilon = epsilon;
 
-        public override void Step(Number parameter, int iteration)
+        // Per-Tensor moment state
+        readonly Dictionary<Tensor, (double[] m, double[] v)> _state = [];
+
+        public override void Step(Tensor parameter, int iteration)
         {
             iteration++;
-            parameter.FirstMoment = (Beta1 * parameter.FirstMoment) + ((1.0 - Beta1) * parameter.Gradient);
-            parameter.SecondMoment = (Beta2 * parameter.SecondMoment) + ((1.0 - Beta2) * Math.Pow(parameter.Gradient, 2.0));
+            if (!_state.TryGetValue(parameter, out var moments))
+            {
+                moments = (new double[parameter.ElementCount], new double[parameter.ElementCount]);
+                _state[parameter] = moments;
+            }
 
-            double mHat = parameter.FirstMoment / (1.0 - Math.Pow(Beta1, iteration));
-            double vHat = parameter.SecondMoment / (1.0 - Math.Pow(Beta2, iteration));
+            var (m, v) = moments;
+            for (int i = 0; i < parameter.ElementCount; i++)
+            {
+                m[i] = Beta1 * m[i] + (1.0 - Beta1) * parameter.Grad[i];
+                v[i] = Beta2 * v[i] + (1.0 - Beta2) * Math.Pow(parameter.Grad[i], 2.0);
 
-            parameter.Value -= (LR * mHat) / (Math.Sqrt(vHat) + Epsilon);
+                double mHat = m[i] / (1.0 - Math.Pow(Beta1, iteration));
+                double vHat = v[i] / (1.0 - Math.Pow(Beta2, iteration));
+
+                parameter.Data[i] -= (LR * mHat) / (Math.Sqrt(vHat) + Epsilon);
+            }
         }
     }
 
     public class Model
     {
         public Layer[] Layers { get; private set; }
-        public List<Number> Parameters
+        public List<Tensor> Parameters
         {
             get
             {
@@ -1551,7 +1578,7 @@ namespace NNN
                 return parameters;
             }
         }
-        List<Number>? parameters;
+        List<Tensor>? parameters;
         public int ParameterCount => Parameters.Count;
 
         public Model(Layer[] layers)
@@ -1596,7 +1623,7 @@ namespace NNN
             int inputs = 1;
             for (int i = 1; i < inputFormat.Rank; i++)
             {
-                inputs *= inputFormat.GetLength(i);
+                inputs *= inputFormat.Dimensions[i];
             }
 
             foreach (var layer in Layers)
@@ -1616,7 +1643,7 @@ namespace NNN
             return output;
         }
 
-        public IEnumerable<Number> GetParameters()
+        public IEnumerable<Tensor> GetParameters()
         {
             foreach (var layer in Layers)
             {
@@ -1630,30 +1657,33 @@ namespace NNN
         public void ClipGradients(double maxNorm)
         {
             double totalNorm = 0.0;
-
             foreach (var param in Parameters)
             {
-                totalNorm += Math.Pow(param.Gradient, 2.0);
+                for (int i = 0; i < param.GradCount; i++)
+                {
+                    totalNorm += Math.Pow(param.Grad[i], 2.0);
+                }
             }
-
             totalNorm = Math.Sqrt(totalNorm);
 
             if (totalNorm > maxNorm)
             {
                 double scale = maxNorm / (totalNorm + 1e-8);
-
                 foreach (var param in Parameters)
                 {
-                    param.Gradient *= scale;
+                    for (int i = 0; i < param.GradCount; i++)
+                    {
+                        param.Grad[i] *= scale;
+                    }
                 }
             }
         }
 
         public void ZeroGrad()
         {
-            foreach (var layer in Layers)
+            foreach (var param in Parameters)
             {
-                layer.ZeroGrad();
+                param.ZeroGrad();
             }
         }
 
@@ -1686,35 +1716,15 @@ namespace NNN
 
         public Layer() { }
 
-        public virtual void SetUpLayer(int inputCount)
-        {
-            throw new NotImplementedException();
-        }
+        public abstract void SetUpLayer(int inputCount);
 
-        public virtual Tensor Forward(Tensor input)
-        {
-            throw new NotImplementedException();
-        }
+        public abstract Tensor Forward(Tensor input);
 
-        public virtual IEnumerable<Number> GetParameters()
-        {
-            throw new NotImplementedException();
-        }
+        public abstract IEnumerable<Tensor> GetParameters();
 
-        public virtual void ZeroGrad()
-        {
-            throw new NotImplementedException();
-        }
+        public abstract Layer Copy();
 
-        public virtual Layer Copy()
-        {
-            throw new NotImplementedException();
-        }
-
-        public virtual void BuildFromData(Saver.LayerData data)
-        {
-            throw new NotImplementedException();
-        }
+        public abstract void BuildFromData(Saver.LayerData data);
     }
 
     public class Dense : Layer
@@ -1742,41 +1752,22 @@ namespace NNN
         public override void SetUpLayer(int inputCount)
         {
             Weights = Tensor.InitWeights(inputCount, NeuronCount);
-            Biases = Tensor.InitBias(NeuronCount);
+            Biases = Tensor.InitBiases(NeuronCount);
         }
 
         public override Tensor Forward(Tensor input)
         {
-            var flatInput = input.Rank > 2 ? input.Flatten() : input;
+            var flatInput = input.Rank > 2 ? Tensor.Flatten(input, 1) : input;
             var output = flatInput ^ Weights;
-            output += Tensor.Broadcast(Biases, output.GetLength(0));
+            output += Tensor.Broadcast(Biases, output.Dimensions);
             output = Activation.Forward(output);
             return output;
         }
 
-        public override IEnumerable<Number> GetParameters()
+        public override IEnumerable<Tensor> GetParameters()
         {
-            foreach (var weight in Weights.ToLinearArray())
-            {
-                yield return weight;
-            }
-            
-            foreach (var bias in Biases.ToLinearArray())
-            {
-                yield return bias;
-            }
-        }
-
-        public override void ZeroGrad()
-        {
-            foreach (var weight in Weights.ToLinearArray())
-            {
-                weight.ZeroGradient();
-            }
-            foreach (var bias in Biases.ToLinearArray())
-            {
-                bias.ZeroGradient();
-            }
+            yield return Weights;
+            yield return Biases;
         }
 
         public override Layer Copy()
@@ -1791,7 +1782,7 @@ namespace NNN
             Biases = data.Biases;
 
             var activType = Type.GetType(data.Activation);
-            if (activType != null)
+            if (activType is not null)
             {
                 Activation = Activator.CreateInstance(activType) as Activation ?? new Linear();
             }
@@ -1800,15 +1791,16 @@ namespace NNN
 
     public abstract class Activation
     {
-        public virtual Tensor Forward(Tensor input)
-        {
-            throw new NotImplementedException();
-        }
+        public abstract Tensor Forward(Tensor input);
 
-        public virtual Activation Copy()
-        {
-            throw new NotImplementedException();
-        }
+        public abstract Activation Copy();
+    }
+
+    public class ReLU : Activation
+    {
+        public override Tensor Forward(Tensor input) => Tensor.ReLU(input);
+
+        public override Activation Copy() => new ReLU();
     }
 
     public class LeakyReLU : Activation
@@ -1822,90 +1814,39 @@ namespace NNN
 
         public LeakyReLU() { }
 
-        public override Tensor Forward(Tensor input)
-        {
-            Tensor output = new(input.Dimensions);
+        public override Tensor Forward(Tensor input) => Tensor.LeakyReLU(input, Tau);
 
-            for (int i = 0; i < input.ElementCount; i++)
-            {
-                output[i] = Number.LeakyReLU(input[i], Tau);
-            }
-
-            return output;
-        }
-
-        public override Activation Copy()
-        {
-            return new LeakyReLU(Tau);
-        }
+        public override Activation Copy() => new LeakyReLU(Tau);
     }
 
     public class Tanh : Activation
     {
-        public override Tensor Forward(Tensor input)
-        {
-            Tensor output = new(input.Dimensions);
+        public override Tensor Forward(Tensor input) => Tensor.Tanh(input);
 
-            for (int i = 0; i < input.ElementCount; i++)
-            {
-                output[i] = Number.Tanh(input[i]);
-            }
-
-            return output;
-        }
-
-        public override Activation Copy()
-        {
-            return new Tanh();
-        }
+        public override Activation Copy() => new Tanh();
     }
 
     public class Sigmoid : Activation
     {
-        public override Tensor Forward(Tensor input)
-        {
-            Tensor output = new(input.Dimensions);
+        public override Tensor Forward(Tensor input) => Tensor.Sigmoid(input);
 
-            for (int i = 0; i < input.ElementCount; i++)
-            {
-                output[i] = Number.Sigmoid(input[i]);
-            }
-
-            return output;
-        }
-
-        public override Activation Copy()
-        {
-            return new Sigmoid();
-        }
+        public override Activation Copy() => new Sigmoid();
     }
 
     public class Linear : Activation
     {
-        public override Tensor Forward(Tensor input)
-        {
-            return input;
-        }
+        public override Tensor Forward(Tensor input) => input;
 
-        public override Activation Copy()
-        {
-            return new Linear();
-        }
+        public override Activation Copy() => new Linear();
     }
 
     public record CostResult(Tensor Losses, double[] Priorities);
 
     public abstract class Cost
     {
-        public virtual Number CalculateCost(Tensor input, Tensor target)
-        {
-            throw new NotImplementedException();
-        }
+        public abstract Tensor CalculateCost(Tensor input, Tensor target);
 
-        public virtual Tensor CalculatePerSampleCost(Tensor input, Tensor target)
-        {
-            throw new NotImplementedException();
-        }
+        public abstract Tensor CalculatePerSampleCost(Tensor input, Tensor target);
 
         public virtual CostResult CalculateCostWithPriority(Tensor input, Tensor target, double[]? weights = null)
         {
@@ -1914,10 +1855,10 @@ namespace NNN
 
             for (int i = 0; i < losses.ElementCount; i++)
             {
-                double value = losses[i].Value;
+                double value = losses[i];
                 priorities[i] = Math.Abs(value) + 1e-8;
 
-                if (weights != null) losses[i] *= weights[i];
+                if (weights is not null) losses[i] *= weights[i];
             }
 
             return new(losses, priorities);
@@ -1926,7 +1867,7 @@ namespace NNN
 
     public class MSE : Cost
     {
-        public override Number CalculateCost(Tensor input, Tensor target)
+        public override Tensor CalculateCost(Tensor input, Tensor target)
         {
             return Tensor.Mean(CalculatePerSampleCost(input, target));
         }
@@ -1943,7 +1884,7 @@ namespace NNN
     {
         readonly double Delta = delta;
 
-        public override Number CalculateCost(Tensor input, Tensor target)
+        public override Tensor CalculateCost(Tensor input, Tensor target)
         {
             return Tensor.Mean(CalculatePerSampleCost(input, target));
         }
@@ -1952,699 +1893,849 @@ namespace NNN
         {
             var diff = input - target;
 
-            Tensor costs = new(diff.Dimensions);
-            for (int i = 0; i < diff.ElementCount; i++)
-            {
-                costs[i] = Math.Pow(Delta, 2.0) * (((1.0 + ((diff[i] / Delta) ^ 2.0)) ^ 0.5) - 1.0);
-            }
-
-            return costs;
+            // Huber: delta^2 * (sqrt(1 + (diff/delta)^2) - 1)
+            var scaled = diff / Delta;
+            var inner = Tensor.Pow(scaled, 2.0) + 1.0;
+            return (Tensor.Pow(inner, 0.5) - 1.0) * Math.Pow(Delta, 2.0);
         }
     }
 
     [Serializable]
     public class Tensor
     {
-        public Number[] Data { get; set; }
-        public int[] Dimensions { get; set; }
-        public int[] Multipliers { get; set; }
+        // Linear value storage
+        public double[] Data { get; init; } = [];
+        public double[] Grad { get; private set; } = [];
 
+        // Shape properties
         public int Rank => Dimensions.Length;
         public int ElementCount => Data.Length;
-        public int FlatSize => ElementCount / Dimensions[0];
+        public int GradCount => Grad.Length;
 
+        // Index mapping
+        public int[] Dimensions { get; init; } = [];
+        public int[] Strides { get; init; } = [];
+
+        // AutoGrad graph
+        public bool RequiresGrad { get; set; }
+        readonly List<Tensor> _parents = [];
+        Action _backward = delegate { };
+
+        // Parameterless constructor for JsonSerializer
+        public Tensor() { }
+
+        // Primary constructor
+        public Tensor(int[] dims, bool requiresGrad = false)
+        {
+            Dimensions = (int[])dims.Clone();
+            Strides = ComputeStrides(dims);
+
+            int size = 1;
+            foreach (var dim in dims) size *= dim;
+
+            Data = new double[size];
+
+            RequiresGrad = requiresGrad;
+            if (RequiresGrad) Grad = new double[size];
+        }
+
+        // Calculate the stride represented by each index when accessing by multidimensional indices
+        static int[] ComputeStrides(int[] dims)
+        {
+            int n = dims.Length;
+            var strides = new int[n];
+
+            strides[n - 1] = 1;
+
+            for (int i = n - 2; i >= 0; i--)
+            {
+                strides[i] = strides[i + 1] * dims[i + 1];
+            }
+
+            return strides;
+        }
+
+        // Convert multidimensional indices to linear index
+        public int LinearIndex(params int[] indices)
+        {
+            int offset = 0;
+
+            for (int i = 0; i < indices.Length; i++)
+            {
+                offset += indices[i] * Strides[i];
+            }
+
+            return offset;
+        }
+
+        // Zero out the current accumulated gradient
+        public void ZeroGrad() => Array.Clear(Grad, 0, GradCount);
+
+        // Calculate the gradients of all Tensors in the current graph
+        public void Backward()
+        {
+            Grad = Ones(Rank);
+
+            List<Tensor> topo = [];
+            BuildTopo(this, topo, []);
+
+            for (int i = topo.Count - 1; i >= 0; i--)
+            {
+                topo[i]._backward();
+            }
+        }
+
+        // Build the topography of the current function graph
+        static void BuildTopo(Tensor t, List<Tensor> topo, HashSet<Tensor> visited)
+        {
+            if (visited.Contains(t)) return;
+            visited.Add(t);
+
+            foreach (var p in t._parents)
+            {
+                BuildTopo(p, topo, visited);
+            }
+
+            topo.Add(t);
+        }
+
+        // Create an array of 1's
+        static double[] Ones(int n)
+        {
+            var output = new double[n];
+            for (int i = 0; i < n; i++) output[i] = 1;
+            return output;
+        }
+
+        // Constructor for a Tensor filled with only one value
+        public static Tensor Scalar(double value, int[] dims, bool requiresGrad = false)
+        {
+            Tensor t = new(dims, requiresGrad);
+            Array.Fill(t.Data, value);
+            return t;
+        }
+
+        // Primary accessor using multidimensional indices
+        public double this[int[] indices]
+        {
+            get => Data[LinearIndex(indices)];
+            set => Data[LinearIndex(indices)] = value;
+        }
+
+        public double this[int index]
+        {
+            get => Data[index];
+            set => Data[index] = value;
+        }
+
+        // Element-wise operators between Tensors and scalars
+        public static Tensor operator +(Tensor a, double b) => a + Scalar(b, a.Dimensions);
+        public static Tensor operator +(double a, Tensor b) => Scalar(a, b.Dimensions) + b;
+        public static Tensor operator -(Tensor a, double b) => a - Scalar(b, a.Dimensions);
+        public static Tensor operator -(double a, Tensor b) => Scalar(a, b.Dimensions) - b;
+        public static Tensor operator *(Tensor a, double b) => a * Scalar(b, a.Dimensions);
+        public static Tensor operator *(double a, Tensor b) => Scalar(a, b.Dimensions) * b;
+        public static Tensor operator /(Tensor a, double b) => a / Scalar(b, a.Dimensions);
+        public static Tensor operator /(double a, Tensor b) => Scalar(a, b.Dimensions) / b;
+        public static Tensor Pow(Tensor a, double b) => Pow(a, Scalar(b, a.Dimensions));
+        public static Tensor Pow(double a, Tensor b) => Pow(Scalar(a, b.Dimensions), b);
+        public static Tensor Log(Tensor a, double b) => Log(a, Scalar(b, a.Dimensions));
+        public static Tensor Log(double a, Tensor b) => Log(Scalar(a, b.Dimensions), b);
+
+        // Element-wise addition operator
         public static Tensor operator +(Tensor a, Tensor b)
         {
-            AssertElementwiseDims(a, b);
-
-            Tensor output = new(a.Dimensions);
-
-            for (int i = 0; i < a.ElementCount; i++)
+            // Calculate each element of the resulting Tensor
+            Tensor result = new(a.Dimensions, a.RequiresGrad || b.RequiresGrad);
+            for (int i = 0; i < result.ElementCount; i++)
             {
-                output[i] = a[i] + b[i];
+                result[i] = a[i] + b[i];
             }
+            result._parents.AddRange([a, b]);
 
-            return output;
+            // Gradient calculation function
+            result._backward = () =>
+            {
+                for (int i = 0; i < result.ElementCount; i++)
+                {
+                    if (a.RequiresGrad) a.Grad[i] += result.Grad[i];
+                    if (b.RequiresGrad) b.Grad[i] += result.Grad[i];
+                }
+            };
+
+            return result;
         }
 
+        // Element-wise subtraction operator
         public static Tensor operator -(Tensor a, Tensor b)
         {
-            AssertElementwiseDims(a, b);
-
-            Tensor output = new(a.Dimensions);
-
-            for (int i = 0; i < a.ElementCount; i++)
+            // Calculate each element of the resulting Tensor
+            Tensor result = new(a.Dimensions, a.RequiresGrad || b.RequiresGrad);
+            for (int i = 0; i < result.ElementCount; i++)
             {
-                output[i] = a[i] - b[i];
+                result[i] = a[i] - b[i];
             }
+            result._parents.AddRange([a, b]);
 
-            return output;
+            // Gradient calculation function
+            result._backward = () =>
+            {
+                for (int i = 0; i < result.ElementCount; i++)
+                {
+                    if (a.RequiresGrad) a.Grad[i] += result.Grad[i];
+                    if (b.RequiresGrad) b.Grad[i] -= result.Grad[i];
+                }
+            };
+
+            return result;
         }
 
+        // Element-wise multiplication operator
         public static Tensor operator *(Tensor a, Tensor b)
         {
-            AssertElementwiseDims(a, b);
-
-            Tensor output = new(a.Dimensions);
-
-            for (int i = 0; i < a.ElementCount; i++)
+            // Calculate each element of the resulting Tensor
+            Tensor result = new(a.Dimensions, a.RequiresGrad || b.RequiresGrad);
+            for (int i = 0; i < result.ElementCount; i++)
             {
-                output[i] = a[i] * b[i];
+                result[i] = a[i] * b[i];
             }
+            result._parents.AddRange([a, b]);
 
-            return output;
+            // Gradient calculation function
+            result._backward = () =>
+            {
+                for (int i = 0; i < result.ElementCount; i++)
+                {
+                    if (a.RequiresGrad) a.Grad[i] += b[i] * result.Grad[i];
+                    if (b.RequiresGrad) b.Grad[i] += a[i] * result.Grad[i];
+                }
+            };
+
+            return result;
         }
 
+        // Element-wise division operator
+        public static Tensor operator /(Tensor a, Tensor b)
+        {
+            // Calculate each element of the resulting Tensor
+            Tensor result = new(a.Dimensions, a.RequiresGrad || b.RequiresGrad);
+            for (int i = 0; i < result.ElementCount; i++)
+            {
+                result[i] = a[i] / b[i];
+            }
+            result._parents.AddRange([a, b]);
+
+            // Gradient calculation function
+            result._backward = () =>
+            {
+                for (int i = 0; i < result.ElementCount; i++)
+                {
+                    if (a.RequiresGrad) a.Grad[i] += (1 / b[i]) * result.Grad[i];
+                    if (b.RequiresGrad) b.Grad[i] -= a[i] / Math.Pow(b[i], 2) * result.Grad[i];
+                }
+            };
+
+            return result;
+        }
+
+        // Element-wise exponentiation
+        public static Tensor Pow(Tensor a, Tensor exp)
+        {
+            // Calculate each element of the resulting Tensor
+            Tensor result = new(a.Dimensions, a.RequiresGrad || exp.RequiresGrad);
+            for (int i = 0; i < result.ElementCount; i++)
+            {
+                result[i] = Math.Pow(a[i], exp[i]);
+            }
+            result._parents.AddRange([a, exp]);
+
+            // Gradient calculation function
+            result._backward = () =>
+            {
+                for (int i = 0; i < result.ElementCount; i++)
+                {
+                    if (a.RequiresGrad) a.Grad[i] += exp[i] * Math.Pow(a[i], exp[i] - 1) * result.Grad[i];
+                    if (exp.RequiresGrad) exp.Grad[i] += result[i] * Math.Log(a[i]) * result.Grad[i];
+                }
+            };
+
+            return result;
+        }
+
+        // Exponentiation with base e
+        public static Tensor Exp(Tensor t)
+        {
+            // Calculate each element of the resulting Tensor
+            Tensor result = new(t.Dimensions, t.RequiresGrad);
+            for (int i = 0; i < result.ElementCount; i++)
+            {
+                result[i] = Math.Exp(t[i]);
+            }
+            result._parents.Add(t);
+
+            // Gradient calculation function
+            result._backward = () =>
+            {
+                if (!t.RequiresGrad) return;
+
+                for (int i = 0; i < result.ElementCount; i++)
+                {
+                    t.Grad[i] += result[i] * result.Grad[i];
+                }
+            };
+
+            return result;
+        }
+
+        // Element-wise logarithm
+        public static Tensor Log(Tensor logBase, Tensor arg)
+        {
+            // Calculate each element of the resulting Tensor
+            Tensor result = new(logBase.Dimensions, logBase.RequiresGrad || arg.RequiresGrad);
+            for (int i = 0; i < result.ElementCount; i++)
+            {
+                result[i] = Math.Log(arg[i], logBase[i]);
+            }
+            result._parents.AddRange([logBase, arg]);
+
+            // Gradient calculation function
+            result._backward = () =>
+            {
+                for (int i = 0; i < result.ElementCount; i++)
+                {
+                    if (logBase.RequiresGrad) logBase.Grad[i] -= (Math.Log(arg[i]) / (logBase[i] * Math.Pow(Math.Log(logBase[i]), 2))) * result.Grad[i];
+                    if (arg.RequiresGrad) arg.Grad[i] += (1 / (arg[i] * Math.Log(logBase[i]))) * result.Grad[i];
+                }
+            };
+
+            return result;
+        }
+
+        // 2D Matrix multiplication operator
         public static Tensor operator ^(Tensor a, Tensor b)
         {
-            AssertMultiplicationDims(a, b);
+            // Last two dimensions are matrix multiplication dimensions, everything ahead is batch
+            int rank = a.Rank;
+            int m = a.Dimensions[^2];
+            int n = a.Dimensions[^1];
+            int p = b.Dimensions[^1];
 
-            var resultDims = new int[a.Rank];
-            for (int i = 0; i < a.Rank - 1; i ++)
+            // Build result dims -> batch dims + [m, p]
+            var resultDims = (int[])a.Dimensions.Clone();
+            resultDims[^1] = p;
+
+            int batchSize = 1;
+            for (int i = 0; i < rank - 2; i++) batchSize *= a.Dimensions[i];
+            int aMatSize = m * n;
+            int bMatSize = n * p;
+            int rMatSize = m * p;
+
+            Tensor result = new(resultDims, a.RequiresGrad || b.RequiresGrad);
+
+            for (int batch = 0; batch < batchSize; batch++)
             {
-                resultDims[i] = a.Dimensions[i];
-            }
-            resultDims[^1] = b.Dimensions[^1];
+                int aOffset = batch * aMatSize;
+                int bOffset = batch * bMatSize;
+                int rOffset = batch * rMatSize;
 
-            Tensor output = new(resultDims);
-            if (a.Rank > 2)
-            {
-                // Recursively reduce arrays down to batches of 2D matrices
-
-                var reducedA = a.ReduceDimensions();
-                var reducedB = b.ReduceDimensions();
-
-                for (int i = 0; i < reducedA.Length; i++)
+                for (int i = 0; i < m; i++)
                 {
-                    output.InsertSubArray(i, reducedA[i] ^ reducedB[i]);
+                    for (int j = 0; j < p; j++)
+                    {
+                        double sum = 0;
+                        for (int k = 0; k < n; k++)
+                        {
+                            sum += a[aOffset + i * n + k] * b[bOffset + k * p + j];
+                        }
+                        result[rOffset + i * p + j] = sum;
+                    }
                 }
             }
-            else
-            {
-                // Standard 2D matrix multiplication
+            result._parents.AddRange([a, b]);
 
-                for (int rowA = 0; rowA < output.GetLength(0); rowA++)
+            // Gradient calculation function
+            result._backward = () =>
+            {
+                for (int batch = 0; batch < batchSize; batch++)
                 {
-                    for (int colB = 0; colB < output.GetLength(1); colB++)
+                    int aOffset = batch * aMatSize;
+                    int bOffset = batch * bMatSize;
+                    int rOffset = batch * rMatSize;
+
+                    if (a.RequiresGrad)
                     {
-                        output[rowA, colB] = new(0);
-                        for (int i = 0; i < a.GetLength(1); i++)
+                        for (int i = 0; i < m; i++)
                         {
-                            output[rowA, colB] += a[rowA, i] * b[i, colB];
+                            for (int k = 0; k < n; k++)
+                            {
+                                double grad = 0.0;
+                                for (int j = 0; j < p; j++)
+                                {
+                                    grad += result.Grad[rOffset + i * p + j] * b[bOffset + k * p + j];
+                                }
+                                a.Grad[aOffset + i * n + k] += grad;
+                            }
+                        }
+                    }
+
+                    if (b.RequiresGrad)
+                    {
+                        for (int k = 0; k < n; k++)
+                        {
+                            for (int j = 0; j < p; j++)
+                            {
+                                double grad = 0.0;
+                                for (int i = 0; i < m; i++)
+                                {
+                                    grad += a[aOffset + i * n + k] * result.Grad[rOffset + i * p + j];
+                                }
+                                b.Grad[bOffset + k * p + j] += grad;
+                            }
                         }
                     }
                 }
-            }
+            };
 
-            return output;
+            return result;
         }
 
-        public int MaxIndex()
+        // Rectified Linear Unit activation function
+        public static Tensor ReLU(Tensor t)
         {
-            int maxIndex = 0;
-            double maxValue = this[0].Value;
-            for (int i = 1; i < ElementCount; i++)
+            // Apply ReLU function to each element
+            Tensor result = new(t.Dimensions, t.RequiresGrad);
+            for (int i = 0; i < result.ElementCount; i++)
             {
-                if (this[i].Value > maxValue)
+                result[i] = t[i] > 0.0 ? t[i] : 0.0;
+            }
+            result._parents.Add(t);
+
+            // Gradient calculation function
+            result._backward = () =>
+            {
+                if (!t.RequiresGrad) return;
+
+                for (int i = 0; i < result.ElementCount; i++)
                 {
-                    maxIndex = i;
-                    maxValue = this[i].Value;
+                    t.Grad[i] += (t[i] > 0.0 ? 1.0 : 0.0) * result.Grad[i];
+                }
+            };
+
+            return result;
+        }
+
+        // Leaky Rectified Linear Unit activation function
+        public static Tensor LeakyReLU(Tensor t, double tau)
+        {
+            // Apply LeakyReLU function to each element
+            Tensor result = new(t.Dimensions, t.RequiresGrad);
+            for (int i = 0; i < result.ElementCount; i++)
+            {
+                result[i] = t[i] > 0.0 ? t[i] : tau * t[i];
+            }
+            result._parents.Add(t);
+
+            // Gradient calculation function
+            result._backward = () =>
+            {
+                if (!t.RequiresGrad) return;
+
+                for (int i = 0; i < result.ElementCount; i++)
+                {
+                    t.Grad[i] += (t[i] > 0.0 ? 1.0 : tau) * result.Grad[i];
+                }
+            };
+
+            return result;
+        }
+
+        // Sigmoid activation function
+        public static Tensor Sigmoid(Tensor t)
+        {
+            // Apply Sigmoid function to each element
+            Tensor result = new(t.Dimensions, t.RequiresGrad);
+            for (int i = 0; i < result.ElementCount; i++)
+            {
+                result[i] = MathUtils.Sigmoid(t[i]);
+            }
+            result._parents.Add(t);
+
+            // Gradient calculation function
+            result._backward = () =>
+            {
+                if (!t.RequiresGrad) return;
+
+                for (int i = 0; i < result.ElementCount; i++)
+                {
+                    t.Grad[i] += result[i] * (1.0 - result[i]) * result.Grad[i];
+                }
+            };
+
+            return result;
+        }
+
+        // Hyperbolic tangent activation function
+        public static Tensor Tanh(Tensor t)
+        {
+            // Apply Tanh function to each element
+            Tensor result = new(t.Dimensions, t.RequiresGrad);
+            for (int i = 0; i < result.ElementCount; i++)
+            {
+                result[i] = MathUtils.Tanh(t[i]);
+            }
+            result._parents.Add(t);
+
+            // Gradient calculation function
+            result._backward = () =>
+            {
+                if (!t.RequiresGrad) return;
+
+                for (int i = 0; i < result.ElementCount; i++)
+                {
+                    t.Grad[i] += (1.0 - Math.Pow(result[i], 2.0)) * result.Grad[i];
+                }
+            };
+
+            return result;
+        }
+
+        // Softmax function
+        public static Tensor Softmax(Tensor t)
+        {
+            Tensor result = new(t.Dimensions, t.RequiresGrad);
+
+            int classes = t.Dimensions[^1];
+            int batchSize = t.ElementCount / classes;
+
+            // Apply Softmax function to each element
+            for (int b = 0; b < batchSize; b++)
+            {
+                int offset = b * classes;
+
+                double max = t[offset];
+                for (int i = 0; i < classes; i++)
+                {
+                    if (t[offset + i] > max) max = t[offset + i];
+                }
+
+                double sum = 0;
+                for (int i = 0; i < classes; i++)
+                {
+                    result[offset + i] = Math.Exp(t[offset + i] - max);
+                    sum += result[offset + i];
+                }
+                for (int i = 0; i < classes; i++)
+                {
+                    result[offset + i] /= sum;
                 }
             }
-            return maxIndex;
-        }
+            result._parents.Add(t);
 
-        public Number Max()
-        {
-            return this[MaxIndex()];
-        }
-
-        public static Number Mean(Tensor input)
-        {
-            return Number.Mean(input.ToLinearArray());
-        }
-
-        public static Tensor InitWeights(int inputCount, int neuronCount)
-        {
-            Tensor output = new(inputCount, neuronCount);
-
-            double weight;
-            for (int i = 0; i < output.ElementCount; i++)
+            // Gradient calculation function
+            result._backward = () =>
             {
-                weight = MathUtils.NextGaussian(0, Math.Sqrt(2.0 / inputCount));
-                output[i] = new(weight);
-            }
+                if (!t.RequiresGrad) return;
 
-            return output;
-        }
-
-        public static Tensor InitBias(int neuronCount)
-        {
-            Tensor output = new(neuronCount);
-
-            for (int i = 0; i < output.ElementCount; i++)
-            {
-                output[i] = new(0.01f);
-            }
-
-            return output;
-        }
-
-        public static Tensor Broadcast(Tensor array, int firstDimLength)
-        {
-            var outputDims = new int[array.Rank + 1];
-            outputDims[0] = firstDimLength;
-            for (int i = 1; i < outputDims.Length; i++)
-            {
-                outputDims[i] = array.Dimensions[i - 1];
-            }
-
-            Tensor output = new(outputDims);
-
-            int[] inputIndices;
-            int[] outputIndices;
-            for (int i = 0; i < output.GetLength(0); i++)
-            {
-                for (int j = 0; j < array.ElementCount; j++)
+                // Jacobian-vector product: dL/dx_i = s_i * (dL/ds_i - sum_j(dL/ds_j * s_j))
+                for (int b = 0; b < batchSize; b++)
                 {
-                    inputIndices = array.GetFullIndices(j);
+                    int offset = b * classes;
 
-                    outputIndices = new int[output.Rank];
-                    outputIndices[0] = i;
-                    for (int k = 1; k < outputIndices.Length; k++)
+                    double dot = 0;
+                    for (int i = 0; i < classes; i++)
                     {
-                        outputIndices[k] = inputIndices[k - 1];
+                        dot += result.Grad[offset + i] * result[offset + i];
                     }
+                    for (int i = 0; i < classes; i++)
+                    {
+                        t.Grad[offset + i] += result[offset + i] * (result.Grad[offset + i] - dot);
+                    }
+                }
+            };
 
-                    output[outputIndices] = array[inputIndices];
+            return result;
+        }
+
+        // Flattened Sum function
+        public static Tensor Sum(Tensor t)
+        {
+            // Calculate sum of all elements
+            Tensor result = new([1], t.RequiresGrad);
+            for (int i = 0; i < t.ElementCount; i++)
+            {
+                result[0] += t[i];
+            }
+            result._parents.Add(t);
+
+            // Gradient calculation function
+            result._backward = () =>
+            {
+                if (!t.RequiresGrad) return;
+
+                for (int i = 0; i < t.ElementCount; i++)
+                {
+                    t.Grad[i] += result.Grad[0];
+                }
+            };
+
+            return result;
+        }
+
+        // Mean function
+        public static Tensor Mean(Tensor t)
+        {
+            // Calculate mean of all elements
+            Tensor result = new([1], t.RequiresGrad);
+            for (int i = 0; i < t.ElementCount; i++)
+            {
+                result[0] += t[i];
+            }
+            result[0] /= t.ElementCount;
+            result._parents.Add(t);
+
+            // Gradient calculation function
+            result._backward = () =>
+            {
+                if (!t.RequiresGrad) return;
+
+                double grad = result.Grad[0] / t.ElementCount;
+                for (int i = 0; i < t.GradCount; i++)
+                {
+                    t.Grad[i] += grad;
+                }
+            };
+
+            return result;
+        }
+
+        // Find index of largest number
+        public static int ArgMax(Tensor t)
+        {
+            int index = 0;
+            double max = t[0];
+
+            for (int i = 1; i < t.ElementCount; i++)
+            {
+                if (t[i] > max)
+                {
+                    max = t[i];
+                    index = i;
                 }
             }
 
-            return output;
+            return index;
         }
 
-        public Tensor Flatten()
+        // Transpose the Tensor along specific axes
+        public static Tensor Transpose(Tensor t, int[]? axes = null)
         {
-            int batchSize = Dimensions[0];
-            int flatSize = ElementCount / batchSize;
-            Tensor output = new(batchSize, flatSize);
-            for (int i = 0; i < ElementCount; i++)
+            // Default: reverse all axes
+            if (axes is null)
             {
-                output[i] = this[i];
+                axes = new int[t.Rank];
+                for (int i = 0; i < axes.Length; i++)
+                {
+                    axes[i] = axes.Length - 1 - i;
+                }
             }
-            return output;
+
+            // Build result dimensions
+            var resultDims = new int[t.Rank];
+            for (int i = 0; i < axes.Length; i++)
+            {
+                resultDims[i] = t.Dimensions[axes[i]];
+            }
+
+            Tensor result = new(resultDims, t.RequiresGrad);
+
+            // Remap each element
+            for (int i = 0; i < t.ElementCount; i++)
+            {
+                var srcIndices = t.GetFullIndices(i);
+                var dstIndices = new int[axes.Length];
+                for (int j = 0; j < axes.Length; j++)
+                {
+                    dstIndices[j] = srcIndices[axes[j]];
+                }
+                result[result.LinearIndex(dstIndices)] = t[i];
+            }
+            result._parents.Add(t);
+
+            // Inverse permutation
+            var invAxes = new int[axes.Length];
+            for (int i = 0; i < axes.Length; i++)
+            {
+                invAxes[axes[i]] = i;
+            }
+
+            // Gradient calculation function
+            result._backward = () =>
+            {
+                if (!t.RequiresGrad) return;
+
+                for (int i = 0; i < result.ElementCount; i++)
+                {
+                    var srcIndices = result.GetFullIndices(i);
+                    var dstIndices = new int[invAxes.Length];
+                    for (int j = 0; j < invAxes.Length; j++)
+                    {
+                        dstIndices[j] = srcIndices[invAxes[j]];
+                    }
+                    t.Grad[t.LinearIndex(dstIndices)] += result.Grad[i];
+                }
+            };
+
+            return result;
         }
 
-        public Tensor(params int[] dimensions)
+        // Broadcast a Tensor along a new dimension
+        public static Tensor Broadcast(Tensor t, int[] targetDims)
         {
-            Dimensions = (int[])dimensions.Clone();
-            Multipliers = new int[Dimensions.Length];
+            // T.Dimensions must be a suffix of targetDims (t -> [16], targetDims = [32, 16])
 
-            int totalSize = 1;
-            for (int i = Rank - 1; i >= 0; i--)
+            Tensor result = new(targetDims, t.RequiresGrad);
+
+            for (int i = 0; i < result.ElementCount; i++)
             {
-                Multipliers[i] = totalSize;
-                totalSize *= Dimensions[i];
+                var indices = result.GetFullIndices(i);
+                var srcIndices = indices[^t.Rank..];
+                result[i] = t[t.LinearIndex(srcIndices)];
             }
+            result._parents.Add(t);
 
-            Data = new Number[totalSize];
-
-            for (int i = 0; i < ElementCount; i++)
+            // Gradient calculation function
+            result._backward = () =>
             {
-                this[i] = new(0);
-            }
+                if (!t.RequiresGrad) return;
+
+                for (int i = 0; i < result.ElementCount; i++)
+                {
+                    var indices = result.GetFullIndices(i);
+                    var srcIndices = indices[^t.Rank..];
+                    t.Grad[t.LinearIndex(srcIndices)] += result.Grad[i];
+                }
+            };
+
+            return result;
         }
 
-        public int GetLinearIndex(int[] indices)
+        // Flatten Tensor dimensions starting from startAxis onward
+        public static Tensor Flatten(Tensor t, int startAxis = 0)
         {
-            int linearIndex = 0;
-            for (int i = 0; i < Rank; i++)
-            {
-                linearIndex += indices[i] * Multipliers[i];
-            }
-            return linearIndex;
+            int flatSize = 1;
+            for (int i = startAxis; i < t.Rank; i++) flatSize *= t.Dimensions[i];
+
+            var newDims = new int[startAxis + 1];
+            for (int i = 0; i < startAxis; i++) newDims[i] = t.Dimensions[i];
+            newDims[^1] = flatSize;
+
+            return Reshape(t, newDims);
         }
 
+        // Reinterpret dimensions without moving data
+        public static Tensor Reshape(Tensor t, int[] newDims)
+        {
+            Tensor result = new(newDims, t.RequiresGrad);
+            Array.Copy(t.Data, result.Data, t.ElementCount);
+            result._parents.Add(t);
+
+            // Gradient calculation function
+            result._backward = () =>
+            {
+                if (!t.RequiresGrad) return;
+
+                for (int i = 0; i < t.GradCount; i++)
+                {
+                    t.Grad[i] += result.Grad[i];
+                }
+            };
+
+            return result;
+        }
+
+        // Add a leading dimension with length 1 to represent as batch
+        public static Tensor WrapBatch(Tensor t)
+        {
+            var batchDims = new int[t.Rank + 1];
+            batchDims[0] = 1;
+            Array.Copy(t.Dimensions, 0, batchDims, 1, t.Rank);
+
+            Tensor batch = new(batchDims, t.RequiresGrad);
+            Array.Copy(t.Data, batch.Data, t.ElementCount);
+            batch._parents.Add(t);
+
+            // Gradient calculation function
+            batch._backward = () =>
+            {
+                if (!t.RequiresGrad) return;
+
+                for (int i = 0; i < t.GradCount; i++)
+                {
+                    t.Grad[i] += batch.Grad[i];
+                }
+            };
+
+            return batch;
+        }
+
+        // Convert linear index to multidimensional indices
         public int[] GetFullIndices(int index)
         {
             var indices = new int[Rank];
-
             for (int i = Rank - 1; i >= 0; i--)
             {
                 indices[i] = index % Dimensions[i];
                 index /= Dimensions[i];
             }
-
             return indices;
         }
 
-        public Number[] ToLinearArray()
+        // Initialize neural network weights using He Initialization
+        public static Tensor InitWeights(int inputCount, int neuronCount)
         {
-            return Data;
-        }
+            Tensor weights = new([inputCount, neuronCount], true);
 
-        public override string ToString()
-        {
-            string output = string.Empty;
-            for (int i = 0; i < ElementCount - 1; i++)
+            for (int i = 0; i < weights.ElementCount; i++)
             {
-                output += $"{Data[i].Value}, ";
-            }
-            output += Data[^1].Value;
-            return output;
-        }
-
-        public static Tensor WrapBatch(Tensor state)
-        {
-            var dims = new int[state.Rank + 1];
-            dims[0] = 1;
-            state.Dimensions.CopyTo(dims, 1);
-            Tensor batch = new(dims);
-            batch.InsertSubArray(0, state);
-            return batch;
-        }
-
-        public Tensor[] ReduceDimensions()
-        {
-            var output = new Tensor[Dimensions[0]];
-
-            for (int i = 0; i < output.Length; i++)
-            {
-                output[i] = ExtractSubArray(i);
+                weights[i] = MathUtils.NextGaussian(0, Math.Sqrt(2.0 / inputCount));
             }
 
-            return output;
+            return weights;
         }
 
-        Tensor ExtractSubArray(int firstDimIndex)
+        // Initialize neural network biases
+        public static Tensor InitBiases(int neuronCount) => Scalar(0.01, [neuronCount], true);
+
+        // Clip gradients
+        public static Tensor Clip(Tensor t, double min, double max)
         {
-            var extractDims = new int[Rank - 1];
-            for (int i = 1; i < Rank; i++)
+            Tensor result = new(t.Dimensions, t.RequiresGrad);
+            for (int i = 0; i < result.ElementCount; i++)
             {
-                extractDims[i - 1] = Dimensions[i];
+                result[i] = Math.Clamp(t[i], min, max);
             }
+            result._parents.Add(t);
 
-            Tensor output = new(extractDims);
-
-            int[] extractIndices;
-            int[] parentIndices;
-            for (int i = 0; i < output.ElementCount; i++)
+            // Gradient calculation function
+            result._backward = () =>
             {
-                extractIndices = output.GetFullIndices(i);
+                if (!t.RequiresGrad) return;
 
-                parentIndices = new int[extractIndices.Length + 1];
+                for (int i = 0; i < t.GradCount; i++)
+                {
+                    t.Grad[i] += (t[i] >= min && t[i] <= max) ? result.Grad[i] : 0;
+                }
+            };
 
-                parentIndices[0] = firstDimIndex;
-                extractIndices.CopyTo(parentIndices, 1);
-
-                output[extractIndices] = this[parentIndices];
-            }
-
-            return output;
+            return result;
         }
 
-        public void InsertSubArray(int firstDimIndex, Tensor subArray)
-        {
-            int[] subIndices;
-            int[] parentIndices;
-            for (int i = 0; i < subArray.ElementCount; i++)
-            {
-                subIndices = subArray.GetFullIndices(i);
-
-                parentIndices = new int[subIndices.Length + 1];
-
-                parentIndices[0] = firstDimIndex;
-                subIndices.CopyTo(parentIndices, 1);
-
-                this[parentIndices] = subArray[subIndices];
-            }
-        }
-
+        // Create an identical Tensor detached from the existing graph
         public Tensor Copy()
         {
-            Tensor output = new(Dimensions);
-
-            for (int i = 0; i < ElementCount; i++)
-            {
-                output[i] = this[i].Copy();
-            }
-
-            return output;
-        }
-
-        public static Tensor Transpose(Tensor array, int[]? axes = null)
-        {
-            if (axes == null)
-            {
-                axes = new int[array.Rank];
-                for (int i = 0; i < array.Rank; i++)
-                {
-                    axes[i] = array.Rank - 1 - i;
-                }
-            }
-
-            AssertTranspositionAxes(array.Dimensions, axes);
-
-            var outputDims = RemapIndices(array.Dimensions, axes);
-
-            Tensor output = new(outputDims);
-
-            for (int i = 0; i < array.ElementCount; i++)
-            {
-                output[RemapIndices(array.GetFullIndices(i), axes)] = array[i];
-            }
-
-            return output;
-        }
-
-        public static (Tensor normalizedArray, double normalizeFactor) Normalize(Tensor array, double? normalizeFactor = null)
-        {
-            double maxValue = array[0].Value;
-            if (normalizeFactor == null)
-            {
-                foreach (var value in array.ToLinearArray())
-                {
-                    maxValue = Math.Max(maxValue, value.Value);
-                }
-            }
-            else maxValue = normalizeFactor.Value;
-
-            Tensor output = new(array.Dimensions);
-            for (int i = 0; i < array.ElementCount; i++)
-            {
-                output[i] = new(array[i].Value / maxValue);
-            }
-
-            return (output, maxValue);
-        }
-
-        public static Tensor UnnormalizeArray(Tensor array, double normalizeFactor)
-        {
-            Tensor output = new(array.Dimensions);
-            for (int i = 0; i < array.ElementCount; i++)
-            {
-                output[i] = new(array[i].Value * normalizeFactor);
-            }
-
-            return output;
-        }
-
-        public static int[] RemapIndices(int[] indices, int[] axes)
-        {
-            var output = new int[indices.Length];
-
-            for (int i = 0; i < axes.Length; i++)
-            {
-                output[i] = indices[axes[i]];
-            }
-
-            return output;
-        }
-
-        public Number this[params int[] indices]
-        {
-            get => Data[GetLinearIndex(indices)];
-            set => Data[GetLinearIndex(indices)] = value;
-        }
-
-        public Number this[int trueIndex]
-        {
-            get => Data[trueIndex];
-            set => Data[trueIndex] = value;
-        }
-
-        public int GetLength(int dimension) => Dimensions[dimension];
-
-        static void AssertElementwiseDims(Tensor a, Tensor b)
-        {
-            if (a.Rank != b.Rank) throw new ArgumentException("Array dimensions mismatch");
-            else
-            {
-                for (int i = 0; i < a.Rank; i++)
-                {
-                    if (a.GetLength(i) != b.GetLength(i)) throw new ArgumentException("Array dimensions mismatch");
-                }
-            }
-        }
-
-        static void AssertMultiplicationDims(Tensor a, Tensor b)
-        {
-            if (a.Rank != b.Rank) throw new ArgumentException("Invalid array dimensions");
-            else
-            {
-                if (a.Dimensions[^1] != b.Dimensions[^2]) throw new ArgumentException("Invalid array dimensions");
-                for (int i = 0; i < a.Rank - 2; i++)
-                {
-                    if (a.GetLength(i) != b.GetLength(i)) throw new ArgumentException("Invalid array dimensions");
-                }
-            }
-        }
-
-        static void AssertTranspositionAxes(int[] dimensions, int[] axes)
-        {
-            if (axes.Length != dimensions.Length) throw new ArgumentException("Axes must match array dimensions");
-            else
-            {
-                foreach (var axis in axes)
-                {
-                    if (axis >= dimensions.Length) throw new ArgumentException("Axes must match array dimensions");
-                }
-            }
-        }
-    }
-
-    [Serializable]
-    public class Number
-    {
-        public double Value { get; set; }
-        public double Gradient = 0.0;
-        public List<Number> DependsOn = [];
-        public Func<List<double>, double>? Op;
-        public Func<List<double>, List<double>>? BackwardOp;
-        public double FirstMoment = 0.0;
-        public double SecondMoment = 0.0;
-
-        public Number(double value, List<Number>? dependsOn = null, Func<List<double>, double>? op = null, Func<List<double>, List<double>>? backwardOp = null)
-        {
-            Value = value;
-            DependsOn = dependsOn ?? [];
-            Op = op;
-            BackwardOp = backwardOp;
-        }
-
-        public Number() { }
-
-        public static Number operator +(Number a, Number b)
-        {
-            return new(value: a.Value + b.Value, dependsOn: [a, b], op: inputs => inputs[0] + inputs[1], backwardOp: inputs => [1.0, 1.0]);
-        }
-
-        public static Number operator +(Number a, double b)
-        {
-            return a + new Number(b);
-        }
-
-        public static Number operator +(double a, Number b)
-        {
-            return new Number(a) + b;
-        }
-
-        public static Number operator -(Number a, Number b)
-        {
-            return new(value: a.Value - b.Value, dependsOn: [a, b], op: inputs => inputs[0] - inputs[1], backwardOp: inputs => [1.0, -1.0]);
-        }
-
-        public static Number operator -(Number a, double b)
-        {
-            return a - new Number(b);
-        }
-
-        public static Number operator -(double a, Number b)
-        {
-            return new Number(a) - b;
-        }
-
-        public static Number operator *(Number a, Number b)
-        {
-            return new(value: a.Value * b.Value, dependsOn: [a, b], op: inputs => inputs[0] * inputs[1], backwardOp: inputs => [inputs[1], inputs[0]]);
-        }
-
-        public static Number operator *(Number a, double b)
-        {
-            return a * new Number(b);
-        }
-
-        public static Number operator *(double a, Number b)
-        {
-            return new Number(a) * b;
-        }
-
-        public static Number operator /(Number a, Number b)
-        {
-            return new(value: a.Value / b.Value, dependsOn: [a, b], op: inputs => inputs[0] / inputs[1],
-                backwardOp: inputs => [1.0 / inputs[1], -inputs[0] / Math.Pow(inputs[1], 2.0)]);
-        }
-
-        public static Number operator /(Number a, double b)
-        {
-            return a / new Number(b);
-        }
-
-        public static Number operator /(double a, Number b)
-        {
-            return new Number(a) / b;
-        }
-
-        public static Number operator ^(Number a, Number b)
-        {
-            return new(value: Math.Pow(a.Value, b.Value), dependsOn: [a, b], op: inputs => Math.Pow(inputs[0], inputs[1]),
-                backwardOp: inputs => [inputs[1] * Math.Pow(inputs[0], inputs[1] - 1.0), Math.Pow(inputs[0], inputs[1]) * Math.Log(inputs[0])]);
-        }
-
-        public static Number operator ^(Number a, double b)
-        {
-            return a ^ new Number(b);
-        }
-
-        public static Number operator ^(double a, Number b)
-        {
-            return new Number(a) ^ b;
-        }
-
-        public static Number Abs(Number a)
-        {
-            return new(value: Math.Abs(a.Value), dependsOn: [a], op: inputs => Math.Abs(inputs[0]), backwardOp: inputs => [Math.Sign(inputs[0])]);
-        }
-
-        public static Number Max(Number a, Number b)
-        {
-            return (a.Value > b.Value) ? a : b;
-        }
-
-        public static Number Min(Number a, Number b)
-        {
-            return (a.Value < b.Value) ? a : b;
-        }
-
-        public static Number Mean(Number[] inputs)
-        {
-            Number sum = new(0);
-            foreach (var input in inputs)
-            {
-                sum += input;
-            }
-            return sum * (1.0 / inputs.Length);
-        }
-
-        public static Number Tanh(Number x)
-        {
-            double value = MathUtils.Tanh(x.Value);
-
-            return new(
-                value: value,
-                dependsOn: [x],
-                op: inputs => MathUtils.Tanh(inputs[0]),
-                backwardOp: inputs => [1.0 - Math.Pow(MathUtils.Tanh(inputs[0]), 2.0)]
-            );
-        }
-
-        public static Number Sigmoid(Number x)
-        {
-            double value = MathUtils.Sigmoid(x.Value);
-
-            return new(
-                value: value,
-                dependsOn: [x],
-                op: inputs => MathUtils.Sigmoid(inputs[0]),
-                backwardOp: inputs =>
-                {
-                    double sig = MathUtils.Sigmoid(inputs[0]);
-                    return [sig * (1.0 - sig)];
-                }
-            );
-        }
-
-        public static Number LeakyReLU(Number x, double tau)
-        {
-            double value = Math.Max(tau * x.Value, x.Value);
-
-            return new(
-                value: value,
-                dependsOn: [x],
-                op: inputs => Math.Max(tau * inputs[0], inputs[0]),
-                backwardOp: inputs => [inputs[0] > 0.0 ? 1.0 : tau]
-            );
-        }
-
-        public static Number Log(Number logBase, Number arg)
-        {
-            double value = Math.Log(arg.Value, logBase.Value);
-            return new(
-                value: value,
-                dependsOn: [logBase, arg],
-                op: inputs => Math.Log(inputs[1], inputs[0]),
-                backwardOp: inputs => [-(Math.Log(inputs[1]) / (inputs[0] * Math.Pow(Math.Log(inputs[0]), 2.0))),
-                    1.0 / (inputs[1] * Math.Log(inputs[0]))]
-            );
-        }
-
-        public void Backward()
-        {
-            List<Number> topography = [];
-            HashSet<Number> visited = [];
-
-            BuildTopography(topography, visited);
-
-            foreach (var node in topography) node.Gradient = 0.0;
-            Gradient = 1.0;
-
-            for (int i = topography.Count - 1; i >= 0; i--)
-            {
-                topography[i].ApplyBackward();
-            }
-        }
-
-        void BuildTopography(List<Number> topography, HashSet<Number> visited)
-        {
-            if (!visited.Contains(this))
-            {
-                visited.Add(this);
-
-                foreach (var parent in DependsOn)
-                {
-                    parent.BuildTopography(topography, visited);
-                }
-
-                topography.Add(this);
-            }
-        }
-
-        void ApplyBackward()
-        {
-            if (DependsOn.Count > 0 && BackwardOp != null)
-            {
-                var grads = BackwardOp(DependsOn.ConvertAll(d => d.Value));
-
-                for (int i = 0; i < DependsOn.Count; i++)
-                {
-                    DependsOn[i].Gradient += Gradient * grads[i];
-                }
-            }
-        }
-
-        public void ZeroGradient()
-        {
-            Gradient = 0;
-        }
-
-        public override string ToString()
-        {
-            return $"Value = {Value}; Gradient = {Gradient}";
-        }
-
-        public Number Copy()
-        {
-            return new(value: Value);
+            Tensor copy = new(Dimensions, false);
+            Array.Copy(Data, copy.Data, ElementCount);
+            return copy;
         }
     }
 
@@ -2681,6 +2772,11 @@ namespace NNN
         public static double Tanh(double value)
         {
             return Math.Tanh(value);
+        }
+
+        public static TimeSpan RoundToMS(TimeSpan input)
+        {
+            return TimeSpan.FromMilliseconds(Math.Round(input.TotalMilliseconds));
         }
     }
 
