@@ -39,7 +39,8 @@ void InteractionLoop()
     else
     {
         model = new([
-            new Dense(32, new LeakyReLU()),
+            new Dense(256, new LeakyReLU()),
+            new Dense(256, new LeakyReLU()),
             new Dense(env.ActionCount, new Linear())
         ], env.StateFormat);
     }
@@ -266,6 +267,9 @@ namespace NNN
     using System.Diagnostics;
     using System.Linq;
     using System.Text.Json;
+    using System.Numerics;
+    using System.Runtime.InteropServices;
+    using System.Buffers;
 
     public abstract class Environment
     {
@@ -1941,6 +1945,13 @@ namespace NNN
         Action _backward = delegate { };
         static int _forwardGen = 0;
         int _lastGen = -1;
+        List<Tensor>? _topo = null;
+        HashSet<Tensor>? _visited = null;
+
+        // Optimizations
+        static readonly int VectorSize = Vector<double>.Count;
+        const long ParallelThreshold = 500_000;
+        const int TileSize = 32;
 
         // Parameterless constructor for JsonSerializer
         public Tensor() { }
@@ -1978,6 +1989,18 @@ namespace NNN
 
         // Convert multidimensional indices to linear index
         public int LinearIndex(params int[] indices)
+        {
+            int offset = 0;
+
+            for (int i = 0; i < indices.Length; i++)
+            {
+                offset += indices[i] * Strides[i];
+            }
+
+            return offset;
+        }
+
+        int LinearIndex(Span<int> indices)
         {
             int offset = 0;
 
@@ -2035,15 +2058,20 @@ namespace NNN
         {
             Array.Fill(Grad, 1.0);
 
-            List<Tensor> topo = [];
-            BuildTopo(this, topo, []);
+            _topo ??= [];
+            _visited ??= [];
 
-            for (int i = topo.Count - 1; i >= 0; i--)
+            _topo.Clear();
+            _visited.Clear();
+
+            BuildTopo(this, _topo, _visited);
+
+            for (int i = _topo.Count - 1; i >= 0; i--)
             {
-                topo[i]._backward();
+                _topo[i]._backward();
             }
 
-            foreach (var t in topo)
+            foreach (var t in _topo)
             {
                 t.FinalizeForward();
             }
@@ -2090,7 +2118,16 @@ namespace NNN
             // Calculate each element of the resulting Tensor
             Tensor result = GetResultTensor(a, a.Dimensions, a.RequiresGrad || b.RequiresGrad);
 
-            for (int i = 0; i < result.ElementCount; i++)
+            var aVecs = MemoryMarshal.Cast<double, Vector<double>>(a.Data.AsSpan());
+            var bVecs = MemoryMarshal.Cast<double, Vector<double>>(b.Data.AsSpan());
+            var rVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Data.AsSpan());
+
+            for (int i = 0; i < aVecs.Length; i++)
+            {
+                rVecs[i] = aVecs[i] + bVecs[i];
+            }
+            
+            for (int i = aVecs.Length * VectorSize; i < result.ElementCount; i++)
             {
                 result[i] = a[i] + b[i];
             }
@@ -2102,7 +2139,19 @@ namespace NNN
                 // Gradient calculation function
                 result._backward = () =>
                 {
-                    for (int i = 0; i < result.ElementCount; i++)
+                    if (!a.RequiresGrad && !b.RequiresGrad) return;
+
+                    var agVecs = MemoryMarshal.Cast<double, Vector<double>>(a.Grad.AsSpan());
+                    var bgVecs = MemoryMarshal.Cast<double, Vector<double>>(b.Grad.AsSpan());
+                    var rgVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Grad.AsSpan());
+
+                    for (int i = 0; i < rgVecs.Length; i++)
+                    {
+                        if (a.RequiresGrad) agVecs[i] += rgVecs[i];
+                        if (b.RequiresGrad) bgVecs[i] += rgVecs[i];
+                    }
+
+                    for (int i = rgVecs.Length * VectorSize; i < result.ElementCount; i++)
                     {
                         if (a.RequiresGrad) a.Grad[i] += result.Grad[i];
                         if (b.RequiresGrad) b.Grad[i] += result.Grad[i];
@@ -2117,7 +2166,16 @@ namespace NNN
         {
             Tensor result = GetResultTensor(a, a.Dimensions, a.RequiresGrad);
 
-            for (int i = 0; i < result.ElementCount; i++)
+            var aVecs = MemoryMarshal.Cast<double, Vector<double>>(a.Data.AsSpan());
+            var vb = new Vector<double>(b);
+            var rVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Data.AsSpan());
+
+            for (int i = 0; i < aVecs.Length; i++)
+            {
+                rVecs[i] = aVecs[i] + vb;
+            }
+
+            for (int i = aVecs.Length * VectorSize; i < result.ElementCount; i++)
             {
                 result[i] = a[i] + b;
             }
@@ -2130,7 +2188,15 @@ namespace NNN
                 {
                     if (!a.RequiresGrad) return;
 
-                    for (int i = 0; i < result.ElementCount; i++)
+                    var agVecs = MemoryMarshal.Cast<double, Vector<double>>(a.Grad.AsSpan());
+                    var rgVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Grad.AsSpan());
+
+                    for (int i = 0; i < agVecs.Length; i++)
+                    {
+                        agVecs[i] += rgVecs[i];
+                    }
+
+                    for (int i = agVecs.Length * VectorSize; i < a.ElementCount; i++)
                     {
                         a.Grad[i] += result.Grad[i];
                     }
@@ -2141,6 +2207,7 @@ namespace NNN
         }
 
         public static Tensor operator +(double a, Tensor b) => b + a;
+        
 
         // Element-wise subtraction operator
         public static Tensor operator -(Tensor a, Tensor b)
@@ -2148,7 +2215,16 @@ namespace NNN
             // Calculate each element of the resulting Tensor
             Tensor result = GetResultTensor(a, a.Dimensions, a.RequiresGrad || b.RequiresGrad);
 
-            for (int i = 0; i < result.ElementCount; i++)
+            var aVecs = MemoryMarshal.Cast<double, Vector<double>>(a.Data.AsSpan());
+            var bVecs = MemoryMarshal.Cast<double, Vector<double>>(b.Data.AsSpan());
+            var rVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Data.AsSpan());
+
+            for (int i = 0; i < aVecs.Length; i++)
+            {
+                rVecs[i] = aVecs[i] - bVecs[i];
+            }
+
+            for (int i = aVecs.Length * VectorSize; i < result.ElementCount; i++)
             {
                 result[i] = a[i] - b[i];
             }
@@ -2160,7 +2236,19 @@ namespace NNN
                 // Gradient calculation function
                 result._backward = () =>
                 {
-                    for (int i = 0; i < result.ElementCount; i++)
+                    if (!a.RequiresGrad && !b.RequiresGrad) return;
+
+                    var agVecs = MemoryMarshal.Cast<double, Vector<double>>(a.Grad.AsSpan());
+                    var bgVecs = MemoryMarshal.Cast<double, Vector<double>>(b.Grad.AsSpan());
+                    var rgVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Grad.AsSpan());
+
+                    for (int i = 0; i < rgVecs.Length; i++)
+                    {
+                        if (a.RequiresGrad) agVecs[i] += rgVecs[i];
+                        if (b.RequiresGrad) bgVecs[i] -= rgVecs[i];
+                    }
+
+                    for (int i = rgVecs.Length * VectorSize; i < result.ElementCount; i++)
                     {
                         if (a.RequiresGrad) a.Grad[i] += result.Grad[i];
                         if (b.RequiresGrad) b.Grad[i] -= result.Grad[i];
@@ -2175,7 +2263,16 @@ namespace NNN
         {
             Tensor result = GetResultTensor(a, a.Dimensions, a.RequiresGrad);
 
-            for (int i = 0; i < result.ElementCount; i++)
+            var aVecs = MemoryMarshal.Cast<double, Vector<double>>(a.Data.AsSpan());
+            var vb = new Vector<double>(b);
+            var rVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Data.AsSpan());
+
+            for (int i = 0; i < aVecs.Length; i++)
+            {
+                rVecs[i] = aVecs[i] - vb;
+            }
+
+            for (int i = aVecs.Length * VectorSize; i < result.ElementCount; i++)
             {
                 result[i] = a[i] - b;
             }
@@ -2188,7 +2285,15 @@ namespace NNN
                 {
                     if (!a.RequiresGrad) return;
 
-                    for (int i = 0; i < result.ElementCount; i++)
+                    var agVecs = MemoryMarshal.Cast<double, Vector<double>>(a.Grad.AsSpan());
+                    var rgVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Grad.AsSpan());
+
+                    for (int i = 0; i < agVecs.Length; i++)
+                    {
+                        agVecs[i] += rgVecs[i];
+                    }
+
+                    for (int i = agVecs.Length * VectorSize; i < a.ElementCount; i++)
                     {
                         a.Grad[i] += result.Grad[i];
                     }
@@ -2202,7 +2307,16 @@ namespace NNN
         {
             Tensor result = GetResultTensor(b, b.Dimensions, b.RequiresGrad);
 
-            for (int i = 0; i < result.ElementCount; i++)
+            var va = new Vector<double>(a);
+            var bVecs = MemoryMarshal.Cast<double, Vector<double>>(b.Data.AsSpan());
+            var rVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Data.AsSpan());
+            
+            for (int i = 0; i < bVecs.Length; i++)
+            {
+                rVecs[i] = va - bVecs[i];
+            }
+
+            for (int i = bVecs.Length * VectorSize; i < result.ElementCount; i++)
             {
                 result[i] = a - b[i];
             }
@@ -2215,7 +2329,15 @@ namespace NNN
                 {
                     if (!b.RequiresGrad) return;
 
-                    for (int i = 0; i < result.ElementCount; i++)
+                    var bgVecs = MemoryMarshal.Cast<double, Vector<double>>(b.Grad.AsSpan());
+                    var rgVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Grad.AsSpan());
+
+                    for (int i = 0; i < bgVecs.Length; i++)
+                    {
+                        bgVecs[i] -= rgVecs[i];
+                    }
+
+                    for (int i = bgVecs.Length * VectorSize; i < b.ElementCount; i++)
                     {
                         b.Grad[i] -= result.Grad[i];
                     }
@@ -2231,7 +2353,16 @@ namespace NNN
             // Calculate each element of the resulting Tensor
             Tensor result = GetResultTensor(a, a.Dimensions, a.RequiresGrad || b.RequiresGrad);
 
-            for (int i = 0; i < result.ElementCount; i++)
+            var aVecs = MemoryMarshal.Cast<double, Vector<double>>(a.Data.AsSpan());
+            var bVecs = MemoryMarshal.Cast<double, Vector<double>>(b.Data.AsSpan());
+            var rVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Data.AsSpan());
+
+            for (int i = 0; i < aVecs.Length; i++)
+            {
+                rVecs[i] = aVecs[i] * bVecs[i];
+            }
+
+            for (int i = aVecs.Length * VectorSize; i < result.ElementCount; i++)
             {
                 result[i] = a[i] * b[i];
             }
@@ -2243,7 +2374,21 @@ namespace NNN
                 // Gradient calculation function
                 result._backward = () =>
                 {
-                    for (int i = 0; i < result.ElementCount; i++)
+                    if (!a.RequiresGrad && !b.RequiresGrad) return;
+
+                    var avVecs = MemoryMarshal.Cast<double, Vector<double>>(a.Data.AsSpan());
+                    var agVecs = MemoryMarshal.Cast<double, Vector<double>>(a.Grad.AsSpan());
+                    var bvVecs = MemoryMarshal.Cast<double, Vector<double>>(b.Data.AsSpan());
+                    var bgVecs = MemoryMarshal.Cast<double, Vector<double>>(b.Grad.AsSpan());
+                    var rgVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Grad.AsSpan());
+
+                    for (int i = 0; i < rgVecs.Length; i++)
+                    {
+                        if (a.RequiresGrad) agVecs[i] += bvVecs[i] * rgVecs[i];
+                        if (b.RequiresGrad) bgVecs[i] += avVecs[i] * rgVecs[i];
+                    }
+
+                    for (int i = rgVecs.Length * VectorSize; i < result.ElementCount; i++)
                     {
                         if (a.RequiresGrad) a.Grad[i] += b[i] * result.Grad[i];
                         if (b.RequiresGrad) b.Grad[i] += a[i] * result.Grad[i];
@@ -2258,7 +2403,16 @@ namespace NNN
         {
             Tensor result = GetResultTensor(a, a.Dimensions, a.RequiresGrad);
 
-            for (int i = 0; i < result.ElementCount; i++)
+            var aVecs = MemoryMarshal.Cast<double, Vector<double>>(a.Data.AsSpan());
+            var vb = new Vector<double>(b);
+            var rVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Data.AsSpan());
+
+            for (int i = 0; i < aVecs.Length; i++)
+            {
+                rVecs[i] = aVecs[i] * vb;
+            }
+
+            for (int i = aVecs.Length * VectorSize; i < result.ElementCount; i++)
             {
                 result[i] = a[i] * b;
             }
@@ -2271,7 +2425,16 @@ namespace NNN
                 {
                     if (!a.RequiresGrad) return;
 
-                    for (int i = 0; i < result.ElementCount; i++)
+                    var agVecs = MemoryMarshal.Cast<double, Vector<double>>(a.Grad.AsSpan());
+                    var vb = new Vector<double>(b);
+                    var rgVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Grad.AsSpan());
+
+                    for (int i = 0; i < agVecs.Length; i++)
+                    {
+                        agVecs[i] += vb * rgVecs[i];
+                    }
+
+                    for (int i = agVecs.Length * VectorSize; i < a.ElementCount; i++)
                     {
                         a.Grad[i] += b * result.Grad[i];
                     }
@@ -2289,7 +2452,16 @@ namespace NNN
             // Calculate each element of the resulting Tensor
             Tensor result = GetResultTensor(a, a.Dimensions, a.RequiresGrad || b.RequiresGrad);
 
-            for (int i = 0; i < result.ElementCount; i++)
+            var aVecs = MemoryMarshal.Cast<double, Vector<double>>(a.Data.AsSpan());
+            var bVecs = MemoryMarshal.Cast<double, Vector<double>>(b.Data.AsSpan());
+            var rVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Data.AsSpan());
+
+            for (int i = 0; i < aVecs.Length; i++)
+            {
+                rVecs[i] = aVecs[i] / bVecs[i];
+            }
+
+            for (int i = aVecs.Length * VectorSize; i < result.ElementCount; i++)
             {
                 result[i] = a[i] / b[i];
             }
@@ -2301,10 +2473,24 @@ namespace NNN
                 // Gradient calculation function
                 result._backward = () =>
                 {
-                    for (int i = 0; i < result.ElementCount; i++)
+                    if (!a.RequiresGrad && !b.RequiresGrad) return;
+
+                    var avVecs = MemoryMarshal.Cast<double, Vector<double>>(a.Data.AsSpan());
+                    var agVecs = MemoryMarshal.Cast<double, Vector<double>>(a.Grad.AsSpan());
+                    var bvVecs = MemoryMarshal.Cast<double, Vector<double>>(b.Data.AsSpan());
+                    var bgVecs = MemoryMarshal.Cast<double, Vector<double>>(b.Grad.AsSpan());
+                    var rgVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Grad.AsSpan());
+
+                    for (int i = 0; i < rgVecs.Length; i++)
                     {
-                        if (a.RequiresGrad) a.Grad[i] += (1.0 / b[i]) * result.Grad[i];
-                        if (b.RequiresGrad) b.Grad[i] -= a[i] / Math.Pow(b[i], 2.0) * result.Grad[i];
+                        if (a.RequiresGrad) agVecs[i] += rgVecs[i] / bvVecs[i];
+                        if (b.RequiresGrad) bgVecs[i] -= (avVecs[i] / (bvVecs[i] * bvVecs[i])) * rgVecs[i];
+                    }
+
+                    for (int i = rgVecs.Length * VectorSize; i < result.ElementCount; i++)
+                    {
+                        if (a.RequiresGrad) a.Grad[i] += result.Grad[i] / b[i];
+                        if (b.RequiresGrad) b.Grad[i] -= (a[i] / Math.Pow(b[i], 2.0)) * result.Grad[i];
                     }
                 };
             }
@@ -2316,7 +2502,16 @@ namespace NNN
         {
             Tensor result = GetResultTensor(a, a.Dimensions, a.RequiresGrad);
 
-            for (int i = 0; i < result.ElementCount; i++)
+            var aVecs = MemoryMarshal.Cast<double, Vector<double>>(a.Data.AsSpan());
+            var vb = new Vector<double>(b);
+            var rVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Data.AsSpan());
+
+            for (int i = 0; i < aVecs.Length; i++)
+            {
+                rVecs[i] = aVecs[i] / vb;
+            }
+
+            for (int i = aVecs.Length * VectorSize; i < result.ElementCount; i++)
             {
                 result[i] = a[i] / b;
             }
@@ -2329,7 +2524,16 @@ namespace NNN
                 {
                     if (!a.RequiresGrad) return;
 
-                    for (int i = 0; i < result.ElementCount; i++)
+                    var agVecs = MemoryMarshal.Cast<double, Vector<double>>(a.Grad.AsSpan());
+                    var vb = new Vector<double>(b);
+                    var rgVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Grad.AsSpan());
+
+                    for (int i = 0; i < agVecs.Length; i++)
+                    {
+                        agVecs[i] += rgVecs[i] / vb;
+                    }
+
+                    for (int i = agVecs.Length * VectorSize; i < a.ElementCount; i++)
                     {
                         a.Grad[i] += (1.0 / b) * result.Grad[i];
                     }
@@ -2343,7 +2547,16 @@ namespace NNN
         {
             Tensor result = GetResultTensor(b, b.Dimensions, b.RequiresGrad);
 
-            for (int i = 0; i < result.ElementCount; i++)
+            var va = new Vector<double>(a);
+            var bVecs = MemoryMarshal.Cast<double, Vector<double>>(b.Data.AsSpan());
+            var rVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Data.AsSpan());
+
+            for (int i = 0; i < bVecs.Length; i++)
+            {
+                rVecs[i] = va / bVecs[i];
+            }
+
+            for (int i = bVecs.Length * VectorSize; i < result.ElementCount; i++)
             {
                 result[i] = a / b[i];
             }
@@ -2356,9 +2569,19 @@ namespace NNN
                 {
                     if (!b.RequiresGrad) return;
 
-                    for (int i = 0; i < result.ElementCount; i++)
+                    var va = new Vector<double>(a);
+                    var bvVecs = MemoryMarshal.Cast<double, Vector<double>>(b.Data.AsSpan());
+                    var bgVecs = MemoryMarshal.Cast<double, Vector<double>>(b.Grad.AsSpan());
+                    var rgVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Grad.AsSpan());
+
+                    for (int i = 0; i < bgVecs.Length; i++)
                     {
-                        b.Grad[i] -= a / Math.Pow(b[i], 2.0) * result.Grad[i];
+                        bgVecs[i] -= (va / (bvVecs[i] * bvVecs[i])) * rgVecs[i];
+                    }
+
+                    for (int i = bgVecs.Length * VectorSize; i < b.ElementCount; i++)
+                    {
+                        b.Grad[i] -= (a / Math.Pow(b[i], 2.0)) * result.Grad[i];
                     }
                 };
             }
@@ -2384,6 +2607,8 @@ namespace NNN
                 // Gradient calculation function
                 result._backward = () =>
                 {
+                    if (!a.RequiresGrad && !exp.RequiresGrad) return;
+
                     for (int i = 0; i < result.ElementCount; i++)
                     {
                         if (a.RequiresGrad) a.Grad[i] += exp[i] * Math.Pow(a[i], exp[i] - 1.0) * result.Grad[i];
@@ -2399,9 +2624,27 @@ namespace NNN
         {
             Tensor result = GetResultTensor(a, a.Dimensions, a.RequiresGrad);
 
-            for (int i = 0; i < result.ElementCount; i++)
+            if (exp == 2.0 || exp == 0.5)
             {
-                result[i] = Math.Pow(a[i], exp);
+                var aVecs = MemoryMarshal.Cast<double, Vector<double>>(a.Data.AsSpan());
+                var rVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Data.AsSpan());
+
+                for (int i = 0; i < aVecs.Length; i++)
+                {
+                    rVecs[i] = exp == 2.0 ? aVecs[i] * aVecs[i] : Vector.SquareRoot(aVecs[i]);
+                }
+
+                for (int i = aVecs.Length * VectorSize; i < result.ElementCount; i++)
+                {
+                    result[i] = exp == 2.0 ? a[i] * a[i] : Math.Sqrt(a[i]);
+                }
+            }
+            else
+            {
+                for (int i = 0; i < result.ElementCount; i++)
+                {
+                    result[i] = Math.Pow(a[i], exp);
+                }
             }
 
             if (!Inference)
@@ -2412,9 +2655,29 @@ namespace NNN
                 {
                     if (!a.RequiresGrad) return;
 
-                    for (int i = 0; i < result.ElementCount; i++)
+                    if (exp == 2.0 || exp == 0.5)
                     {
-                        a.Grad[i] += exp * Math.Pow(a[i], exp - 1.0) * result.Grad[i];
+                        var avVecs = MemoryMarshal.Cast<double, Vector<double>>(a.Data.AsSpan());
+                        var agVecs = MemoryMarshal.Cast<double, Vector<double>>(a.Grad.AsSpan());
+                        var vexp = new Vector<double>(exp);
+                        var rgVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Grad.AsSpan());
+
+                        for (int i = 0; i < agVecs.Length; i++)
+                        {
+                            agVecs[i] += exp == 2.0 ? vexp * avVecs[i] * rgVecs[i] : (vexp / Vector.SquareRoot(avVecs[i])) * rgVecs[i];
+                        }
+
+                        for (int i = agVecs.Length * VectorSize; i < a.ElementCount; i++)
+                        {
+                            a.Grad[i] += exp * Math.Pow(a[i], exp - 1.0) * result.Grad[i];
+                        }
+                    }
+                    else
+                    {
+                        for (int i = 0; i < a.ElementCount; i++)
+                        {
+                            a.Grad[i] += exp * Math.Pow(a[i], exp - 1.0) * result.Grad[i];
+                        }
                     }
                 };
             }
@@ -2439,9 +2702,20 @@ namespace NNN
                 {
                     if (!exp.RequiresGrad) return;
 
-                    for (int i = 0; i < result.ElementCount; i++)
+                    var expgVecs = MemoryMarshal.Cast<double, Vector<double>>(exp.Grad.AsSpan());
+                    double lna = Math.Log(a);
+                    var vlna = new Vector<double>(lna);
+                    var rvVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Data.AsSpan());
+                    var rgVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Grad.AsSpan());
+
+                    for (int i = 0; i < expgVecs.Length; i++)
                     {
-                        exp.Grad[i] += result[i] * Math.Log(a) * result.Grad[i];
+                        expgVecs[i] += rvVecs[i] * vlna * rgVecs[i];
+                    }
+
+                    for (int i = expgVecs.Length * VectorSize; i < exp.ElementCount; i++)
+                    {
+                        exp.Grad[i] += result[i] * lna * result.Grad[i];
                     }
                 };
             }
@@ -2455,7 +2729,15 @@ namespace NNN
             // Calculate each element of the resulting Tensor
             Tensor result = GetResultTensor(t, t.Dimensions, t.RequiresGrad);
 
-            for (int i = 0; i < result.ElementCount; i++)
+            var tVecs = MemoryMarshal.Cast<double, Vector<double>>(t.Data.AsSpan());
+            var rVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Data.AsSpan());
+
+            for (int i = 0; i < tVecs.Length; i++)
+            {
+                rVecs[i] = Vector.Exp(tVecs[i]);
+            }
+
+            for (int i = tVecs.Length * VectorSize; i < result.ElementCount; i++)
             {
                 result[i] = Math.Exp(t[i]);
             }
@@ -2469,7 +2751,16 @@ namespace NNN
                 {
                     if (!t.RequiresGrad) return;
 
-                    for (int i = 0; i < result.ElementCount; i++)
+                    var tgVecs = MemoryMarshal.Cast<double, Vector<double>>(t.Grad.AsSpan());
+                    var rvVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Data.AsSpan());
+                    var rgVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Grad.AsSpan());
+
+                    for (int i = 0; i < rgVecs.Length; i++)
+                    {
+                        tgVecs[i] += rvVecs[i] * rgVecs[i];
+                    }
+
+                    for (int i = rgVecs.Length * VectorSize; i < result.ElementCount; i++)
                     {
                         t.Grad[i] += result[i] * result.Grad[i];
                     }
@@ -2485,7 +2776,16 @@ namespace NNN
             // Calculate each element of the resulting Tensor
             Tensor result = GetResultTensor(logBase, logBase.Dimensions, logBase.RequiresGrad || arg.RequiresGrad);
 
-            for (int i = 0; i < result.ElementCount; i++)
+            var lbVecs = MemoryMarshal.Cast<double, Vector<double>>(logBase.Data.AsSpan());
+            var argVecs = MemoryMarshal.Cast<double, Vector<double>>(arg.Data.AsSpan());
+            var rVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Data.AsSpan());
+
+            for (int i = 0; i < lbVecs.Length; i++)
+            {
+                rVecs[i] = Vector.Log(argVecs[i]) / Vector.Log(lbVecs[i]);
+            }
+
+            for (int i = lbVecs.Length * VectorSize; i < result.ElementCount; i++)
             {
                 result[i] = Math.Log(arg[i], logBase[i]);
             }
@@ -2497,10 +2797,29 @@ namespace NNN
                 // Gradient calculation function
                 result._backward = () =>
                 {
-                    for (int i = 0; i < result.ElementCount; i++)
+                    if (!logBase.RequiresGrad && !arg.RequiresGrad) return;
+
+                    var lbvVecs = MemoryMarshal.Cast<double, Vector<double>>(logBase.Data.AsSpan());
+                    var lbgVecs = MemoryMarshal.Cast<double, Vector<double>>(logBase.Grad.AsSpan());
+                    var argvVecs = MemoryMarshal.Cast<double, Vector<double>>(arg.Data.AsSpan());
+                    var arggVecs = MemoryMarshal.Cast<double, Vector<double>>(arg.Grad.AsSpan());
+                    var rgVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Grad.AsSpan());
+
+                    for (int i = 0; i < rgVecs.Length; i++)
                     {
-                        if (logBase.RequiresGrad) logBase.Grad[i] -= (Math.Log(arg[i]) / (logBase[i] * Math.Pow(Math.Log(logBase[i]), 2.0))) * result.Grad[i];
-                        if (arg.RequiresGrad) arg.Grad[i] += (1.0 / (arg[i] * Math.Log(logBase[i]))) * result.Grad[i];
+                        var lnb = Vector.Log(lbvVecs[i]);
+                        if (logBase.RequiresGrad)
+                        {
+                            lbgVecs[i] -= (Vector.Log(argvVecs[i]) / (lbvVecs[i] * lnb * lnb)) * rgVecs[i];
+                        }
+                        if (arg.RequiresGrad) arggVecs[i] += rgVecs[i] / (argvVecs[i] * lnb);
+                    }
+
+                    for (int i = rgVecs.Length * VectorSize; i < result.ElementCount; i++)
+                    {
+                        double lnb = Math.Log(logBase[i]);
+                        if (logBase.RequiresGrad) logBase.Grad[i] -= (Math.Log(arg[i]) / (logBase[i] * Math.Pow(lnb, 2.0))) * result.Grad[i];
+                        if (arg.RequiresGrad) arg.Grad[i] += (1.0 / (arg[i] * lnb)) * result.Grad[i];
                     }
                 };
             }
@@ -2512,7 +2831,16 @@ namespace NNN
         {
             Tensor result = GetResultTensor(logBase, logBase.Dimensions, logBase.RequiresGrad);
 
-            for (int i = 0; i < result.ElementCount; i++)
+            var lbVecs = MemoryMarshal.Cast<double, Vector<double>>(logBase.Data.AsSpan());
+            var lnvarg = Vector.Log(new Vector<double>(arg));
+            var rVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Data.AsSpan());
+
+            for (int i = 0; i < lbVecs.Length; i++)
+            {
+                rVecs[i] = lnvarg / Vector.Log(lbVecs[i]);
+            }
+
+            for (int i = lbVecs.Length * VectorSize; i < result.ElementCount; i++)
             {
                 result[i] = Math.Log(arg, logBase[i]);
             }
@@ -2525,9 +2853,21 @@ namespace NNN
                 {
                     if (!logBase.RequiresGrad) return;
 
-                    for (int i = 0; i < result.ElementCount; i++)
+                    var lbvVecs = MemoryMarshal.Cast<double, Vector<double>>(logBase.Data.AsSpan());
+                    var lbgVecs = MemoryMarshal.Cast<double, Vector<double>>(logBase.Grad.AsSpan());
+                    double lnarg = Math.Log(arg);
+                    var lnvarg = new Vector<double>(lnarg);
+                    var rgVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Grad.AsSpan());
+
+                    for (int i = 0; i < rgVecs.Length; i++)
                     {
-                        logBase.Grad[i] -= (Math.Log(arg) / (logBase[i] * Math.Pow(Math.Log(logBase[i]), 2.0))) * result.Grad[i];
+                        var lnb = Vector.Log(lbvVecs[i]);
+                        lbgVecs[i] -= (lnvarg / (lbvVecs[i] * lnb * lnb)) * rgVecs[i];
+                    }
+
+                    for (int i = rgVecs.Length * VectorSize; i < result.ElementCount; i++)
+                    {
+                        logBase.Grad[i] -= (lnarg / (logBase[i] * Math.Pow(Math.Log(logBase[i]), 2.0))) * result.Grad[i];
                     }
                 };
             }
@@ -2539,7 +2879,16 @@ namespace NNN
         {
             Tensor result = GetResultTensor(arg, arg.Dimensions, arg.RequiresGrad);
 
-            for (int i = 0; i < result.ElementCount; i++)
+            var lnvlb = Vector.Log(new Vector<double>(logBase));
+            var argVecs = MemoryMarshal.Cast<double, Vector<double>>(arg.Data.AsSpan());
+            var rVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Data.AsSpan());
+
+            for (int i = 0; i < argVecs.Length; i++)
+            {
+                rVecs[i] = Vector.Log(argVecs[i]) / lnvlb;
+            }
+
+            for (int i = argVecs.Length * VectorSize; i < result.ElementCount; i++)
             {
                 result[i] = Math.Log(arg[i], logBase);
             }
@@ -2552,9 +2901,20 @@ namespace NNN
                 {
                     if (!arg.RequiresGrad) return;
 
-                    for (int i = 0; i < result.ElementCount; i++)
+                    double lnb = Math.Log(logBase);
+                    var lnvlb = new Vector<double>(lnb);
+                    var argvVecs = MemoryMarshal.Cast<double, Vector<double>>(arg.Data.AsSpan());
+                    var arggVecs = MemoryMarshal.Cast<double, Vector<double>>(arg.Grad.AsSpan());
+                    var rgVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Grad.AsSpan());
+
+                    for (int i = 0; i < rgVecs.Length; i++)
                     {
-                        arg.Grad[i] += (1.0 / (arg[i] * Math.Log(logBase))) * result.Grad[i];
+                        arggVecs[i] += rgVecs[i] / (argvVecs[i] * lnvlb);
+                    }
+
+                    for (int i = rgVecs.Length * VectorSize; i < result.ElementCount; i++)
+                    {
+                        arg.Grad[i] += (1.0 / (arg[i] * lnb)) * result.Grad[i];
                     }
                 };
             }
@@ -2577,30 +2937,50 @@ namespace NNN
             int bMatSize = n * p;
             int rMatSize = m * p;
 
+            int totalRows = batchSize * m;
+
             // Build result dims -> batch dims + [m, p]
             var resultDims = (int[])a.Dimensions.Clone();
             resultDims[^1] = p;
 
             Tensor result = GetResultTensor(a, resultDims, a.RequiresGrad || b.RequiresGrad);
 
-            for (int batch = 0; batch < batchSize; batch++)
+            bool useParallel = (long)totalRows * n * p > ParallelThreshold;
+            double[] bT = ArrayPool<double>.Shared.Rent(bMatSize * batchSize);
+            try
             {
-                int aOffset = batch * aMatSize;
-                int bOffset = batch * bMatSize;
-                int rOffset = batch * rMatSize;
-
-                for (int i = 0; i < m; i++)
+                for (int batch = 0; batch < batchSize; batch++)
                 {
-                    for (int j = 0; j < p; j++)
+                    TransposeMatrix(b.Data, bT, batch * bMatSize, batch * bMatSize, n, p);
+                }
+
+                if (useParallel)
+                {
+                    Parallel.For(0, batchSize * m, row =>
                     {
-                        double sum = 0.0;
-                        for (int k = 0; k < n; k++)
+                        int batch = row / m;
+                        int i = row % m;
+                        ComputeRow(i, n, p, a.Data, bT, result.Data, batch * aMatSize, batch * bMatSize, batch * rMatSize);
+                    });
+                }
+                else
+                {
+                    for (int batch = 0; batch < batchSize; batch++)
+                    {
+                        int aOff = batch * aMatSize;
+                        int bTOff = batch * bMatSize;
+                        int rOff = batch * rMatSize;
+
+                        for (int i = 0; i < m; i++)
                         {
-                            sum += a[aOffset + i * n + k] * b[bOffset + k * p + j];
+                            ComputeRow(i, n, p, a.Data, bT, result.Data, aOff, bTOff, rOff);
                         }
-                        result[rOffset + i * p + j] = sum;
                     }
                 }
+            }
+            finally
+            {
+                ArrayPool<double>.Shared.Return(bT);
             }
 
             if (!Inference)
@@ -2612,39 +2992,133 @@ namespace NNN
                 {
                     for (int batch = 0; batch < batchSize; batch++)
                     {
-                        int aOffset = batch * aMatSize;
-                        int bOffset = batch * bMatSize;
-                        int rOffset = batch * rMatSize;
+                        int aOff = batch * aMatSize;
+                        int bOff = batch * bMatSize;
+                        int rOff = batch * rMatSize;
+                        bool par = (long)m * n * p > ParallelThreshold;
 
-                        if (a.RequiresGrad)
+                        if (a.RequiresGrad && b.RequiresGrad)
                         {
-                            for (int i = 0; i < m; i++)
+                            double[] bT = ArrayPool<double>.Shared.Rent(bMatSize);
+                            double[] aT = ArrayPool<double>.Shared.Rent(aMatSize);
+                            double[] dOutT = ArrayPool<double>.Shared.Rent(rMatSize);
+                            try
                             {
-                                for (int k = 0; k < n; k++)
+                                TransposeMatrix(b.Data, bT, bOff, 0, n, p);
+                                TransposeMatrix(a.Data, aT, aOff, 0, m, n);
+                                TransposeMatrix(result.Grad, dOutT, rOff, 0, m, p);
+
+                                if (par)
                                 {
-                                    double grad = 0.0;
-                                    for (int j = 0; j < p; j++)
+                                    Parallel.For(0, m, i =>
                                     {
-                                        grad += result.Grad[rOffset + i * p + j] * b[bOffset + k * p + j];
-                                    }
-                                    a.Grad[aOffset + i * n + k] += grad;
-                                }
-                            }
-                        }
+                                        for (int k = 0; k < n; k++)
+                                        {
+                                            a.Grad[aOff + i * n + k] += DotProduct(result.Grad, bT, rOff + i * p, k * n, p);
+                                        }
+                                    });
 
-                        if (b.RequiresGrad)
-                        {
-                            for (int k = 0; k < n; k++)
-                            {
-                                for (int j = 0; j < p; j++)
+                                    Parallel.For(0, n, k =>
+                                    {
+                                        for (int j = 0; j < p; j++)
+                                        {
+                                            b.Grad[bOff + k * p + j] += DotProduct(aT, dOutT, k * m, j * m, m);
+                                        }
+                                    });
+                                }
+                                else
                                 {
-                                    double grad = 0.0;
                                     for (int i = 0; i < m; i++)
                                     {
-                                        grad += a[aOffset + i * n + k] * result.Grad[rOffset + i * p + j];
+                                        for (int k = 0; k < n; k++)
+                                        {
+                                            a.Grad[aOff + i * n + k] += DotProduct(result.Grad, bT, rOff + i * p, k * n, p); 
+                                        }
                                     }
-                                    b.Grad[bOffset + k * p + j] += grad;
+
+                                    for (int k = 0; k < n; k++)
+                                    {
+                                        for (int j = 0; j < p; j++)
+                                        {
+                                            b.Grad[bOff + k * p + j] += DotProduct(aT, dOutT, k * m, j * m, m);
+                                        }
+                                    }
                                 }
+                            }
+                            finally
+                            {
+                                ArrayPool<double>.Shared.Return(bT);
+                                ArrayPool<double>.Shared.Return(aT);
+                                ArrayPool<double>.Shared.Return(dOutT);
+                            }
+                        }
+                        else if (a.RequiresGrad)
+                        {
+                            double[] bT = ArrayPool<double>.Shared.Rent(bMatSize);
+                            try
+                            {
+                                TransposeMatrix(b.Data, bT, bOff, 0, n, p);
+
+                                if (par)
+                                {
+                                    Parallel.For(0, m, i =>
+                                    {
+                                        for (int k = 0; k < n; k++)
+                                        {
+                                            a.Grad[aOff + i * n + k] += DotProduct(result.Grad, bT, rOff + i * p, k * n, p);
+                                        }
+                                    });
+                                }
+                                else
+                                {
+                                    for (int i = 0; i < m; i++)
+                                    {
+                                        for (int k = 0; k < n; k++)
+                                        {
+                                            a.Grad[aOff + i * n + k] += DotProduct(result.Grad, bT, rOff + i * p, k * n, p);
+                                        }
+                                    }
+                                }
+                            }
+                            finally
+                            {
+                                ArrayPool<double>.Shared.Return(bT);
+                            }
+                        }
+                        else if (b.RequiresGrad)
+                        {
+                            double[] aT = ArrayPool<double>.Shared.Rent(aMatSize);
+                            double[] dOutT = ArrayPool<double>.Shared.Rent(rMatSize);
+                            try
+                            {
+                                TransposeMatrix(a.Data, aT, aOff, 0, m, n);
+                                TransposeMatrix(result.Grad, dOutT, rOff, 0, m, p);
+
+                                if (par)
+                                {
+                                    Parallel.For(0, n, k =>
+                                    {
+                                        for (int j = 0; j < p; j++)
+                                        {
+                                            b.Grad[bOff + k * p + j] += DotProduct(aT, dOutT, k * m, j * m, m);
+                                        }
+                                    });
+                                }
+                                else
+                                {
+                                    for (int k = 0; k < n; k++)
+                                    {
+                                        for (int j = 0; j < p; j++)
+                                        {
+                                            b.Grad[bOff + k * p + j] += DotProduct(aT, dOutT, k * m, j * m, m);
+                                        }
+                                    }
+                                }
+                            }
+                            finally
+                            {
+                                ArrayPool<double>.Shared.Return(aT);
+                                ArrayPool<double>.Shared.Return(dOutT);
                             }
                         }
                     }
@@ -2654,15 +3128,61 @@ namespace NNN
             return result;
         }
 
+        static void TransposeMatrix(double[] src, double[] dst, int srcOff, int dstOff, int rows, int cols)
+        {
+            for (int r = 0; r < rows; r++)
+            {
+                for (int c = 0; c < cols; c++)
+                {
+                    dst[dstOff + c * rows + r] = src[srcOff + r * cols + c];
+                }
+            }
+        }
+
+        static void ComputeRow(int i, int n, int p, double[] a, double[] bT, double[] r, int aOff, int bTOff, int rOff)
+        {
+            for (int j = 0; j < p; j++)
+            {
+                r[rOff + i * p + j] = DotProduct(a, bT, aOff + i * n, bTOff + j * n, n);
+            }
+        }
+
+        static double DotProduct(double[] x, double[] y, int xOff, int yOff, int len)
+        {
+            var xVecs = MemoryMarshal.Cast<double, Vector<double>>(x.AsSpan(xOff, len));
+            var yVecs = MemoryMarshal.Cast<double, Vector<double>>(y.AsSpan(yOff, len));
+
+            var acc = Vector<double>.Zero;
+            for (int i = 0; i < xVecs.Length; i++)
+            {
+                acc += xVecs[i] * yVecs[i];
+            }
+            double sum = Vector.Sum(acc);
+            for (int i = xVecs.Length * VectorSize; i < len; i++)
+            {
+                sum += x[xOff + i] * y[yOff + i];
+            }
+
+            return sum;
+        }
+
         // Rectified Linear Unit activation function
         public static Tensor ReLU(Tensor t)
         {
             // Apply ReLU function to each element
             Tensor result = GetResultTensor(t, t.Dimensions, t.RequiresGrad);
 
-            for (int i = 0; i < result.ElementCount; i++)
+            var tVecs = MemoryMarshal.Cast<double, Vector<double>>(t.Data.AsSpan());
+            var rVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Data.AsSpan());
+
+            for (int i = 0; i < tVecs.Length; i++)
             {
-                result[i] = t[i] > 0.0 ? t[i] : 0.0;
+                rVecs[i] = Vector.Max(tVecs[i], Vector<double>.Zero);
+            }
+
+            for (int i = tVecs.Length * VectorSize; i < result.ElementCount; i++)
+            {
+                result[i] = Math.Max(t[i], 0.0);
             }
 
             if (!Inference)
@@ -2674,7 +3194,17 @@ namespace NNN
                 {
                     if (!t.RequiresGrad) return;
 
-                    for (int i = 0; i < result.ElementCount; i++)
+                    var tvVecs = MemoryMarshal.Cast<double, Vector<double>>(t.Data.AsSpan());
+                    var tgVecs = MemoryMarshal.Cast<double, Vector<double>>(t.Grad.AsSpan());
+                    var rgVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Grad.AsSpan());
+
+                    for (int i = 0; i < rgVecs.Length; i++)
+                    {
+                        var mask = Vector.GreaterThan(tvVecs[i], Vector<double>.Zero);
+                        tgVecs[i] += Vector.ConditionalSelect(mask, rgVecs[i], Vector<double>.Zero);
+                    }
+
+                    for (int i = rgVecs.Length * VectorSize; i < result.ElementCount; i++)
                     {
                         t.Grad[i] += (t[i] > 0.0 ? 1.0 : 0.0) * result.Grad[i];
                     }
@@ -2690,7 +3220,17 @@ namespace NNN
             // Apply LeakyReLU function to each element
             Tensor result = GetResultTensor(t, t.Dimensions, t.RequiresGrad);
 
-            for (int i = 0; i < result.ElementCount; i++)
+            var tVecs = MemoryMarshal.Cast<double, Vector<double>>(t.Data.AsSpan());
+            var vtau = new Vector<double>(tau);
+            var rVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Data.AsSpan());
+
+            for (int i = 0; i < tVecs.Length; i++)
+            {
+                var mask = Vector.GreaterThan(tVecs[i], Vector<double>.Zero);
+                rVecs[i] = Vector.ConditionalSelect(mask, tVecs[i], vtau * tVecs[i]);
+            }
+
+            for (int i = tVecs.Length * VectorSize; i < result.ElementCount; i++)
             {
                 result[i] = t[i] > 0.0 ? t[i] : tau * t[i];
             }
@@ -2704,7 +3244,18 @@ namespace NNN
                 {
                     if (!t.RequiresGrad) return;
 
-                    for (int i = 0; i < result.ElementCount; i++)
+                    var tvVecs = MemoryMarshal.Cast<double, Vector<double>>(t.Data.AsSpan());
+                    var tgVecs = MemoryMarshal.Cast<double, Vector<double>>(t.Grad.AsSpan());
+                    var vtau = new Vector<double>(tau);
+                    var rgVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Grad.AsSpan());
+
+                    for (int i = 0; i < rgVecs.Length; i++)
+                    {
+                        var mask = Vector.GreaterThan(tvVecs[i], Vector<double>.Zero);
+                        tgVecs[i] += Vector.ConditionalSelect(mask, Vector<double>.One, vtau) * rgVecs[i];
+                    }
+
+                    for (int i = rgVecs.Length * VectorSize; i < result.ElementCount; i++)
                     {
                         t.Grad[i] += (t[i] > 0.0 ? 1.0 : tau) * result.Grad[i];
                     }
@@ -2720,7 +3271,16 @@ namespace NNN
             // Apply Sigmoid function to each element
             Tensor result = GetResultTensor(t, t.Dimensions, t.RequiresGrad);
 
-            for (int i = 0; i < result.ElementCount; i++)
+            var tVecs = MemoryMarshal.Cast<double, Vector<double>>(t.Data.AsSpan());
+            var vone = Vector<double>.One;
+            var rVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Data.AsSpan());
+
+            for (int i = 0; i < tVecs.Length; i++)
+            {
+                rVecs[i] = vone / (vone + Vector.Exp(-tVecs[i]));
+            }
+
+            for (int i = tVecs.Length * VectorSize; i < result.ElementCount; i++)
             {
                 result[i] = MathUtils.Sigmoid(t[i]);
             }
@@ -2734,7 +3294,16 @@ namespace NNN
                 {
                     if (!t.RequiresGrad) return;
 
-                    for (int i = 0; i < result.ElementCount; i++)
+                    var tgVecs = MemoryMarshal.Cast<double, Vector<double>>(t.Grad.AsSpan());
+                    var rvVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Data.AsSpan());
+                    var rgVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Grad.AsSpan());
+
+                    for (int i = 0; i < rgVecs.Length; i++)
+                    {
+                        tgVecs[i] += rvVecs[i] * (Vector<double>.One - rvVecs[i]) * rgVecs[i];
+                    }
+
+                    for (int i = rgVecs.Length * VectorSize; i < result.ElementCount; i++)
                     {
                         t.Grad[i] += result[i] * (1.0 - result[i]) * result.Grad[i];
                     }
@@ -2750,7 +3319,18 @@ namespace NNN
             // Apply Tanh function to each element
             Tensor result = GetResultTensor(t, t.Dimensions, t.RequiresGrad);
 
-            for (int i = 0; i < result.ElementCount; i++)
+            var tVecs = MemoryMarshal.Cast<double, Vector<double>>(t.Data.AsSpan());
+            var vone = Vector<double>.One;
+            var vtwo = new Vector<double>(2.0);
+            var rVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Data.AsSpan());
+
+            for (int i = 0; i < tVecs.Length; i++)
+            {
+                var e2x = Vector.Exp(vtwo * tVecs[i]);
+                rVecs[i] = (e2x - vone) / (e2x + vone);
+            }
+
+            for (int i = tVecs.Length * VectorSize; i < result.ElementCount; i++)
             {
                 result[i] = MathUtils.Tanh(t[i]);
             }
@@ -2764,7 +3344,16 @@ namespace NNN
                 {
                     if (!t.RequiresGrad) return;
 
-                    for (int i = 0; i < result.ElementCount; i++)
+                    var tgVecs = MemoryMarshal.Cast<double, Vector<double>>(t.Grad.AsSpan());
+                    var rvVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Data.AsSpan());
+                    var rgVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Grad.AsSpan());
+
+                    for (int i = 0; i < rgVecs.Length; i++)
+                    {
+                        tgVecs[i] += (Vector<double>.One - (rvVecs[i] * rvVecs[i])) * rgVecs[i];
+                    }
+
+                    for (int i = rgVecs.Length * VectorSize; i < result.ElementCount; i++)
                     {
                         t.Grad[i] += (1.0 - Math.Pow(result[i], 2.0)) * result.Grad[i];
                     }
@@ -2787,21 +3376,50 @@ namespace NNN
             {
                 int offset = b * classes;
 
-                double max = t[offset];
-                for (int i = 0; i < classes; i++)
+                var tSlice = t.Data.AsSpan(offset, classes);
+                var tVecs = MemoryMarshal.Cast<double, Vector<double>>(tSlice);
+                var rSlice = result.Data.AsSpan(offset, classes);
+                var rVecs = MemoryMarshal.Cast<double, Vector<double>>(rSlice);
+
+                var vmax = new Vector<double>(double.MinValue);
+                for (int i = 0; i < tVecs.Length; i++)
                 {
-                    if (t[offset + i] > max) max = t[offset + i];
+                    vmax = Vector.Max(vmax, tVecs[i]);
+                }
+                double max = double.MinValue;
+                for (int lane = 0; lane < VectorSize; lane++)
+                {
+                    max = Math.Max(max, vmax[lane]);
+                }
+                for (int i = tVecs.Length * VectorSize; i < classes; i++)
+                {
+                    max = Math.Max(max, tSlice[i]);
                 }
 
-                double sum = 0;
-                for (int i = 0; i < classes; i++)
+                var vmaxSplat = new Vector<double>(max);
+                var acc = Vector<double>.Zero;
+                for (int i = 0; i < tVecs.Length; i++)
                 {
-                    result[offset + i] = Math.Exp(t[offset + i] - max);
-                    sum += result[offset + i];
+                    rVecs[i] = Vector.Exp(tVecs[i] - vmaxSplat);
+                    acc += rVecs[i];
                 }
-                for (int i = 0; i < classes; i++)
+                double sum = Vector.Sum(acc);
+
+                for (int i = tVecs.Length * VectorSize; i < classes; i++)
                 {
-                    result[offset + i] /= sum;
+                    rSlice[i] = Math.Exp(tSlice[i] - max);
+                    sum += rSlice[i];
+                }
+
+                var vsumSplat = new Vector<double>(sum);
+                for (int i = 0; i < rVecs.Length; i++)
+                {
+                    rVecs[i] /= vsumSplat;
+                }
+                
+                for (int i = rVecs.Length * VectorSize; i < classes; i++)
+                {
+                    rSlice[i] /= sum;
                 }
             }
 
@@ -2819,14 +3437,33 @@ namespace NNN
                     {
                         int offset = b * classes;
 
-                        double dot = 0;
-                        for (int i = 0; i < classes; i++)
+                        var tgSlice = t.Grad.AsSpan(offset, classes);
+                        var tgVecs = MemoryMarshal.Cast<double, Vector<double>>(tgSlice);
+                        var rvSlice = result.Data.AsSpan(offset, classes);
+                        var rvVecs = MemoryMarshal.Cast<double, Vector<double>>(rvSlice);
+                        var rgSlice = result.Grad.AsSpan(offset, classes);
+                        var rgVecs = MemoryMarshal.Cast<double, Vector<double>>(rgSlice);
+
+                        var vdot = Vector<double>.Zero;
+                        for (int i = 0; i < rvVecs.Length; i++)
                         {
-                            dot += result.Grad[offset + i] * result[offset + i];
+                            vdot += rgVecs[i] * rvVecs[i];
                         }
-                        for (int i = 0; i < classes; i++)
+                        double dot = Vector.Sum(vdot);
+                        for (int i = rvVecs.Length * VectorSize; i < classes; i++)
                         {
-                            t.Grad[offset + i] += result[offset + i] * (result.Grad[offset + i] - dot);
+                            dot += rgSlice[i] * rvSlice[i];
+                        }
+
+                        var vdotSplat = new Vector<double>(dot);
+                        for (int i = 0; i < tgVecs.Length; i++)
+                        {
+                            tgVecs[i] += rvVecs[i] * (rgVecs[i] - vdotSplat);
+                        }
+
+                        for (int i = tgVecs.Length * VectorSize; i < classes; i++)
+                        {
+                            tgSlice[i] += rvSlice[i] * (rgSlice[i] - dot);
                         }
                     }
                 };
@@ -2841,11 +3478,21 @@ namespace NNN
             // Calculate sum of all elements
             Tensor result = GetResultTensor(t, [1], t.RequiresGrad);
 
-            result[0] = 0.0;
-            for (int i = 0; i < t.ElementCount; i++)
+            var tVecs = MemoryMarshal.Cast<double, Vector<double>>(t.Data.AsSpan());
+            var acc = Vector<double>.Zero;
+
+            for (int i = 0; i < tVecs.Length; i++)
             {
-                result[0] += t[i];
+                acc += tVecs[i];
             }
+            double sum = Vector.Sum(acc);
+
+            for (int i = tVecs.Length * VectorSize; i < t.ElementCount ; i++)
+            {
+                sum += t[i];
+            }
+
+            result[0] = sum;
 
             if (!Inference)
             {
@@ -2856,7 +3503,15 @@ namespace NNN
                 {
                     if (!t.RequiresGrad) return;
 
-                    for (int i = 0; i < t.ElementCount; i++)
+                    var tgVecs = MemoryMarshal.Cast<double, Vector<double>>(t.Grad.AsSpan());
+                    var vrg = new Vector<double>(result.Grad[0]);
+
+                    for (int i = 0; i < tgVecs.Length; i++)
+                    {
+                        tgVecs[i] += vrg;
+                    }
+
+                    for (int i = tgVecs.Length * VectorSize; i < t.ElementCount; i++)
                     {
                         t.Grad[i] += result.Grad[0];
                     }
@@ -2872,12 +3527,21 @@ namespace NNN
             // Calculate mean of all elements
             Tensor result = GetResultTensor(t, [1], t.RequiresGrad);
 
-            result[0] = 0.0;
-            for (int i = 0; i < t.ElementCount; i++)
+            var tVecs = MemoryMarshal.Cast<double, Vector<double>>(t.Data.AsSpan());
+            var acc = Vector<double>.Zero;
+
+            for (int i = 0; i < tVecs.Length; i++)
             {
-                result[0] += t[i];
+                acc += tVecs[i];
             }
-            result[0] /= t.ElementCount;
+            double sum = Vector.Sum(acc);
+
+            for (int i = tVecs.Length * VectorSize; i < t.ElementCount; i++)
+            {
+                sum += t[i];
+            }
+
+            result[0] = sum / t.ElementCount;
 
             if (!Inference)
             {
@@ -2888,10 +3552,18 @@ namespace NNN
                 {
                     if (!t.RequiresGrad) return;
 
-                    double grad = result.Grad[0] / t.ElementCount;
-                    for (int i = 0; i < t.GradCount; i++)
+                    var tgVecs = MemoryMarshal.Cast<double, Vector<double>>(t.Grad.AsSpan());
+                    double rg = result.Grad[0] / t.ElementCount;
+                    var vrg = new Vector<double>(rg);
+
+                    for (int i = 0; i < tgVecs.Length; i++)
                     {
-                        t.Grad[i] += grad;
+                        tgVecs[i] += vrg;
+                    }
+
+                    for (int i = tgVecs.Length * VectorSize; i < t.GradCount; i++)
+                    {
+                        t.Grad[i] += rg;
                     }
                 };
             }
@@ -2939,11 +3611,13 @@ namespace NNN
 
             Tensor result = GetResultTensor(t, resultDims, t.RequiresGrad);
 
+            Span<int> srcIndices = stackalloc int[t.Rank];
+            Span<int> dstIndices = stackalloc int[axes.Length];
+
             // Remap each element
             for (int i = 0; i < t.ElementCount; i++)
             {
-                var srcIndices = t.GetFullIndices(i);
-                var dstIndices = new int[axes.Length];
+                t.GetFullIndices(i, srcIndices);
                 for (int j = 0; j < axes.Length; j++)
                 {
                     dstIndices[j] = srcIndices[axes[j]];
@@ -2967,10 +3641,12 @@ namespace NNN
                 {
                     if (!t.RequiresGrad) return;
 
+                    Span<int> srcIndices = stackalloc int[result.Rank];
+                    Span<int> dstIndices = stackalloc int[invAxes.Length];
+
                     for (int i = 0; i < result.ElementCount; i++)
                     {
-                        var srcIndices = result.GetFullIndices(i);
-                        var dstIndices = new int[invAxes.Length];
+                        result.GetFullIndices(i, srcIndices);
                         for (int j = 0; j < invAxes.Length; j++)
                         {
                             dstIndices[j] = srcIndices[invAxes[j]];
@@ -2990,11 +3666,26 @@ namespace NNN
 
             Tensor result = GetResultTensor(t, targetDims, t.RequiresGrad);
 
-            for (int i = 0; i < result.ElementCount; i++)
+            if (t.Rank == 1)
             {
-                var indices = result.GetFullIndices(i);
-                var srcIndices = indices[^t.Rank..];
-                result[i] = t[t.LinearIndex(srcIndices)];
+                int stride = t.ElementCount;
+                int rows = result.ElementCount / stride;
+                for (int r = 0; r < rows; r++)
+                {
+                    t.Data.AsSpan(0, stride).CopyTo(result.Data.AsSpan(r * stride, stride));
+                }
+            }
+            else
+            {
+                Span<int> indices = stackalloc int[result.Rank];
+                Span<int> srcIndices = stackalloc int[t.Rank];
+
+                for (int i = 0; i < result.ElementCount; i++)
+                {
+                    result.GetFullIndices(i);
+                    indices[^t.Rank..].CopyTo(srcIndices);
+                    result[i] = t[t.LinearIndex(srcIndices)];
+                }
             }
 
             if (!Inference)
@@ -3006,11 +3697,38 @@ namespace NNN
                 {
                     if (!t.RequiresGrad) return;
 
-                    for (int i = 0; i < result.ElementCount; i++)
+                    if (t.Rank == 1)
                     {
-                        var indices = result.GetFullIndices(i);
-                        var srcIndices = indices[^t.Rank..];
-                        t.Grad[t.LinearIndex(srcIndices)] += result.Grad[i];
+                        int stride = t.ElementCount;
+                        int rows = result.ElementCount / stride;
+
+                        var tgVecs = MemoryMarshal.Cast<double, Vector<double>>(t.Grad.AsSpan());
+
+                        for (int r = 0; r < rows; r++)
+                        {
+                            var rgSlice = result.Grad.AsSpan(r * stride, stride);
+                            var rgVecs = MemoryMarshal.Cast<double, Vector<double>>(rgSlice);
+                            for (int i = 0; i < tgVecs.Length; i++)
+                            {
+                                tgVecs[i] += rgVecs[i];
+                            }
+                            for (int i = tgVecs.Length * VectorSize; i < stride; i++)
+                            {
+                                t.Grad[i] += rgSlice[i];
+                            }
+                        }
+                    }
+                    else
+                    {
+                        Span<int> indices = stackalloc int[result.Rank];
+                        Span<int> srcIndices = stackalloc int[t.Rank];
+
+                        for (int i = 0; i < result.ElementCount; i++)
+                        {
+                            result.GetFullIndices(i, indices);
+                            indices[^t.Rank..].CopyTo(srcIndices);
+                            t.Grad[t.LinearIndex(srcIndices)] += result.Grad[i];
+                        }
                     }
                 };
             }
@@ -3047,7 +3765,15 @@ namespace NNN
                 {
                     if (!t.RequiresGrad) return;
 
-                    for (int i = 0; i < t.GradCount; i++)
+                    var tgVecs = MemoryMarshal.Cast<double, Vector<double>>(t.Grad.AsSpan());
+                    var rgVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Grad.AsSpan());
+
+                    for (int i = 0; i < tgVecs.Length; i++)
+                    {
+                        tgVecs[i] += rgVecs[i];
+                    }
+
+                    for (int i = tgVecs.Length * VectorSize; i < t.GradCount; i++)
                     {
                         t.Grad[i] += result.Grad[i];
                     }
@@ -3077,7 +3803,15 @@ namespace NNN
                 {
                     if (!t.RequiresGrad) return;
 
-                    for (int i = 0; i < t.GradCount; i++)
+                    var tgVecs = MemoryMarshal.Cast<double, Vector<double>>(t.Grad.AsSpan());
+                    var bgVecs = MemoryMarshal.Cast<double, Vector<double>>(batch.Grad.AsSpan());
+
+                    for (int i = 0; i < tgVecs.Length; i++)
+                    {
+                        tgVecs[i] += bgVecs[i];
+                    }
+
+                    for (int i = tgVecs.Length * VectorSize; i < t.GradCount; i++)
                     {
                         t.Grad[i] += batch.Grad[i];
                     }
@@ -3090,11 +3824,9 @@ namespace NNN
         static Tensor GetResultTensor(Tensor owner, int[] dims, bool requiresGrad)
         {
             owner.PrepareForward();
-
             bool newOp = owner._results.Count <= owner._opIndex;
 
             Tensor result;
-
             if (newOp)
             {
                 result = new(dims, requiresGrad);
@@ -3104,8 +3836,18 @@ namespace NNN
             {
                 result = owner._results[owner._opIndex];
 
-                bool shapeMismatch = result.ElementCount != dims.Aggregate(1, (a, b) => a * b)
-                    || !result.Dimensions.SequenceEqual(dims);
+                bool shapeMismatch = result.Rank != dims.Length;
+                if (!shapeMismatch)
+                {
+                    for (int i = 0; i < dims.Length; i++)
+                    {
+                        if (result.Dimensions[i] != dims[i])
+                        {
+                            shapeMismatch = true;
+                            break;
+                        }
+                    }
+                }
 
                 if (shapeMismatch)
                 {
@@ -3136,6 +3878,15 @@ namespace NNN
             return indices;
         }
 
+        void GetFullIndices(int index, Span<int> indices)
+        {
+            for (int i = Rank - 1; i >= 0; i--)
+            {
+                indices[i] = index % Dimensions[i];
+                index /= Dimensions[i];
+            }
+        }
+
         // Initialize neural network weights using He Initialization
         public static Tensor InitWeights(int inputCount, int neuronCount)
         {
@@ -3157,7 +3908,17 @@ namespace NNN
         {
             Tensor result = GetResultTensor(t, t.Dimensions, t.RequiresGrad);
 
-            for (int i = 0; i < result.ElementCount; i++)
+            var tVecs = MemoryMarshal.Cast<double, Vector<double>>(t.Data.AsSpan());
+            var vmin = new Vector<double>(min);
+            var vmax = new Vector<double>(max);
+            var rVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Data.AsSpan());
+
+            for (int i = 0; i < tVecs.Length; i++)
+            {
+                rVecs[i] = Vector.Min(Vector.Max(tVecs[i], vmin), vmax);
+            }
+
+            for (int i = tVecs.Length * VectorSize; i < result.ElementCount; i++)
             {
                 result[i] = Math.Clamp(t[i], min, max);
             }
@@ -3171,7 +3932,21 @@ namespace NNN
                 {
                     if (!t.RequiresGrad) return;
 
-                    for (int i = 0; i < t.GradCount; i++)
+                    var tvVecs = MemoryMarshal.Cast<double, Vector<double>>(t.Data.AsSpan());
+                    var tgVecs = MemoryMarshal.Cast<double, Vector<double>>(t.Grad.AsSpan());
+                    var vmin = new Vector<double>(min);
+                    var vmax = new Vector<double>(max);
+                    var rgVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Grad.AsSpan());
+
+                    for (int i = 0; i < tgVecs.Length; i++)
+                    {
+                        var inRange = Vector.BitwiseAnd(
+                            Vector.GreaterThanOrEqual(tvVecs[i], vmin),
+                            Vector.LessThanOrEqual(tvVecs[i], vmax));
+                        tgVecs[i] += Vector.ConditionalSelect(inRange, rgVecs[i], Vector<double>.Zero);
+                    }
+
+                    for (int i = tgVecs.Length * VectorSize; i < t.GradCount; i++)
                     {
                         t.Grad[i] += (t[i] >= min && t[i] <= max) ? result.Grad[i] : 0;
                     }
