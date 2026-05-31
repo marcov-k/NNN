@@ -1919,6 +1919,8 @@ namespace NNN
         // AutoGrad graph
         public bool RequiresGrad { get; set; }
         readonly List<Tensor> _parents = [];
+        readonly List<Tensor> _results = [];
+        int _opIndex = 0;
         Action _backward = delegate { };
 
         // Parameterless constructor for JsonSerializer
@@ -1969,18 +1971,26 @@ namespace NNN
         }
 
         // Zero out the current accumulated gradient
-        public void ZeroGrad() => Array.Clear(Grad, 0, GradCount);
+        public void ZeroGrad()
+        {
+            Array.Clear(Grad, 0, GradCount);
+            foreach (var result in _results)
+            {
+                result.ZeroGrad();
+            }
+        }
 
         // Calculate the gradients of all Tensors in the current graph
         public void Backward()
         {
-            Grad = Ones(Rank);
+            Array.Fill(Grad, 1.0);
 
             List<Tensor> topo = [];
             BuildTopo(this, topo, []);
 
             for (int i = topo.Count - 1; i >= 0; i--)
             {
+                topo[i]._opIndex = 0;
                 topo[i]._backward();
             }
         }
@@ -1997,14 +2007,6 @@ namespace NNN
             }
 
             topo.Add(t);
-        }
-
-        // Create an array of 1's
-        static double[] Ones(int n)
-        {
-            var output = new double[n];
-            for (int i = 0; i < n; i++) output[i] = 1;
-            return output;
         }
 
         // Constructor for a Tensor filled with only one value
@@ -2028,64 +2030,161 @@ namespace NNN
             set => Data[index] = value;
         }
 
-        // Element-wise operators between Tensors and scalars
-        public static Tensor operator +(Tensor a, double b) => a + Scalar(b, a.Dimensions);
-        public static Tensor operator +(double a, Tensor b) => Scalar(a, b.Dimensions) + b;
-        public static Tensor operator -(Tensor a, double b) => a - Scalar(b, a.Dimensions);
-        public static Tensor operator -(double a, Tensor b) => Scalar(a, b.Dimensions) - b;
-        public static Tensor operator *(Tensor a, double b) => a * Scalar(b, a.Dimensions);
-        public static Tensor operator *(double a, Tensor b) => Scalar(a, b.Dimensions) * b;
-        public static Tensor operator /(Tensor a, double b) => a / Scalar(b, a.Dimensions);
-        public static Tensor operator /(double a, Tensor b) => Scalar(a, b.Dimensions) / b;
-        public static Tensor Pow(Tensor a, double b) => Pow(a, Scalar(b, a.Dimensions));
-        public static Tensor Pow(double a, Tensor b) => Pow(Scalar(a, b.Dimensions), b);
-        public static Tensor Log(Tensor a, double b) => Log(a, Scalar(b, a.Dimensions));
-        public static Tensor Log(double a, Tensor b) => Log(Scalar(a, b.Dimensions), b);
-
         // Element-wise addition operator
         public static Tensor operator +(Tensor a, Tensor b)
         {
             // Calculate each element of the resulting Tensor
-            Tensor result = new(a.Dimensions, a.RequiresGrad || b.RequiresGrad);
+            bool newOp = a._results.Count <= a._opIndex;
+            Tensor result = newOp ? new(a.Dimensions, a.RequiresGrad || b.RequiresGrad) : a._results[a._opIndex];
+
             for (int i = 0; i < result.ElementCount; i++)
             {
                 result[i] = a[i] + b[i];
             }
-            result._parents.AddRange([a, b]);
 
-            // Gradient calculation function
-            result._backward = () =>
+            if (newOp)
             {
-                for (int i = 0; i < result.ElementCount; i++)
+                result._parents.AddRange([a, b]);
+
+                // Gradient calculation function
+                result._backward = () =>
                 {
-                    if (a.RequiresGrad) a.Grad[i] += result.Grad[i];
-                    if (b.RequiresGrad) b.Grad[i] += result.Grad[i];
-                }
-            };
+                    for (int i = 0; i < result.ElementCount; i++)
+                    {
+                        if (a.RequiresGrad) a.Grad[i] += result.Grad[i];
+                        if (b.RequiresGrad) b.Grad[i] += result.Grad[i];
+                    }
+                };
+
+                a._results.Add(result);
+            }
+            a._opIndex++;
 
             return result;
         }
+
+        public static Tensor operator +(Tensor a, double b)
+        {
+            bool newOp = a._results.Count <= a._opIndex;
+            Tensor result = newOp ? new(a.Dimensions, a.RequiresGrad) : a._results[a._opIndex];
+
+            for (int i = 0; i < result.ElementCount; i++)
+            {
+                result[i] = a[i] + b;
+            }
+
+            if (newOp)
+            {
+                result._parents.Add(a);
+
+                result._backward = () =>
+                {
+                    if (!a.RequiresGrad) return;
+
+                    for (int i = 0; i < result.ElementCount; i++)
+                    {
+                        a.Grad[i] += result.Grad[i];
+                    }
+                };
+
+                a._results.Add(result);
+            }
+            a._opIndex++;
+
+            return result;
+        }
+
+        public static Tensor operator +(double a, Tensor b) => b + a;
 
         // Element-wise subtraction operator
         public static Tensor operator -(Tensor a, Tensor b)
         {
             // Calculate each element of the resulting Tensor
-            Tensor result = new(a.Dimensions, a.RequiresGrad || b.RequiresGrad);
+            bool newOp = a._results.Count <= a._opIndex;
+            Tensor result = newOp ? new(a.Dimensions, a.RequiresGrad || b.RequiresGrad) : a._results[a._opIndex];
+
             for (int i = 0; i < result.ElementCount; i++)
             {
                 result[i] = a[i] - b[i];
             }
-            result._parents.AddRange([a, b]);
 
-            // Gradient calculation function
-            result._backward = () =>
+            if (newOp)
             {
-                for (int i = 0; i < result.ElementCount; i++)
+                result._parents.AddRange([a, b]);
+
+                // Gradient calculation function
+                result._backward = () =>
                 {
-                    if (a.RequiresGrad) a.Grad[i] += result.Grad[i];
-                    if (b.RequiresGrad) b.Grad[i] -= result.Grad[i];
-                }
-            };
+                    for (int i = 0; i < result.ElementCount; i++)
+                    {
+                        if (a.RequiresGrad) a.Grad[i] += result.Grad[i];
+                        if (b.RequiresGrad) b.Grad[i] -= result.Grad[i];
+                    }
+                };
+
+                a._results.Add(result);
+            }
+            a._opIndex++;
+
+            return result;
+        }
+
+        public static Tensor operator -(Tensor a, double b)
+        {
+            bool newOp = a._results.Count <= a._opIndex;
+            Tensor result = newOp ? new(a.Dimensions, a.RequiresGrad) : a._results[a._opIndex];
+
+            for (int i = 0; i < result.ElementCount; i++)
+            {
+                result[i] = a[i] - b;
+            }
+
+            if (newOp)
+            {
+                result._parents.Add(a);
+
+                result._backward = () =>
+                {
+                    if (!a.RequiresGrad) return;
+
+                    for (int i = 0; i < result.ElementCount; i++)
+                    {
+                        a.Grad[i] += result.Grad[i];
+                    }
+                };
+
+                a._results.Add(result);
+            }
+            a._opIndex++;
+
+            return result;
+        }
+
+        public static Tensor operator -(double a, Tensor b)
+        {
+            bool newOp = b._results.Count <= b._opIndex;
+            Tensor result = newOp ? new(b.Dimensions, b.RequiresGrad) : b._results[b._opIndex];
+
+            for (int i = 0; i < result.ElementCount; i++)
+            {
+                result[i] = a - b[i];
+            }
+
+            if (newOp)
+            {
+                result._parents.Add(b);
+
+                result._backward = () =>
+                {
+                    if (!b.RequiresGrad) return;
+
+                    for (int i = 0; i < result.ElementCount; i++)
+                    {
+                        b.Grad[i] -= result.Grad[i];
+                    }
+                };
+            }
+            b._opIndex++;
 
             return result;
         }
@@ -2094,46 +2193,159 @@ namespace NNN
         public static Tensor operator *(Tensor a, Tensor b)
         {
             // Calculate each element of the resulting Tensor
-            Tensor result = new(a.Dimensions, a.RequiresGrad || b.RequiresGrad);
+            bool newOp = a._results.Count <= a._opIndex;
+            Tensor result = newOp ? new(a.Dimensions, a.RequiresGrad || b.RequiresGrad) : a._results[a._opIndex];
+
             for (int i = 0; i < result.ElementCount; i++)
             {
                 result[i] = a[i] * b[i];
             }
-            result._parents.AddRange([a, b]);
 
-            // Gradient calculation function
-            result._backward = () =>
+            if (newOp)
             {
-                for (int i = 0; i < result.ElementCount; i++)
+                result._parents.AddRange([a, b]);
+
+                // Gradient calculation function
+                result._backward = () =>
                 {
-                    if (a.RequiresGrad) a.Grad[i] += b[i] * result.Grad[i];
-                    if (b.RequiresGrad) b.Grad[i] += a[i] * result.Grad[i];
-                }
-            };
+                    for (int i = 0; i < result.ElementCount; i++)
+                    {
+                        if (a.RequiresGrad) a.Grad[i] += b[i] * result.Grad[i];
+                        if (b.RequiresGrad) b.Grad[i] += a[i] * result.Grad[i];
+                    }
+                };
+
+                a._results.Add(result);
+            }
+            a._opIndex++;
 
             return result;
         }
+
+        public static Tensor operator *(Tensor a, double b)
+        {
+            bool newOp = a._results.Count <= a._opIndex;
+            Tensor result = newOp ? new(a.Dimensions, a.RequiresGrad) : a._results[a._opIndex];
+
+            for (int i = 0; i < result.ElementCount; i++)
+            {
+                result[i] = a[i] * b;
+            }
+
+            if (newOp)
+            {
+                result._parents.Add(a);
+
+                result._backward = () =>
+                {
+                    if (!a.RequiresGrad) return;
+
+                    for (int i = 0; i < result.ElementCount; i++)
+                    {
+                        a.Grad[i] += b * result.Grad[i];
+                    }
+                };
+
+                a._results.Add(result);
+            }
+            a._opIndex++;
+
+            return result;
+        }
+
+        public static Tensor operator *(double a, Tensor b) => b * a;
 
         // Element-wise division operator
         public static Tensor operator /(Tensor a, Tensor b)
         {
             // Calculate each element of the resulting Tensor
-            Tensor result = new(a.Dimensions, a.RequiresGrad || b.RequiresGrad);
+            bool newOp = a._results.Count <= a._opIndex;
+            Tensor result = newOp ? new(a.Dimensions, a.RequiresGrad || b.RequiresGrad) : a._results[a._opIndex];
+
             for (int i = 0; i < result.ElementCount; i++)
             {
                 result[i] = a[i] / b[i];
             }
-            result._parents.AddRange([a, b]);
 
-            // Gradient calculation function
-            result._backward = () =>
+            if (newOp)
             {
-                for (int i = 0; i < result.ElementCount; i++)
+                result._parents.AddRange([a, b]);
+
+                // Gradient calculation function
+                result._backward = () =>
                 {
-                    if (a.RequiresGrad) a.Grad[i] += (1 / b[i]) * result.Grad[i];
-                    if (b.RequiresGrad) b.Grad[i] -= a[i] / Math.Pow(b[i], 2) * result.Grad[i];
-                }
-            };
+                    for (int i = 0; i < result.ElementCount; i++)
+                    {
+                        if (a.RequiresGrad) a.Grad[i] += (1.0 / b[i]) * result.Grad[i];
+                        if (b.RequiresGrad) b.Grad[i] -= a[i] / Math.Pow(b[i], 2.0) * result.Grad[i];
+                    }
+                };
+
+                a._results.Add(result);
+            }
+            a._opIndex++;
+
+            return result;
+        }
+
+        public static Tensor operator /(Tensor a, double b)
+        {
+            bool newOp = a._results.Count <= a._opIndex;
+            Tensor result = newOp ? new(a.Dimensions, a.RequiresGrad) : a._results[a._opIndex];
+
+            for (int i = 0; i < result.ElementCount; i++)
+            {
+                result[i] = a[i] / b;
+            }
+
+            if (newOp)
+            {
+                result._parents.Add(a);
+
+                result._backward = () =>
+                {
+                    if (!a.RequiresGrad) return;
+
+                    for (int i = 0; i < result.ElementCount; i++)
+                    {
+                        a.Grad[i] += (1.0 / b) * result.Grad[i];
+                    }
+                };
+
+                a._results.Add(result);
+            }
+            a._opIndex++;
+
+            return result;
+        }
+
+        public static Tensor operator /(double a, Tensor b)
+        {
+            bool newOp = b._results.Count <= b._opIndex;
+            Tensor result = newOp ? new(b.Dimensions, b.RequiresGrad) : b._results[b._opIndex];
+
+            for (int i = 0; i < result.ElementCount; i++)
+            {
+                result[i] = a / b[i];
+            }
+
+            if (newOp)
+            {
+                result._parents.Add(b);
+
+                result._backward = () =>
+                {
+                    if (!b.RequiresGrad) return;
+
+                    for (int i = 0; i < result.ElementCount; i++)
+                    {
+                        b.Grad[i] -= a / Math.Pow(b[i], 2.0) * result.Grad[i];
+                    }
+                };
+
+                b._results.Add(result);
+            }
+            b._opIndex++;
 
             return result;
         }
@@ -2142,22 +2354,93 @@ namespace NNN
         public static Tensor Pow(Tensor a, Tensor exp)
         {
             // Calculate each element of the resulting Tensor
-            Tensor result = new(a.Dimensions, a.RequiresGrad || exp.RequiresGrad);
+            bool newOp = a._results.Count <= a._opIndex;
+            Tensor result = newOp ? new(a.Dimensions, a.RequiresGrad || exp.RequiresGrad) : a._results[a._opIndex];
+
             for (int i = 0; i < result.ElementCount; i++)
             {
                 result[i] = Math.Pow(a[i], exp[i]);
             }
-            result._parents.AddRange([a, exp]);
 
-            // Gradient calculation function
-            result._backward = () =>
+            if (newOp)
             {
-                for (int i = 0; i < result.ElementCount; i++)
+                result._parents.AddRange([a, exp]);
+
+                // Gradient calculation function
+                result._backward = () =>
                 {
-                    if (a.RequiresGrad) a.Grad[i] += exp[i] * Math.Pow(a[i], exp[i] - 1) * result.Grad[i];
-                    if (exp.RequiresGrad) exp.Grad[i] += result[i] * Math.Log(a[i]) * result.Grad[i];
-                }
-            };
+                    for (int i = 0; i < result.ElementCount; i++)
+                    {
+                        if (a.RequiresGrad) a.Grad[i] += exp[i] * Math.Pow(a[i], exp[i] - 1.0) * result.Grad[i];
+                        if (exp.RequiresGrad) exp.Grad[i] += result[i] * Math.Log(a[i]) * result.Grad[i];
+                    }
+                };
+
+                a._results.Add(result);
+            }
+            a._opIndex++;
+
+            return result;
+        }
+
+        public static Tensor Pow(Tensor a, double exp)
+        {
+            bool newOp = a._results.Count <= a._opIndex;
+            Tensor result = newOp ? new(a.Dimensions, a.RequiresGrad) : a._results[a._opIndex];
+
+            for (int i = 0; i < result.ElementCount; i++)
+            {
+                result[i] = Math.Pow(a[i], exp);
+            }
+
+            if (newOp)
+            {
+                result._parents.Add(a);
+
+                result._backward = () =>
+                {
+                    if (!a.RequiresGrad) return;
+
+                    for (int i = 0; i < result.ElementCount; i++)
+                    {
+                        a.Grad[i] += exp * Math.Pow(a[i], exp - 1.0) * result.Grad[i];
+                    }
+                };
+
+                a._results.Add(result);
+            }
+            a._opIndex++;
+
+            return result;
+        }
+
+        public static Tensor Pow(double a, Tensor exp)
+        {
+            bool newOp = exp._results.Count <= exp._opIndex;
+            Tensor result = newOp ? new(exp.Dimensions, exp.RequiresGrad) : exp._results[exp._opIndex];
+
+            for (int i = 0; i < result.ElementCount; i++)
+            {
+                result[i] = Math.Pow(a, exp[i]);
+            }
+
+            if (newOp)
+            {
+                result._parents.Add(exp);
+
+                result._backward = () =>
+                {
+                    if (!exp.RequiresGrad) return;
+
+                    for (int i = 0; i < result.ElementCount; i++)
+                    {
+                        exp.Grad[i] += result[i] * Math.Log(a) * result.Grad[i];
+                    }
+                };
+
+                exp._results.Add(result);
+            }
+            exp._opIndex++;
 
             return result;
         }
@@ -2166,23 +2449,30 @@ namespace NNN
         public static Tensor Exp(Tensor t)
         {
             // Calculate each element of the resulting Tensor
-            Tensor result = new(t.Dimensions, t.RequiresGrad);
+            bool newOp = t._results.Count <= t._opIndex;
+            Tensor result = newOp ? new(t.Dimensions, t.RequiresGrad) : t._results[t._opIndex];
             for (int i = 0; i < result.ElementCount; i++)
             {
                 result[i] = Math.Exp(t[i]);
             }
-            result._parents.Add(t);
-
-            // Gradient calculation function
-            result._backward = () =>
+            if (newOp)
             {
-                if (!t.RequiresGrad) return;
+                result._parents.Add(t);
 
-                for (int i = 0; i < result.ElementCount; i++)
+                // Gradient calculation function
+                result._backward = () =>
                 {
-                    t.Grad[i] += result[i] * result.Grad[i];
-                }
-            };
+                    if (!t.RequiresGrad) return;
+
+                    for (int i = 0; i < result.ElementCount; i++)
+                    {
+                        t.Grad[i] += result[i] * result.Grad[i];
+                    }
+                };
+
+                t._results.Add(result);
+            }
+            t._opIndex++;
 
             return result;
         }
@@ -2191,22 +2481,93 @@ namespace NNN
         public static Tensor Log(Tensor logBase, Tensor arg)
         {
             // Calculate each element of the resulting Tensor
-            Tensor result = new(logBase.Dimensions, logBase.RequiresGrad || arg.RequiresGrad);
+            bool newOp = logBase._results.Count <= logBase._opIndex;
+            Tensor result = newOp ? new(logBase.Dimensions, logBase.RequiresGrad || arg.RequiresGrad) : logBase._results[logBase._opIndex];
+
             for (int i = 0; i < result.ElementCount; i++)
             {
                 result[i] = Math.Log(arg[i], logBase[i]);
             }
-            result._parents.AddRange([logBase, arg]);
 
-            // Gradient calculation function
-            result._backward = () =>
+            if (newOp)
             {
-                for (int i = 0; i < result.ElementCount; i++)
+                result._parents.AddRange([logBase, arg]);
+
+                // Gradient calculation function
+                result._backward = () =>
                 {
-                    if (logBase.RequiresGrad) logBase.Grad[i] -= (Math.Log(arg[i]) / (logBase[i] * Math.Pow(Math.Log(logBase[i]), 2))) * result.Grad[i];
-                    if (arg.RequiresGrad) arg.Grad[i] += (1 / (arg[i] * Math.Log(logBase[i]))) * result.Grad[i];
-                }
-            };
+                    for (int i = 0; i < result.ElementCount; i++)
+                    {
+                        if (logBase.RequiresGrad) logBase.Grad[i] -= (Math.Log(arg[i]) / (logBase[i] * Math.Pow(Math.Log(logBase[i]), 2.0))) * result.Grad[i];
+                        if (arg.RequiresGrad) arg.Grad[i] += (1.0 / (arg[i] * Math.Log(logBase[i]))) * result.Grad[i];
+                    }
+                };
+
+                logBase._results.Add(result);
+            }
+            logBase._opIndex++;
+
+            return result;
+        }
+
+        public static Tensor Log(Tensor logBase, double arg)
+        {
+            bool newOp = logBase._results.Count <= logBase._opIndex;
+            Tensor result = newOp ? new(logBase.Dimensions, logBase.RequiresGrad) : logBase._results[logBase._opIndex];
+
+            for (int i = 0; i < result.ElementCount; i++)
+            {
+                result[i] = Math.Log(arg, logBase[i]);
+            }
+
+            if (newOp)
+            {
+                result._parents.Add(logBase);
+
+                result._backward = () =>
+                {
+                    if (!logBase.RequiresGrad) return;
+
+                    for (int i = 0; i < result.ElementCount; i++)
+                    {
+                        logBase.Grad[i] -= (Math.Log(arg) / (logBase[i] * Math.Pow(Math.Log(logBase[i]), 2.0))) * result.Grad[i];
+                    }
+                };
+
+                logBase._results.Add(result);
+            }
+            logBase._opIndex++;
+
+            return result;
+        }
+
+        public static Tensor Log(double logBase, Tensor arg)
+        {
+            bool newOp = arg._results.Count <= arg._opIndex;
+            Tensor result = newOp ? new(arg.Dimensions, arg.RequiresGrad) : arg._results[arg._opIndex];
+
+            for (int i = 0; i < result.ElementCount; i++)
+            {
+                result[i] = Math.Log(arg[i], logBase);
+            }
+
+            if (newOp)
+            {
+                result._parents.Add(arg);
+
+                result._backward = () =>
+                {
+                    if (!arg.RequiresGrad) return;
+
+                    for (int i = 0; i < result.ElementCount; i++)
+                    {
+                        arg.Grad[i] += (1.0 / (arg[i] * Math.Log(logBase))) * result.Grad[i];
+                    }
+                };
+
+                arg._results.Add(result);
+            }
+            arg._opIndex++;
 
             return result;
         }
@@ -2220,17 +2581,26 @@ namespace NNN
             int n = a.Dimensions[^1];
             int p = b.Dimensions[^1];
 
-            // Build result dims -> batch dims + [m, p]
-            var resultDims = (int[])a.Dimensions.Clone();
-            resultDims[^1] = p;
-
             int batchSize = 1;
             for (int i = 0; i < rank - 2; i++) batchSize *= a.Dimensions[i];
             int aMatSize = m * n;
             int bMatSize = n * p;
             int rMatSize = m * p;
 
-            Tensor result = new(resultDims, a.RequiresGrad || b.RequiresGrad);
+            bool newOp = a._results.Count <= a._opIndex;
+
+            Tensor result;
+            if (newOp)
+            {
+                // Build result dims -> batch dims + [m, p]
+                var resultDims = (int[])a.Dimensions.Clone();
+                resultDims[^1] = p;
+                result = new(resultDims, a.RequiresGrad || b.RequiresGrad);
+            }
+            else
+            {
+                result = a._results[a._opIndex];
+            }
 
             for (int batch = 0; batch < batchSize; batch++)
             {
@@ -2242,7 +2612,7 @@ namespace NNN
                 {
                     for (int j = 0; j < p; j++)
                     {
-                        double sum = 0;
+                        double sum = 0.0;
                         for (int k = 0; k < n; k++)
                         {
                             sum += a[aOffset + i * n + k] * b[bOffset + k * p + j];
@@ -2251,50 +2621,57 @@ namespace NNN
                     }
                 }
             }
-            result._parents.AddRange([a, b]);
 
-            // Gradient calculation function
-            result._backward = () =>
+            if (newOp)
             {
-                for (int batch = 0; batch < batchSize; batch++)
-                {
-                    int aOffset = batch * aMatSize;
-                    int bOffset = batch * bMatSize;
-                    int rOffset = batch * rMatSize;
+                result._parents.AddRange([a, b]);
 
-                    if (a.RequiresGrad)
+                // Gradient calculation function
+                result._backward = () =>
+                {
+                    for (int batch = 0; batch < batchSize; batch++)
                     {
-                        for (int i = 0; i < m; i++)
+                        int aOffset = batch * aMatSize;
+                        int bOffset = batch * bMatSize;
+                        int rOffset = batch * rMatSize;
+
+                        if (a.RequiresGrad)
+                        {
+                            for (int i = 0; i < m; i++)
+                            {
+                                for (int k = 0; k < n; k++)
+                                {
+                                    double grad = 0.0;
+                                    for (int j = 0; j < p; j++)
+                                    {
+                                        grad += result.Grad[rOffset + i * p + j] * b[bOffset + k * p + j];
+                                    }
+                                    a.Grad[aOffset + i * n + k] += grad;
+                                }
+                            }
+                        }
+
+                        if (b.RequiresGrad)
                         {
                             for (int k = 0; k < n; k++)
                             {
-                                double grad = 0.0;
                                 for (int j = 0; j < p; j++)
                                 {
-                                    grad += result.Grad[rOffset + i * p + j] * b[bOffset + k * p + j];
+                                    double grad = 0.0;
+                                    for (int i = 0; i < m; i++)
+                                    {
+                                        grad += a[aOffset + i * n + k] * result.Grad[rOffset + i * p + j];
+                                    }
+                                    b.Grad[bOffset + k * p + j] += grad;
                                 }
-                                a.Grad[aOffset + i * n + k] += grad;
                             }
                         }
                     }
+                };
 
-                    if (b.RequiresGrad)
-                    {
-                        for (int k = 0; k < n; k++)
-                        {
-                            for (int j = 0; j < p; j++)
-                            {
-                                double grad = 0.0;
-                                for (int i = 0; i < m; i++)
-                                {
-                                    grad += a[aOffset + i * n + k] * result.Grad[rOffset + i * p + j];
-                                }
-                                b.Grad[bOffset + k * p + j] += grad;
-                            }
-                        }
-                    }
-                }
-            };
+                a._results.Add(result);
+            }
+            a._opIndex++;
 
             return result;
         }
@@ -2303,23 +2680,32 @@ namespace NNN
         public static Tensor ReLU(Tensor t)
         {
             // Apply ReLU function to each element
-            Tensor result = new(t.Dimensions, t.RequiresGrad);
+            bool newOp = t._results.Count <= t._opIndex;
+            Tensor result = newOp ? new(t.Dimensions, t.RequiresGrad) : t._results[t._opIndex];
+
             for (int i = 0; i < result.ElementCount; i++)
             {
                 result[i] = t[i] > 0.0 ? t[i] : 0.0;
             }
-            result._parents.Add(t);
 
-            // Gradient calculation function
-            result._backward = () =>
+            if (newOp)
             {
-                if (!t.RequiresGrad) return;
+                result._parents.Add(t);
 
-                for (int i = 0; i < result.ElementCount; i++)
+                // Gradient calculation function
+                result._backward = () =>
                 {
-                    t.Grad[i] += (t[i] > 0.0 ? 1.0 : 0.0) * result.Grad[i];
-                }
-            };
+                    if (!t.RequiresGrad) return;
+
+                    for (int i = 0; i < result.ElementCount; i++)
+                    {
+                        t.Grad[i] += (t[i] > 0.0 ? 1.0 : 0.0) * result.Grad[i];
+                    }
+                };
+
+                t._results.Add(result);
+            }
+            t._opIndex++;
 
             return result;
         }
@@ -2328,23 +2714,32 @@ namespace NNN
         public static Tensor LeakyReLU(Tensor t, double tau)
         {
             // Apply LeakyReLU function to each element
-            Tensor result = new(t.Dimensions, t.RequiresGrad);
+            bool newOp = t._results.Count <= t._opIndex;
+            Tensor result = newOp ? new(t.Dimensions, t.RequiresGrad) : t._results[t._opIndex];
+
             for (int i = 0; i < result.ElementCount; i++)
             {
                 result[i] = t[i] > 0.0 ? t[i] : tau * t[i];
             }
-            result._parents.Add(t);
 
-            // Gradient calculation function
-            result._backward = () =>
+            if (newOp)
             {
-                if (!t.RequiresGrad) return;
+                result._parents.Add(t);
 
-                for (int i = 0; i < result.ElementCount; i++)
+                // Gradient calculation function
+                result._backward = () =>
                 {
-                    t.Grad[i] += (t[i] > 0.0 ? 1.0 : tau) * result.Grad[i];
-                }
-            };
+                    if (!t.RequiresGrad) return;
+
+                    for (int i = 0; i < result.ElementCount; i++)
+                    {
+                        t.Grad[i] += (t[i] > 0.0 ? 1.0 : tau) * result.Grad[i];
+                    }
+                };
+
+                t._results.Add(result);
+            }
+            t._opIndex++;
 
             return result;
         }
@@ -2353,23 +2748,32 @@ namespace NNN
         public static Tensor Sigmoid(Tensor t)
         {
             // Apply Sigmoid function to each element
-            Tensor result = new(t.Dimensions, t.RequiresGrad);
+            bool newOp = t._results.Count <= t._opIndex;
+            Tensor result = newOp ? new(t.Dimensions, t.RequiresGrad) : t._results[t._opIndex];
+
             for (int i = 0; i < result.ElementCount; i++)
             {
                 result[i] = MathUtils.Sigmoid(t[i]);
             }
-            result._parents.Add(t);
 
-            // Gradient calculation function
-            result._backward = () =>
+            if (newOp)
             {
-                if (!t.RequiresGrad) return;
+                result._parents.Add(t);
 
-                for (int i = 0; i < result.ElementCount; i++)
+                // Gradient calculation function
+                result._backward = () =>
                 {
-                    t.Grad[i] += result[i] * (1.0 - result[i]) * result.Grad[i];
-                }
-            };
+                    if (!t.RequiresGrad) return;
+
+                    for (int i = 0; i < result.ElementCount; i++)
+                    {
+                        t.Grad[i] += result[i] * (1.0 - result[i]) * result.Grad[i];
+                    }
+                };
+
+                t._results.Add(result);
+            }
+            t._opIndex++;
 
             return result;
         }
@@ -2378,23 +2782,32 @@ namespace NNN
         public static Tensor Tanh(Tensor t)
         {
             // Apply Tanh function to each element
-            Tensor result = new(t.Dimensions, t.RequiresGrad);
+            bool newOp = t._results.Count <= t._opIndex;
+            Tensor result = newOp ? new(t.Dimensions, t.RequiresGrad) : t._results[t._opIndex];
+
             for (int i = 0; i < result.ElementCount; i++)
             {
                 result[i] = MathUtils.Tanh(t[i]);
             }
-            result._parents.Add(t);
 
-            // Gradient calculation function
-            result._backward = () =>
+            if (newOp)
             {
-                if (!t.RequiresGrad) return;
+                result._parents.Add(t);
 
-                for (int i = 0; i < result.ElementCount; i++)
+                // Gradient calculation function
+                result._backward = () =>
                 {
-                    t.Grad[i] += (1.0 - Math.Pow(result[i], 2.0)) * result.Grad[i];
-                }
-            };
+                    if (!t.RequiresGrad) return;
+
+                    for (int i = 0; i < result.ElementCount; i++)
+                    {
+                        t.Grad[i] += (1.0 - Math.Pow(result[i], 2.0)) * result.Grad[i];
+                    }
+                };
+
+                t._results.Add(result);
+            }
+            t._opIndex++;
 
             return result;
         }
@@ -2402,7 +2815,8 @@ namespace NNN
         // Softmax function
         public static Tensor Softmax(Tensor t)
         {
-            Tensor result = new(t.Dimensions, t.RequiresGrad);
+            bool newOp = t._results.Count <= t._opIndex;
+            Tensor result = newOp ? new(t.Dimensions, t.RequiresGrad) : t._results[t._opIndex];
 
             int classes = t.Dimensions[^1];
             int batchSize = t.ElementCount / classes;
@@ -2429,29 +2843,36 @@ namespace NNN
                     result[offset + i] /= sum;
                 }
             }
-            result._parents.Add(t);
 
-            // Gradient calculation function
-            result._backward = () =>
+            if (newOp)
             {
-                if (!t.RequiresGrad) return;
+                result._parents.Add(t);
 
-                // Jacobian-vector product: dL/dx_i = s_i * (dL/ds_i - sum_j(dL/ds_j * s_j))
-                for (int b = 0; b < batchSize; b++)
+                // Gradient calculation function
+                result._backward = () =>
                 {
-                    int offset = b * classes;
+                    if (!t.RequiresGrad) return;
 
-                    double dot = 0;
-                    for (int i = 0; i < classes; i++)
+                    // Jacobian-vector product: dL/dx_i = s_i * (dL/ds_i - sum_j(dL/ds_j * s_j))
+                    for (int b = 0; b < batchSize; b++)
                     {
-                        dot += result.Grad[offset + i] * result[offset + i];
+                        int offset = b * classes;
+
+                        double dot = 0;
+                        for (int i = 0; i < classes; i++)
+                        {
+                            dot += result.Grad[offset + i] * result[offset + i];
+                        }
+                        for (int i = 0; i < classes; i++)
+                        {
+                            t.Grad[offset + i] += result[offset + i] * (result.Grad[offset + i] - dot);
+                        }
                     }
-                    for (int i = 0; i < classes; i++)
-                    {
-                        t.Grad[offset + i] += result[offset + i] * (result.Grad[offset + i] - dot);
-                    }
-                }
-            };
+                };
+
+                t._results.Add(result);
+            }
+            t._opIndex++;
 
             return result;
         }
@@ -2460,23 +2881,33 @@ namespace NNN
         public static Tensor Sum(Tensor t)
         {
             // Calculate sum of all elements
-            Tensor result = new([1], t.RequiresGrad);
+            bool newOp = t._results.Count <= t._opIndex;
+            Tensor result = newOp ? new([1], t.RequiresGrad) : t._results[t._opIndex];
+
+            result[0] = 0.0;
             for (int i = 0; i < t.ElementCount; i++)
             {
                 result[0] += t[i];
             }
-            result._parents.Add(t);
 
-            // Gradient calculation function
-            result._backward = () =>
+            if (newOp)
             {
-                if (!t.RequiresGrad) return;
+                result._parents.Add(t);
 
-                for (int i = 0; i < t.ElementCount; i++)
+                // Gradient calculation function
+                result._backward = () =>
                 {
-                    t.Grad[i] += result.Grad[0];
-                }
-            };
+                    if (!t.RequiresGrad) return;
+
+                    for (int i = 0; i < t.ElementCount; i++)
+                    {
+                        t.Grad[i] += result.Grad[0];
+                    }
+                };
+
+                t._results.Add(result);
+            }
+            t._opIndex++;
 
             return result;
         }
@@ -2485,25 +2916,35 @@ namespace NNN
         public static Tensor Mean(Tensor t)
         {
             // Calculate mean of all elements
-            Tensor result = new([1], t.RequiresGrad);
+            bool newOp = t._results.Count <= t._opIndex;
+            Tensor result = newOp ? new([1], t.RequiresGrad) : t._results[t._opIndex];
+
+            result[0] = 0.0;
             for (int i = 0; i < t.ElementCount; i++)
             {
                 result[0] += t[i];
             }
             result[0] /= t.ElementCount;
-            result._parents.Add(t);
 
-            // Gradient calculation function
-            result._backward = () =>
+            if (newOp)
             {
-                if (!t.RequiresGrad) return;
+                result._parents.Add(t);
 
-                double grad = result.Grad[0] / t.ElementCount;
-                for (int i = 0; i < t.GradCount; i++)
+                // Gradient calculation function
+                result._backward = () =>
                 {
-                    t.Grad[i] += grad;
-                }
-            };
+                    if (!t.RequiresGrad) return;
+
+                    double grad = result.Grad[0] / t.ElementCount;
+                    for (int i = 0; i < t.GradCount; i++)
+                    {
+                        t.Grad[i] += grad;
+                    }
+                };
+
+                t._results.Add(result);
+            }
+            t._opIndex++;
 
             return result;
         }
@@ -2539,14 +2980,24 @@ namespace NNN
                 }
             }
 
-            // Build result dimensions
-            var resultDims = new int[t.Rank];
-            for (int i = 0; i < axes.Length; i++)
-            {
-                resultDims[i] = t.Dimensions[axes[i]];
-            }
+            bool newOp = t._results.Count <= t._opIndex;
 
-            Tensor result = new(resultDims, t.RequiresGrad);
+            Tensor result;
+            if (newOp)
+            {
+                // Build result dimensions
+                var resultDims = new int[t.Rank];
+                for (int i = 0; i < axes.Length; i++)
+                {
+                    resultDims[i] = t.Dimensions[axes[i]];
+                }
+
+                result = new(resultDims, t.RequiresGrad);
+            }
+            else
+            {
+                result = t._results[t._opIndex];
+            }
 
             // Remap each element
             for (int i = 0; i < t.ElementCount; i++)
@@ -2559,31 +3010,38 @@ namespace NNN
                 }
                 result[result.LinearIndex(dstIndices)] = t[i];
             }
-            result._parents.Add(t);
 
-            // Inverse permutation
-            var invAxes = new int[axes.Length];
-            for (int i = 0; i < axes.Length; i++)
+            if (newOp)
             {
-                invAxes[axes[i]] = i;
-            }
+                result._parents.Add(t);
 
-            // Gradient calculation function
-            result._backward = () =>
-            {
-                if (!t.RequiresGrad) return;
-
-                for (int i = 0; i < result.ElementCount; i++)
+                // Inverse permutation
+                var invAxes = new int[axes.Length];
+                for (int i = 0; i < axes.Length; i++)
                 {
-                    var srcIndices = result.GetFullIndices(i);
-                    var dstIndices = new int[invAxes.Length];
-                    for (int j = 0; j < invAxes.Length; j++)
-                    {
-                        dstIndices[j] = srcIndices[invAxes[j]];
-                    }
-                    t.Grad[t.LinearIndex(dstIndices)] += result.Grad[i];
+                    invAxes[axes[i]] = i;
                 }
-            };
+
+                // Gradient calculation function
+                result._backward = () =>
+                {
+                    if (!t.RequiresGrad) return;
+
+                    for (int i = 0; i < result.ElementCount; i++)
+                    {
+                        var srcIndices = result.GetFullIndices(i);
+                        var dstIndices = new int[invAxes.Length];
+                        for (int j = 0; j < invAxes.Length; j++)
+                        {
+                            dstIndices[j] = srcIndices[invAxes[j]];
+                        }
+                        t.Grad[t.LinearIndex(dstIndices)] += result.Grad[i];
+                    }
+                };
+
+                t._results.Add(result);
+            }
+            t._opIndex++;
 
             return result;
         }
@@ -2593,7 +3051,8 @@ namespace NNN
         {
             // T.Dimensions must be a suffix of targetDims (t -> [16], targetDims = [32, 16])
 
-            Tensor result = new(targetDims, t.RequiresGrad);
+            bool newOp = t._results.Count <= t._opIndex;
+            Tensor result = newOp ? new(targetDims, t.RequiresGrad) : t._results[t._opIndex];
 
             for (int i = 0; i < result.ElementCount; i++)
             {
@@ -2601,20 +3060,27 @@ namespace NNN
                 var srcIndices = indices[^t.Rank..];
                 result[i] = t[t.LinearIndex(srcIndices)];
             }
-            result._parents.Add(t);
 
-            // Gradient calculation function
-            result._backward = () =>
+            if (newOp)
             {
-                if (!t.RequiresGrad) return;
+                result._parents.Add(t);
 
-                for (int i = 0; i < result.ElementCount; i++)
+                // Gradient calculation function
+                result._backward = () =>
                 {
-                    var indices = result.GetFullIndices(i);
-                    var srcIndices = indices[^t.Rank..];
-                    t.Grad[t.LinearIndex(srcIndices)] += result.Grad[i];
-                }
-            };
+                    if (!t.RequiresGrad) return;
+
+                    for (int i = 0; i < result.ElementCount; i++)
+                    {
+                        var indices = result.GetFullIndices(i);
+                        var srcIndices = indices[^t.Rank..];
+                        t.Grad[t.LinearIndex(srcIndices)] += result.Grad[i];
+                    }
+                };
+
+                t._results.Add(result);
+            }
+            t._opIndex++;
 
             return result;
         }
@@ -2635,20 +3101,29 @@ namespace NNN
         // Reinterpret dimensions without moving data
         public static Tensor Reshape(Tensor t, int[] newDims)
         {
-            Tensor result = new(newDims, t.RequiresGrad);
+            bool newOp = t._results.Count <= t._opIndex;
+            Tensor result = newOp ? new(newDims, t.RequiresGrad) : t._results[t._opIndex];
+
             Array.Copy(t.Data, result.Data, t.ElementCount);
-            result._parents.Add(t);
 
-            // Gradient calculation function
-            result._backward = () =>
+            if (newOp)
             {
-                if (!t.RequiresGrad) return;
+                result._parents.Add(t);
 
-                for (int i = 0; i < t.GradCount; i++)
+                // Gradient calculation function
+                result._backward = () =>
                 {
-                    t.Grad[i] += result.Grad[i];
-                }
-            };
+                    if (!t.RequiresGrad) return;
+
+                    for (int i = 0; i < t.GradCount; i++)
+                    {
+                        t.Grad[i] += result.Grad[i];
+                    }
+                };
+
+                t._results.Add(result);
+            }
+            t._opIndex++;
 
             return result;
         }
@@ -2656,24 +3131,41 @@ namespace NNN
         // Add a leading dimension with length 1 to represent as batch
         public static Tensor WrapBatch(Tensor t)
         {
-            var batchDims = new int[t.Rank + 1];
-            batchDims[0] = 1;
-            Array.Copy(t.Dimensions, 0, batchDims, 1, t.Rank);
+            bool newOp = t._results.Count <= t._opIndex;
 
-            Tensor batch = new(batchDims, t.RequiresGrad);
-            Array.Copy(t.Data, batch.Data, t.ElementCount);
-            batch._parents.Add(t);
-
-            // Gradient calculation function
-            batch._backward = () =>
+            Tensor batch;
+            if (newOp)
             {
-                if (!t.RequiresGrad) return;
+                var batchDims = new int[t.Rank + 1];
+                batchDims[0] = 1;
+                Array.Copy(t.Dimensions, 0, batchDims, 1, t.Rank);
+                batch = new(batchDims, t.RequiresGrad);
+            }
+            else
+            {
+                batch = t._results[t._opIndex];
+            }
 
-                for (int i = 0; i < t.GradCount; i++)
+            Array.Copy(t.Data, batch.Data, t.ElementCount);
+
+            if (newOp)
+            {
+                batch._parents.Add(t);
+
+                // Gradient calculation function
+                batch._backward = () =>
                 {
-                    t.Grad[i] += batch.Grad[i];
-                }
-            };
+                    if (!t.RequiresGrad) return;
+
+                    for (int i = 0; i < t.GradCount; i++)
+                    {
+                        t.Grad[i] += batch.Grad[i];
+                    }
+                };
+
+                t._results.Add(batch);
+            }
+            t._opIndex++;
 
             return batch;
         }
@@ -2709,23 +3201,32 @@ namespace NNN
         // Clip gradients
         public static Tensor Clip(Tensor t, double min, double max)
         {
-            Tensor result = new(t.Dimensions, t.RequiresGrad);
+            bool newOp = t._results.Count <= t._opIndex;
+            Tensor result = newOp ? new(t.Dimensions, t.RequiresGrad) : t._results[t._opIndex];
+
             for (int i = 0; i < result.ElementCount; i++)
             {
                 result[i] = Math.Clamp(t[i], min, max);
             }
-            result._parents.Add(t);
 
-            // Gradient calculation function
-            result._backward = () =>
+            if (newOp)
             {
-                if (!t.RequiresGrad) return;
+                result._parents.Add(t);
 
-                for (int i = 0; i < t.GradCount; i++)
+                // Gradient calculation function
+                result._backward = () =>
                 {
-                    t.Grad[i] += (t[i] >= min && t[i] <= max) ? result.Grad[i] : 0;
-                }
-            };
+                    if (!t.RequiresGrad) return;
+
+                    for (int i = 0; i < t.GradCount; i++)
+                    {
+                        t.Grad[i] += (t[i] >= min && t[i] <= max) ? result.Grad[i] : 0;
+                    }
+                };
+
+                t._results.Add(result);
+            }
+            t._opIndex++;
 
             return result;
         }
