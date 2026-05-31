@@ -335,7 +335,7 @@ namespace NNN
 
         public override Tensor GetState()
         {
-            return State;
+            return State.Copy();
         }
 
         public override (double reward, Tensor nextState, bool done) Step(int action, int steps)
@@ -472,7 +472,7 @@ namespace NNN
 
         public override Tensor GetState()
         {
-            return State;
+            return State.Copy();
         }
 
         public override (double reward, Tensor nextState, bool done) Step(int action, int steps)
