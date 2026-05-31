@@ -108,7 +108,7 @@ void TestDQNModel()
     {
         steps++;
         trueState = env.GetState();
-        int action = env.PickAgentAction(model.Forward(Tensor.WrapBatch(state)));
+        int action = env.PickAgentAction(model.Predict(Tensor.WrapBatch(state)));
         var (reward, nextState, isDone) = env.Step(action, steps);
 
         totalReward += reward;
@@ -643,7 +643,7 @@ namespace NNN
         public int GetAgentAction(Model agent, Tensor? state = null)
         {
             state ??= State;
-            return PickAgentAction(agent.Forward(Tensor.WrapBatch(state)), state);
+            return PickAgentAction(agent.Predict(Tensor.WrapBatch(state)), state);
         }
 
         bool CheckWin(Tensor? state = null)
@@ -1009,7 +1009,7 @@ namespace NNN
             while (!Collided())
             {
                 Console.Clear();
-                int action = PickAgentAction(agent.Forward(Tensor.WrapBatch(GetNormalizedState())));
+                int action = PickAgentAction(agent.Predict(Tensor.WrapBatch(GetNormalizedState())));
                 SnakeHead.Move(MapAction(action));
 
                 if (Collided()) break;
@@ -1276,6 +1276,11 @@ namespace NNN
         readonly bool SelfPlay = environment is ISelfPlay;
         double totalLoss = 0.0;
 
+        Tensor? _currentBatch;
+        Tensor? _nextBatch;
+        Tensor? _predictedQs;
+        Tensor? _targetQs;
+
         public void Train(ref FIFOBuffer<Episode>? episodeBuffer, int episodes = 1000)
         {
             List<Experience> episodeExperiences = [];
@@ -1365,7 +1370,7 @@ namespace NNN
             }
             else
             {
-                return Environment.PickAgentAction(Agent.Forward(Tensor.WrapBatch(state)));
+                return Environment.PickAgentAction(Agent.Predict(Tensor.WrapBatch(state)));
             }
         }
 
@@ -1384,27 +1389,29 @@ namespace NNN
 
             var (batch, weights) = ReplayBuffer.GetBatch(BatchSize);
 
-            var stateDims = batch[0].State.Dimensions;
-            var batchDims = new int[stateDims.Length + 1];
-            batchDims[0] = BatchSize;
-            stateDims.CopyTo(batchDims, 1);
 
-            Tensor currentBatch = new(batchDims);
-            Tensor nextBatch = new(batchDims);
+            if (_currentBatch is null || _nextBatch is null)
+            {
+                var stateDims = batch[0].State.Dimensions;
+                var batchDims = new int[stateDims.Length + 1];
+                batchDims[0] = BatchSize;
+                stateDims.CopyTo(batchDims, 1);
+                _currentBatch = new(batchDims);
+                _nextBatch = new(batchDims);
+            }
 
-            int stateSize = batch[0].State.ElementCount;
             for (int b = 0; b < BatchSize; b++)
             {
-                for (int i = 0; i < stateSize; i++)
+                for (int i = 0; i < Environment.StateSize; i++)
                 {
-                    currentBatch[b * stateSize + i] = batch[b].State[i];
-                    nextBatch[b * stateSize + i] = batch[b].NextState[i];
+                    _currentBatch[b * Environment.StateSize + i] = batch[b].State[i];
+                    _nextBatch[b * Environment.StateSize + i] = batch[b].NextState[i];
                 }
             }
 
-            var predictions = Agent.Forward(currentBatch);
-            var nextAgentQs = Agent.Forward(nextBatch).Copy();
-            var nextTargetQs = TargetModel.Forward(nextBatch).Copy();
+            var predictions = Agent.Forward(_currentBatch);
+            var nextAgentQs = Agent.Predict(_nextBatch).Copy();
+            var nextTargetQs = TargetModel.Predict(_nextBatch).Copy();
 
             var predictedQs = MaskQValues(predictions, batch);
             var targetQs = MaskQValuesDouble(nextAgentQs, nextTargetQs, batch);
@@ -1441,20 +1448,18 @@ namespace NNN
 
         Tensor MaskQValues(Tensor qValues, List<Experience> batch)
         {
-            Tensor maskedQs = new([BatchSize, 1]);
-
+            _predictedQs ??= new([BatchSize, 1]);
             for (int i = 0; i < BatchSize; i++)
             {
-                maskedQs[i] = qValues[[i, batch[i].Action]];
+                _predictedQs[i] = qValues[[i, batch[i].Action]];
             }
-
-            return maskedQs;
+            return _predictedQs;
         }
 
         Tensor MaskQValuesDouble(Tensor agentQValues, Tensor targetQValues, List<Experience> batch)
         {
+            _targetQs ??= new([BatchSize, 1]);
             int actionCount = agentQValues.Dimensions[^1];
-            Tensor maskedQs = new([BatchSize, 1]);
 
             for (int i = 0; i < BatchSize; i++)
             {
@@ -1474,10 +1479,10 @@ namespace NNN
                     qTarget += Discount * evalQ * (SelfPlay ? -1.0 : 1.0);
                 }
 
-                maskedQs[i] = qTarget;
+                _targetQs[i] = qTarget;
             }
 
-            return maskedQs;
+            return _targetQs;
         }
     }
 
@@ -1635,11 +1640,21 @@ namespace NNN
 
         public Tensor Forward(Tensor input)
         {
+            Tensor.BeginForward();
+
             var output = input;
             foreach (var layer in Layers)
             {
                 output = layer.Forward(output);
             }
+            return output;
+        }
+
+        public Tensor Predict(Tensor input)
+        {
+            Tensor.Inference = true;
+            var output = Forward(input);
+            Tensor.Inference = false;
             return output;
         }
 
@@ -1918,11 +1933,14 @@ namespace NNN
         public int[] Strides { get; init; } = [];
 
         // AutoGrad graph
+        public static bool Inference { get; set; } = false;
         public bool RequiresGrad { get; set; }
         readonly List<Tensor> _parents = [];
         readonly List<Tensor> _results = [];
         int _opIndex = 0;
         Action _backward = delegate { };
+        static int _forwardGen = 0;
+        int _lastGen = -1;
 
         // Parameterless constructor for JsonSerializer
         public Tensor() { }
@@ -1984,6 +2002,34 @@ namespace NNN
         // Restores the gradient array to match the data array
         public void RestoreGrad() => Grad = new double[ElementCount];
 
+        public static void BeginForward()
+        {
+            if (!Inference) _forwardGen++;
+        }
+
+        void PrepareForward()
+        {
+            if (_lastGen == _forwardGen) return;
+
+            _opIndex = 0;
+
+            foreach (var r in _results)
+            {
+                r._parents.Clear();
+                r._backward = delegate { };
+            }
+
+            _lastGen = _forwardGen;
+        }
+
+        void FinalizeForward()
+        {
+            if (_opIndex < _results.Count)
+            {
+                _results.RemoveRange(_opIndex, _results.Count - _opIndex);
+            }
+        }
+
         // Calculate the gradients of all Tensors in the current graph
         public void Backward()
         {
@@ -1994,8 +2040,12 @@ namespace NNN
 
             for (int i = topo.Count - 1; i >= 0; i--)
             {
-                topo[i]._opIndex = 0;
                 topo[i]._backward();
+            }
+
+            foreach (var t in topo)
+            {
+                t.FinalizeForward();
             }
         }
 
@@ -2038,15 +2088,14 @@ namespace NNN
         public static Tensor operator +(Tensor a, Tensor b)
         {
             // Calculate each element of the resulting Tensor
-            bool newOp = a._results.Count <= a._opIndex;
-            Tensor result = newOp ? new(a.Dimensions, a.RequiresGrad || b.RequiresGrad) : a._results[a._opIndex];
+            Tensor result = GetResultTensor(a, a.Dimensions, a.RequiresGrad || b.RequiresGrad);
 
             for (int i = 0; i < result.ElementCount; i++)
             {
                 result[i] = a[i] + b[i];
             }
 
-            if (newOp)
+            if (!Inference)
             {
                 result._parents.AddRange([a, b]);
 
@@ -2059,25 +2108,21 @@ namespace NNN
                         if (b.RequiresGrad) b.Grad[i] += result.Grad[i];
                     }
                 };
-
-                a._results.Add(result);
             }
-            a._opIndex++;
 
             return result;
         }
 
         public static Tensor operator +(Tensor a, double b)
         {
-            bool newOp = a._results.Count <= a._opIndex;
-            Tensor result = newOp ? new(a.Dimensions, a.RequiresGrad) : a._results[a._opIndex];
+            Tensor result = GetResultTensor(a, a.Dimensions, a.RequiresGrad);
 
             for (int i = 0; i < result.ElementCount; i++)
             {
                 result[i] = a[i] + b;
             }
 
-            if (newOp)
+            if (!Inference)
             {
                 result._parents.Add(a);
 
@@ -2090,10 +2135,7 @@ namespace NNN
                         a.Grad[i] += result.Grad[i];
                     }
                 };
-
-                a._results.Add(result);
             }
-            a._opIndex++;
 
             return result;
         }
@@ -2104,15 +2146,14 @@ namespace NNN
         public static Tensor operator -(Tensor a, Tensor b)
         {
             // Calculate each element of the resulting Tensor
-            bool newOp = a._results.Count <= a._opIndex;
-            Tensor result = newOp ? new(a.Dimensions, a.RequiresGrad || b.RequiresGrad) : a._results[a._opIndex];
+            Tensor result = GetResultTensor(a, a.Dimensions, a.RequiresGrad || b.RequiresGrad);
 
             for (int i = 0; i < result.ElementCount; i++)
             {
                 result[i] = a[i] - b[i];
             }
 
-            if (newOp)
+            if (!Inference)
             {
                 result._parents.AddRange([a, b]);
 
@@ -2125,25 +2166,21 @@ namespace NNN
                         if (b.RequiresGrad) b.Grad[i] -= result.Grad[i];
                     }
                 };
-
-                a._results.Add(result);
             }
-            a._opIndex++;
 
             return result;
         }
 
         public static Tensor operator -(Tensor a, double b)
         {
-            bool newOp = a._results.Count <= a._opIndex;
-            Tensor result = newOp ? new(a.Dimensions, a.RequiresGrad) : a._results[a._opIndex];
+            Tensor result = GetResultTensor(a, a.Dimensions, a.RequiresGrad);
 
             for (int i = 0; i < result.ElementCount; i++)
             {
                 result[i] = a[i] - b;
             }
 
-            if (newOp)
+            if (!Inference)
             {
                 result._parents.Add(a);
 
@@ -2156,25 +2193,21 @@ namespace NNN
                         a.Grad[i] += result.Grad[i];
                     }
                 };
-
-                a._results.Add(result);
             }
-            a._opIndex++;
 
             return result;
         }
 
         public static Tensor operator -(double a, Tensor b)
         {
-            bool newOp = b._results.Count <= b._opIndex;
-            Tensor result = newOp ? new(b.Dimensions, b.RequiresGrad) : b._results[b._opIndex];
+            Tensor result = GetResultTensor(b, b.Dimensions, b.RequiresGrad);
 
             for (int i = 0; i < result.ElementCount; i++)
             {
                 result[i] = a - b[i];
             }
 
-            if (newOp)
+            if (!Inference)
             {
                 result._parents.Add(b);
 
@@ -2187,10 +2220,7 @@ namespace NNN
                         b.Grad[i] -= result.Grad[i];
                     }
                 };
-
-                b._results.Add(result);
             }
-            b._opIndex++;
 
             return result;
         }
@@ -2199,15 +2229,14 @@ namespace NNN
         public static Tensor operator *(Tensor a, Tensor b)
         {
             // Calculate each element of the resulting Tensor
-            bool newOp = a._results.Count <= a._opIndex;
-            Tensor result = newOp ? new(a.Dimensions, a.RequiresGrad || b.RequiresGrad) : a._results[a._opIndex];
+            Tensor result = GetResultTensor(a, a.Dimensions, a.RequiresGrad || b.RequiresGrad);
 
             for (int i = 0; i < result.ElementCount; i++)
             {
                 result[i] = a[i] * b[i];
             }
 
-            if (newOp)
+            if (!Inference)
             {
                 result._parents.AddRange([a, b]);
 
@@ -2220,25 +2249,21 @@ namespace NNN
                         if (b.RequiresGrad) b.Grad[i] += a[i] * result.Grad[i];
                     }
                 };
-
-                a._results.Add(result);
             }
-            a._opIndex++;
 
             return result;
         }
 
         public static Tensor operator *(Tensor a, double b)
         {
-            bool newOp = a._results.Count <= a._opIndex;
-            Tensor result = newOp ? new(a.Dimensions, a.RequiresGrad) : a._results[a._opIndex];
+            Tensor result = GetResultTensor(a, a.Dimensions, a.RequiresGrad);
 
             for (int i = 0; i < result.ElementCount; i++)
             {
                 result[i] = a[i] * b;
             }
 
-            if (newOp)
+            if (!Inference)
             {
                 result._parents.Add(a);
 
@@ -2251,10 +2276,7 @@ namespace NNN
                         a.Grad[i] += b * result.Grad[i];
                     }
                 };
-
-                a._results.Add(result);
             }
-            a._opIndex++;
 
             return result;
         }
@@ -2265,15 +2287,14 @@ namespace NNN
         public static Tensor operator /(Tensor a, Tensor b)
         {
             // Calculate each element of the resulting Tensor
-            bool newOp = a._results.Count <= a._opIndex;
-            Tensor result = newOp ? new(a.Dimensions, a.RequiresGrad || b.RequiresGrad) : a._results[a._opIndex];
+            Tensor result = GetResultTensor(a, a.Dimensions, a.RequiresGrad || b.RequiresGrad);
 
             for (int i = 0; i < result.ElementCount; i++)
             {
                 result[i] = a[i] / b[i];
             }
 
-            if (newOp)
+            if (!Inference)
             {
                 result._parents.AddRange([a, b]);
 
@@ -2286,25 +2307,21 @@ namespace NNN
                         if (b.RequiresGrad) b.Grad[i] -= a[i] / Math.Pow(b[i], 2.0) * result.Grad[i];
                     }
                 };
-
-                a._results.Add(result);
             }
-            a._opIndex++;
 
             return result;
         }
 
         public static Tensor operator /(Tensor a, double b)
         {
-            bool newOp = a._results.Count <= a._opIndex;
-            Tensor result = newOp ? new(a.Dimensions, a.RequiresGrad) : a._results[a._opIndex];
+            Tensor result = GetResultTensor(a, a.Dimensions, a.RequiresGrad);
 
             for (int i = 0; i < result.ElementCount; i++)
             {
                 result[i] = a[i] / b;
             }
 
-            if (newOp)
+            if (!Inference)
             {
                 result._parents.Add(a);
 
@@ -2317,25 +2334,21 @@ namespace NNN
                         a.Grad[i] += (1.0 / b) * result.Grad[i];
                     }
                 };
-
-                a._results.Add(result);
             }
-            a._opIndex++;
 
             return result;
         }
 
         public static Tensor operator /(double a, Tensor b)
         {
-            bool newOp = b._results.Count <= b._opIndex;
-            Tensor result = newOp ? new(b.Dimensions, b.RequiresGrad) : b._results[b._opIndex];
+            Tensor result = GetResultTensor(b, b.Dimensions, b.RequiresGrad);
 
             for (int i = 0; i < result.ElementCount; i++)
             {
                 result[i] = a / b[i];
             }
 
-            if (newOp)
+            if (!Inference)
             {
                 result._parents.Add(b);
 
@@ -2348,10 +2361,7 @@ namespace NNN
                         b.Grad[i] -= a / Math.Pow(b[i], 2.0) * result.Grad[i];
                     }
                 };
-
-                b._results.Add(result);
             }
-            b._opIndex++;
 
             return result;
         }
@@ -2360,15 +2370,14 @@ namespace NNN
         public static Tensor Pow(Tensor a, Tensor exp)
         {
             // Calculate each element of the resulting Tensor
-            bool newOp = a._results.Count <= a._opIndex;
-            Tensor result = newOp ? new(a.Dimensions, a.RequiresGrad || exp.RequiresGrad) : a._results[a._opIndex];
+            Tensor result = GetResultTensor(a, a.Dimensions, a.RequiresGrad || exp.RequiresGrad);
 
             for (int i = 0; i < result.ElementCount; i++)
             {
                 result[i] = Math.Pow(a[i], exp[i]);
             }
 
-            if (newOp)
+            if (!Inference)
             {
                 result._parents.AddRange([a, exp]);
 
@@ -2381,25 +2390,21 @@ namespace NNN
                         if (exp.RequiresGrad) exp.Grad[i] += result[i] * Math.Log(a[i]) * result.Grad[i];
                     }
                 };
-
-                a._results.Add(result);
             }
-            a._opIndex++;
 
             return result;
         }
 
         public static Tensor Pow(Tensor a, double exp)
         {
-            bool newOp = a._results.Count <= a._opIndex;
-            Tensor result = newOp ? new(a.Dimensions, a.RequiresGrad) : a._results[a._opIndex];
+            Tensor result = GetResultTensor(a, a.Dimensions, a.RequiresGrad);
 
             for (int i = 0; i < result.ElementCount; i++)
             {
                 result[i] = Math.Pow(a[i], exp);
             }
 
-            if (newOp)
+            if (!Inference)
             {
                 result._parents.Add(a);
 
@@ -2412,25 +2417,21 @@ namespace NNN
                         a.Grad[i] += exp * Math.Pow(a[i], exp - 1.0) * result.Grad[i];
                     }
                 };
-
-                a._results.Add(result);
             }
-            a._opIndex++;
 
             return result;
         }
 
         public static Tensor Pow(double a, Tensor exp)
         {
-            bool newOp = exp._results.Count <= exp._opIndex;
-            Tensor result = newOp ? new(exp.Dimensions, exp.RequiresGrad) : exp._results[exp._opIndex];
+            Tensor result = GetResultTensor(exp, exp.Dimensions, exp.RequiresGrad);
 
             for (int i = 0; i < result.ElementCount; i++)
             {
                 result[i] = Math.Pow(a, exp[i]);
             }
 
-            if (newOp)
+            if (!Inference)
             {
                 result._parents.Add(exp);
 
@@ -2443,10 +2444,7 @@ namespace NNN
                         exp.Grad[i] += result[i] * Math.Log(a) * result.Grad[i];
                     }
                 };
-
-                exp._results.Add(result);
             }
-            exp._opIndex++;
 
             return result;
         }
@@ -2455,13 +2453,14 @@ namespace NNN
         public static Tensor Exp(Tensor t)
         {
             // Calculate each element of the resulting Tensor
-            bool newOp = t._results.Count <= t._opIndex;
-            Tensor result = newOp ? new(t.Dimensions, t.RequiresGrad) : t._results[t._opIndex];
+            Tensor result = GetResultTensor(t, t.Dimensions, t.RequiresGrad);
+
             for (int i = 0; i < result.ElementCount; i++)
             {
                 result[i] = Math.Exp(t[i]);
             }
-            if (newOp)
+
+            if (!Inference)
             {
                 result._parents.Add(t);
 
@@ -2475,10 +2474,7 @@ namespace NNN
                         t.Grad[i] += result[i] * result.Grad[i];
                     }
                 };
-
-                t._results.Add(result);
             }
-            t._opIndex++;
 
             return result;
         }
@@ -2487,15 +2483,14 @@ namespace NNN
         public static Tensor Log(Tensor logBase, Tensor arg)
         {
             // Calculate each element of the resulting Tensor
-            bool newOp = logBase._results.Count <= logBase._opIndex;
-            Tensor result = newOp ? new(logBase.Dimensions, logBase.RequiresGrad || arg.RequiresGrad) : logBase._results[logBase._opIndex];
+            Tensor result = GetResultTensor(logBase, logBase.Dimensions, logBase.RequiresGrad || arg.RequiresGrad);
 
             for (int i = 0; i < result.ElementCount; i++)
             {
                 result[i] = Math.Log(arg[i], logBase[i]);
             }
 
-            if (newOp)
+            if (!Inference)
             {
                 result._parents.AddRange([logBase, arg]);
 
@@ -2508,25 +2503,21 @@ namespace NNN
                         if (arg.RequiresGrad) arg.Grad[i] += (1.0 / (arg[i] * Math.Log(logBase[i]))) * result.Grad[i];
                     }
                 };
-
-                logBase._results.Add(result);
             }
-            logBase._opIndex++;
 
             return result;
         }
 
         public static Tensor Log(Tensor logBase, double arg)
         {
-            bool newOp = logBase._results.Count <= logBase._opIndex;
-            Tensor result = newOp ? new(logBase.Dimensions, logBase.RequiresGrad) : logBase._results[logBase._opIndex];
+            Tensor result = GetResultTensor(logBase, logBase.Dimensions, logBase.RequiresGrad);
 
             for (int i = 0; i < result.ElementCount; i++)
             {
                 result[i] = Math.Log(arg, logBase[i]);
             }
 
-            if (newOp)
+            if (!Inference)
             {
                 result._parents.Add(logBase);
 
@@ -2539,25 +2530,21 @@ namespace NNN
                         logBase.Grad[i] -= (Math.Log(arg) / (logBase[i] * Math.Pow(Math.Log(logBase[i]), 2.0))) * result.Grad[i];
                     }
                 };
-
-                logBase._results.Add(result);
             }
-            logBase._opIndex++;
 
             return result;
         }
 
         public static Tensor Log(double logBase, Tensor arg)
         {
-            bool newOp = arg._results.Count <= arg._opIndex;
-            Tensor result = newOp ? new(arg.Dimensions, arg.RequiresGrad) : arg._results[arg._opIndex];
+            Tensor result = GetResultTensor(arg, arg.Dimensions, arg.RequiresGrad);
 
             for (int i = 0; i < result.ElementCount; i++)
             {
                 result[i] = Math.Log(arg[i], logBase);
             }
 
-            if (newOp)
+            if (!Inference)
             {
                 result._parents.Add(arg);
 
@@ -2570,10 +2557,7 @@ namespace NNN
                         arg.Grad[i] += (1.0 / (arg[i] * Math.Log(logBase))) * result.Grad[i];
                     }
                 };
-
-                arg._results.Add(result);
             }
-            arg._opIndex++;
 
             return result;
         }
@@ -2593,20 +2577,11 @@ namespace NNN
             int bMatSize = n * p;
             int rMatSize = m * p;
 
-            bool newOp = a._results.Count <= a._opIndex;
+            // Build result dims -> batch dims + [m, p]
+            var resultDims = (int[])a.Dimensions.Clone();
+            resultDims[^1] = p;
 
-            Tensor result;
-            if (newOp)
-            {
-                // Build result dims -> batch dims + [m, p]
-                var resultDims = (int[])a.Dimensions.Clone();
-                resultDims[^1] = p;
-                result = new(resultDims, a.RequiresGrad || b.RequiresGrad);
-            }
-            else
-            {
-                result = a._results[a._opIndex];
-            }
+            Tensor result = GetResultTensor(a, resultDims, a.RequiresGrad || b.RequiresGrad);
 
             for (int batch = 0; batch < batchSize; batch++)
             {
@@ -2628,7 +2603,7 @@ namespace NNN
                 }
             }
 
-            if (newOp)
+            if (!Inference)
             {
                 result._parents.AddRange([a, b]);
 
@@ -2674,10 +2649,7 @@ namespace NNN
                         }
                     }
                 };
-
-                a._results.Add(result);
             }
-            a._opIndex++;
 
             return result;
         }
@@ -2686,15 +2658,14 @@ namespace NNN
         public static Tensor ReLU(Tensor t)
         {
             // Apply ReLU function to each element
-            bool newOp = t._results.Count <= t._opIndex;
-            Tensor result = newOp ? new(t.Dimensions, t.RequiresGrad) : t._results[t._opIndex];
+            Tensor result = GetResultTensor(t, t.Dimensions, t.RequiresGrad);
 
             for (int i = 0; i < result.ElementCount; i++)
             {
                 result[i] = t[i] > 0.0 ? t[i] : 0.0;
             }
 
-            if (newOp)
+            if (!Inference)
             {
                 result._parents.Add(t);
 
@@ -2708,10 +2679,7 @@ namespace NNN
                         t.Grad[i] += (t[i] > 0.0 ? 1.0 : 0.0) * result.Grad[i];
                     }
                 };
-
-                t._results.Add(result);
             }
-            t._opIndex++;
 
             return result;
         }
@@ -2720,15 +2688,14 @@ namespace NNN
         public static Tensor LeakyReLU(Tensor t, double tau)
         {
             // Apply LeakyReLU function to each element
-            bool newOp = t._results.Count <= t._opIndex;
-            Tensor result = newOp ? new(t.Dimensions, t.RequiresGrad) : t._results[t._opIndex];
+            Tensor result = GetResultTensor(t, t.Dimensions, t.RequiresGrad);
 
             for (int i = 0; i < result.ElementCount; i++)
             {
                 result[i] = t[i] > 0.0 ? t[i] : tau * t[i];
             }
 
-            if (newOp)
+            if (!Inference)
             {
                 result._parents.Add(t);
 
@@ -2742,10 +2709,7 @@ namespace NNN
                         t.Grad[i] += (t[i] > 0.0 ? 1.0 : tau) * result.Grad[i];
                     }
                 };
-
-                t._results.Add(result);
             }
-            t._opIndex++;
 
             return result;
         }
@@ -2754,15 +2718,14 @@ namespace NNN
         public static Tensor Sigmoid(Tensor t)
         {
             // Apply Sigmoid function to each element
-            bool newOp = t._results.Count <= t._opIndex;
-            Tensor result = newOp ? new(t.Dimensions, t.RequiresGrad) : t._results[t._opIndex];
+            Tensor result = GetResultTensor(t, t.Dimensions, t.RequiresGrad);
 
             for (int i = 0; i < result.ElementCount; i++)
             {
                 result[i] = MathUtils.Sigmoid(t[i]);
             }
 
-            if (newOp)
+            if (!Inference)
             {
                 result._parents.Add(t);
 
@@ -2776,10 +2739,7 @@ namespace NNN
                         t.Grad[i] += result[i] * (1.0 - result[i]) * result.Grad[i];
                     }
                 };
-
-                t._results.Add(result);
             }
-            t._opIndex++;
 
             return result;
         }
@@ -2788,15 +2748,14 @@ namespace NNN
         public static Tensor Tanh(Tensor t)
         {
             // Apply Tanh function to each element
-            bool newOp = t._results.Count <= t._opIndex;
-            Tensor result = newOp ? new(t.Dimensions, t.RequiresGrad) : t._results[t._opIndex];
+            Tensor result = GetResultTensor(t, t.Dimensions, t.RequiresGrad);
 
             for (int i = 0; i < result.ElementCount; i++)
             {
                 result[i] = MathUtils.Tanh(t[i]);
             }
 
-            if (newOp)
+            if (!Inference)
             {
                 result._parents.Add(t);
 
@@ -2810,10 +2769,7 @@ namespace NNN
                         t.Grad[i] += (1.0 - Math.Pow(result[i], 2.0)) * result.Grad[i];
                     }
                 };
-
-                t._results.Add(result);
             }
-            t._opIndex++;
 
             return result;
         }
@@ -2821,8 +2777,7 @@ namespace NNN
         // Softmax function
         public static Tensor Softmax(Tensor t)
         {
-            bool newOp = t._results.Count <= t._opIndex;
-            Tensor result = newOp ? new(t.Dimensions, t.RequiresGrad) : t._results[t._opIndex];
+            Tensor result = GetResultTensor(t, t.Dimensions, t.RequiresGrad);
 
             int classes = t.Dimensions[^1];
             int batchSize = t.ElementCount / classes;
@@ -2850,7 +2805,7 @@ namespace NNN
                 }
             }
 
-            if (newOp)
+            if (!Inference)
             {
                 result._parents.Add(t);
 
@@ -2875,10 +2830,7 @@ namespace NNN
                         }
                     }
                 };
-
-                t._results.Add(result);
             }
-            t._opIndex++;
 
             return result;
         }
@@ -2887,8 +2839,7 @@ namespace NNN
         public static Tensor Sum(Tensor t)
         {
             // Calculate sum of all elements
-            bool newOp = t._results.Count <= t._opIndex;
-            Tensor result = newOp ? new([1], t.RequiresGrad) : t._results[t._opIndex];
+            Tensor result = GetResultTensor(t, [1], t.RequiresGrad);
 
             result[0] = 0.0;
             for (int i = 0; i < t.ElementCount; i++)
@@ -2896,7 +2847,7 @@ namespace NNN
                 result[0] += t[i];
             }
 
-            if (newOp)
+            if (!Inference)
             {
                 result._parents.Add(t);
 
@@ -2910,10 +2861,7 @@ namespace NNN
                         t.Grad[i] += result.Grad[0];
                     }
                 };
-
-                t._results.Add(result);
             }
-            t._opIndex++;
 
             return result;
         }
@@ -2922,8 +2870,7 @@ namespace NNN
         public static Tensor Mean(Tensor t)
         {
             // Calculate mean of all elements
-            bool newOp = t._results.Count <= t._opIndex;
-            Tensor result = newOp ? new([1], t.RequiresGrad) : t._results[t._opIndex];
+            Tensor result = GetResultTensor(t, [1], t.RequiresGrad);
 
             result[0] = 0.0;
             for (int i = 0; i < t.ElementCount; i++)
@@ -2932,7 +2879,7 @@ namespace NNN
             }
             result[0] /= t.ElementCount;
 
-            if (newOp)
+            if (!Inference)
             {
                 result._parents.Add(t);
 
@@ -2947,10 +2894,7 @@ namespace NNN
                         t.Grad[i] += grad;
                     }
                 };
-
-                t._results.Add(result);
             }
-            t._opIndex++;
 
             return result;
         }
@@ -2986,24 +2930,14 @@ namespace NNN
                 }
             }
 
-            bool newOp = t._results.Count <= t._opIndex;
-
-            Tensor result;
-            if (newOp)
+            // Build result dimensions
+            var resultDims = new int[t.Rank];
+            for (int i = 0; i < axes.Length; i++)
             {
-                // Build result dimensions
-                var resultDims = new int[t.Rank];
-                for (int i = 0; i < axes.Length; i++)
-                {
-                    resultDims[i] = t.Dimensions[axes[i]];
-                }
+                resultDims[i] = t.Dimensions[axes[i]];
+            }
 
-                result = new(resultDims, t.RequiresGrad);
-            }
-            else
-            {
-                result = t._results[t._opIndex];
-            }
+            Tensor result = GetResultTensor(t, resultDims, t.RequiresGrad);
 
             // Remap each element
             for (int i = 0; i < t.ElementCount; i++)
@@ -3017,7 +2951,7 @@ namespace NNN
                 result[result.LinearIndex(dstIndices)] = t[i];
             }
 
-            if (newOp)
+            if (!Inference)
             {
                 result._parents.Add(t);
 
@@ -3044,10 +2978,7 @@ namespace NNN
                         t.Grad[t.LinearIndex(dstIndices)] += result.Grad[i];
                     }
                 };
-
-                t._results.Add(result);
             }
-            t._opIndex++;
 
             return result;
         }
@@ -3057,8 +2988,7 @@ namespace NNN
         {
             // T.Dimensions must be a suffix of targetDims (t -> [16], targetDims = [32, 16])
 
-            bool newOp = t._results.Count <= t._opIndex;
-            Tensor result = newOp ? new(targetDims, t.RequiresGrad) : t._results[t._opIndex];
+            Tensor result = GetResultTensor(t, targetDims, t.RequiresGrad);
 
             for (int i = 0; i < result.ElementCount; i++)
             {
@@ -3067,7 +2997,7 @@ namespace NNN
                 result[i] = t[t.LinearIndex(srcIndices)];
             }
 
-            if (newOp)
+            if (!Inference)
             {
                 result._parents.Add(t);
 
@@ -3083,10 +3013,7 @@ namespace NNN
                         t.Grad[t.LinearIndex(srcIndices)] += result.Grad[i];
                     }
                 };
-
-                t._results.Add(result);
             }
-            t._opIndex++;
 
             return result;
         }
@@ -3107,12 +3034,11 @@ namespace NNN
         // Reinterpret dimensions without moving data
         public static Tensor Reshape(Tensor t, int[] newDims)
         {
-            bool newOp = t._results.Count <= t._opIndex;
-            Tensor result = newOp ? new(newDims, t.RequiresGrad) : t._results[t._opIndex];
+            Tensor result = GetResultTensor(t, newDims, t.RequiresGrad);
 
             Array.Copy(t.Data, result.Data, t.ElementCount);
 
-            if (newOp)
+            if (!Inference)
             {
                 result._parents.Add(t);
 
@@ -3126,10 +3052,7 @@ namespace NNN
                         t.Grad[i] += result.Grad[i];
                     }
                 };
-
-                t._results.Add(result);
             }
-            t._opIndex++;
 
             return result;
         }
@@ -3137,24 +3060,15 @@ namespace NNN
         // Add a leading dimension with length 1 to represent as batch
         public static Tensor WrapBatch(Tensor t)
         {
-            bool newOp = t._results.Count <= t._opIndex;
+            var batchDims = new int[t.Rank + 1];
+            batchDims[0] = 1;
+            Array.Copy(t.Dimensions, 0, batchDims, 1, t.Rank);
 
-            Tensor batch;
-            if (newOp)
-            {
-                var batchDims = new int[t.Rank + 1];
-                batchDims[0] = 1;
-                Array.Copy(t.Dimensions, 0, batchDims, 1, t.Rank);
-                batch = new(batchDims, t.RequiresGrad);
-            }
-            else
-            {
-                batch = t._results[t._opIndex];
-            }
+            Tensor batch = GetResultTensor(t, batchDims, t.RequiresGrad);
 
             Array.Copy(t.Data, batch.Data, t.ElementCount);
 
-            if (newOp)
+            if (!Inference)
             {
                 batch._parents.Add(t);
 
@@ -3168,12 +3082,46 @@ namespace NNN
                         t.Grad[i] += batch.Grad[i];
                     }
                 };
-
-                t._results.Add(batch);
             }
-            t._opIndex++;
 
             return batch;
+        }
+
+        static Tensor GetResultTensor(Tensor owner, int[] dims, bool requiresGrad)
+        {
+            owner.PrepareForward();
+
+            bool newOp = owner._results.Count <= owner._opIndex;
+
+            Tensor result;
+
+            if (newOp)
+            {
+                result = new(dims, requiresGrad);
+                owner._results.Add(result);
+            }
+            else
+            {
+                result = owner._results[owner._opIndex];
+
+                bool shapeMismatch = result.ElementCount != dims.Aggregate(1, (a, b) => a * b)
+                    || !result.Dimensions.SequenceEqual(dims);
+
+                if (shapeMismatch)
+                {
+                    result = new(dims, requiresGrad);
+                    owner._results[owner._opIndex] = result;
+                }
+                else
+                {
+                    result._parents.Clear();
+                    result._backward = delegate { };
+                }
+            }
+
+            owner._opIndex++;
+
+            return result;
         }
 
         // Convert linear index to multidimensional indices
@@ -3207,15 +3155,14 @@ namespace NNN
         // Clip gradients
         public static Tensor Clip(Tensor t, double min, double max)
         {
-            bool newOp = t._results.Count <= t._opIndex;
-            Tensor result = newOp ? new(t.Dimensions, t.RequiresGrad) : t._results[t._opIndex];
+            Tensor result = GetResultTensor(t, t.Dimensions, t.RequiresGrad);
 
             for (int i = 0; i < result.ElementCount; i++)
             {
                 result[i] = Math.Clamp(t[i], min, max);
             }
 
-            if (newOp)
+            if (!Inference)
             {
                 result._parents.Add(t);
 
@@ -3229,10 +3176,7 @@ namespace NNN
                         t.Grad[i] += (t[i] >= min && t[i] <= max) ? result.Grad[i] : 0;
                     }
                 };
-
-                t._results.Add(result);
             }
-            t._opIndex++;
 
             return result;
         }
