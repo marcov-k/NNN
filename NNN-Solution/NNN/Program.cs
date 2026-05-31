@@ -277,40 +277,21 @@ namespace NNN
         public virtual Tensor StateFormat => throw new NotImplementedException();
         public virtual int ActionCount => throw new NotImplementedException();
 
-        public virtual Tensor GetNormalizedState()
-        {
-            throw new NotImplementedException();
-        }
+        public abstract Tensor GetNormalizedState();
 
-        public virtual Tensor GetState()
-        {
-            throw new NotImplementedException();
-        }
+        public abstract Tensor GetState();
 
-        public virtual (double reward, Tensor nextState, bool done) Step(int action, int steps)
-        {
-            throw new NotImplementedException();
-        }
+        public abstract (double reward, Tensor nextState, bool done) Step(int action, int steps);
 
-        public virtual void Reset()
-        {
-            throw new NotImplementedException();
-        }
+        public abstract void Reset();
 
-        public virtual void Render(Episode episode, int step)
-        {
-            throw new NotImplementedException();
-        }
+        public abstract void Render(Episode episode, int step);
 
-        public virtual int PickAgentAction(Tensor qValues, Tensor? state = null)
-        {
-            throw new NotImplementedException();
-        }
+        public abstract int PickAgentAction(Tensor qValues, Tensor? state = null);
 
-        public virtual int PickRandomAction()
-        {
-            throw new NotImplementedException();
-        }
+        public abstract int PickRandomAction();
+
+        public abstract bool ValidAction(int action, Tensor? state);
     }
 
     public class MovementGrid2D : Environment
@@ -354,7 +335,7 @@ namespace NNN
 
         public override Tensor GetState()
         {
-            return State.Copy();
+            return State;
         }
 
         public override (double reward, Tensor nextState, bool done) Step(int action, int steps)
@@ -461,6 +442,8 @@ namespace NNN
 
         public override int PickRandomAction() => random.Next(ActionCount);
 
+        public override bool ValidAction(int action, Tensor? state) => true;
+
         enum Action { Left, Right, Up, Down }
     }
 
@@ -489,7 +472,7 @@ namespace NNN
 
         public override Tensor GetState()
         {
-            return State.Copy();
+            return State;
         }
 
         public override (double reward, Tensor nextState, bool done) Step(int action, int steps)
@@ -532,7 +515,7 @@ namespace NNN
             Console.WriteLine($"\n\nPosition Taken: {action}, Reward: {reward}");
         }
 
-        bool ValidAction(int action, Tensor? state = null)
+        public override bool ValidAction(int action, Tensor? state = null)
         {
             state ??= State;
             return (action != state.ElementCount - 1) && (state[action] == 0.0);
@@ -960,6 +943,8 @@ namespace NNN
 
         public override int PickRandomAction() => Random.Next(ActionCount);
 
+        public override bool ValidAction(int action, Tensor? state) => true;
+
         public override void Render(Episode episode, int step)
         {
             step = Math.Clamp(step, 0, episode.Experiences.Count);
@@ -1147,7 +1132,7 @@ namespace NNN
 
         public Episode(List<Experience> experiences)
         {
-            Experiences = [.. experiences.Select(e => new Experience(e.State.Copy(), e.Action, e.Reward, e.NextState.Copy(), e.Done))];
+            Experiences = [.. experiences.Select(e => new Experience(e.State, e.Action, e.Reward, e.NextState, e.Done))];
         }
     }
 
@@ -1282,6 +1267,7 @@ namespace NNN
 
         Tensor? _currentBatch;
         Tensor? _nextBatch;
+        Tensor? _nextState;
         Tensor? _predictedQs;
         Tensor? _targetQs;
 
@@ -1453,6 +1439,7 @@ namespace NNN
         Tensor MaskQValues(Tensor qValues, List<Experience> batch)
         {
             _predictedQs ??= new([BatchSize, 1]);
+            _predictedQs.ClearGraph();
             for (int i = 0; i < BatchSize; i++)
             {
                 _predictedQs[i] = qValues[[i, batch[i].Action]];
@@ -1463,7 +1450,12 @@ namespace NNN
         Tensor MaskQValuesDouble(Tensor agentQValues, Tensor targetQValues, List<Experience> batch)
         {
             _targetQs ??= new([BatchSize, 1]);
+            _nextState ??= new(batch[0].NextState.Dimensions);
+            _targetQs.ClearGraph();
+            _nextState.ClearGraph();
+
             int actionCount = agentQValues.Dimensions[^1];
+            int stateSize = Environment.StateSize;
 
             for (int i = 0; i < BatchSize; i++)
             {
@@ -1471,16 +1463,26 @@ namespace NNN
 
                 if (!batch[i].Done)
                 {
-                    int bestAction = 0;
-                    double bestQ = agentQValues[i * actionCount];
-                    for (int a = 1; a < actionCount; a++)
+                    Array.Copy(_nextBatch!.Data, i * stateSize, _nextState.Data, 0, stateSize);
+
+                    int bestAction = -1;
+                    double bestQ = double.MinValue;
+                    for (int a = 0; a < actionCount; a++)
                     {
+                        if (!Environment.ValidAction(a, _nextState)) continue;
                         double q = agentQValues[i * actionCount + a];
-                        if (q > bestQ) { bestQ = q; bestAction = a; }
+                        if (q > bestQ)
+                        {
+                            bestQ = q;
+                            bestAction = a;
+                        }
                     }
 
-                    double evalQ = targetQValues[i * actionCount + bestAction];
-                    qTarget += Discount * evalQ * (SelfPlay ? -1.0 : 1.0);
+                    if (bestAction != -1)
+                    {
+                        double evalQ = targetQValues[i * actionCount + bestAction];
+                        qTarget += Discount * evalQ * (SelfPlay ? -1.0 : 1.0);
+                    }
                 }
 
                 _targetQs[i] = qTarget;
@@ -1555,7 +1557,6 @@ namespace NNN
 
         public override void Step(Tensor parameter, int iteration)
         {
-            iteration++;
             if (!_state.TryGetValue(parameter, out var moments))
             {
                 moments = (new double[parameter.ElementCount], new double[parameter.ElementCount]);
@@ -1568,8 +1569,8 @@ namespace NNN
                 m[i] = Beta1 * m[i] + (1.0 - Beta1) * parameter.Grad[i];
                 v[i] = Beta2 * v[i] + (1.0 - Beta2) * Math.Pow(parameter.Grad[i], 2.0);
 
-                double mHat = m[i] / (1.0 - Math.Pow(Beta1, iteration));
-                double vHat = v[i] / (1.0 - Math.Pow(Beta2, iteration));
+                double mHat = m[i] / (1.0 - Math.Pow(Beta1, iteration + 1));
+                double vHat = v[i] / (1.0 - Math.Pow(Beta2, iteration + 1));
 
                 parameter.Data[i] -= (LR * mHat) / (Math.Sqrt(vHat) + Epsilon);
             }
@@ -2024,6 +2025,12 @@ namespace NNN
 
         // Restores the gradient array to match the data array
         public void RestoreGrad() => Grad = new double[ElementCount];
+
+        public void ClearGraph()
+        {
+            _parents.Clear();
+            _backward = delegate { };
+        }
 
         public static void BeginForward()
         {
