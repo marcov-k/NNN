@@ -849,7 +849,7 @@ namespace NNN
             int linearPos = validPositions[Random.Next(validPositions.Count)];
             var arrayPos = state.GetFullIndices(linearPos);
 
-            ApplePosition = new(arrayPos[0], arrayPos[1]);
+            ApplePosition = new(arrayPos[1], arrayPos[0]);
         }
 
         Tensor GetBoardState()
@@ -1859,8 +1859,7 @@ namespace NNN
 
             for (int i = 0; i < losses.ElementCount; i++)
             {
-                double value = losses[i];
-                priorities[i] = Math.Abs(value) + 1e-8;
+                priorities[i] = Math.Abs(losses[i]) + 1e-8;
 
                 if (weights is not null) losses[i] *= weights[i];
             }
@@ -1878,9 +1877,7 @@ namespace NNN
 
         public override Tensor CalculatePerSampleCost(Tensor input, Tensor target)
         {
-            var diff = input - target;
-            diff *= diff;
-            return diff;
+            return Tensor.Pow(input - target, 2.0);
         }
     }
 
@@ -2190,6 +2187,8 @@ namespace NNN
                         b.Grad[i] -= result.Grad[i];
                     }
                 };
+
+                b._results.Add(result);
             }
             b._opIndex++;
 
