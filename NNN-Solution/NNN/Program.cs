@@ -1778,8 +1778,12 @@ namespace NNN
         public override void BuildFromData(Saver.LayerData data)
         {
             NeuronCount = data.NeuronCount;
+
             Weights = data.Weights;
+            Weights.RestoreGrad();
+
             Biases = data.Biases;
+            Biases.RestoreGrad();
 
             var activType = Type.GetType(data.Activation);
             if (activType is not null)
@@ -1979,6 +1983,9 @@ namespace NNN
                 result.ZeroGrad();
             }
         }
+
+        // Restores the gradient array to match the data array
+        public void RestoreGrad() => Grad = new double[ElementCount];
 
         // Calculate the gradients of all Tensors in the current graph
         public void Backward()
