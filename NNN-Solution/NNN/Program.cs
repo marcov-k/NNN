@@ -8,14 +8,14 @@ double minExploration = 0.1;
 double discount = 0.99;
 Optimizer optimizer = new Adam(0.001);
 Cost cost = new Huber();
-int replayBufferSize = 5000;
-int batchSize = 64;
-int agentBufferSize = 3;
-int opponentCopyRate = 50;
+int replayBufferSize = 10000;
+int batchSize = 256;
+int agentBufferSize = 10;
+int opponentCopyRate = 100;
 int minRandomOpponentEpisodes = 100;
 double tau = 0.005;
 double maxGradNorm = 1.0;
-int minExperiences = 100;
+int minExperiences = 512;
 int episodeMemorySize = 100;
 DQNTrainer dqnTrainer;
 FIFOBuffer<Episode> episodeBuffer = new(episodeMemorySize);
@@ -39,8 +39,8 @@ void InteractionLoop()
     else
     {
         model = new([
-            new Dense(256, new LeakyReLU()),
-            new Dense(256, new LeakyReLU()),
+            new Dense(64, new LeakyReLU()),
+            new Dense(64, new LeakyReLU()),
             new Dense(env.ActionCount, new Linear())
         ], env.StateFormat);
     }
@@ -1951,7 +1951,6 @@ namespace NNN
         // Optimizations
         static readonly int VectorSize = Vector<double>.Count;
         const long ParallelThreshold = 500_000;
-        const int TileSize = 32;
 
         // Parameterless constructor for JsonSerializer
         public Tensor() { }
@@ -2015,10 +2014,11 @@ namespace NNN
         // Zero out the current accumulated gradient
         public void ZeroGrad()
         {
-            Array.Clear(Grad, 0, GradCount);
-            foreach (var result in _results)
+            if (RequiresGrad) Array.Clear(Grad, 0, GradCount);
+
+            foreach (var r in _results)
             {
-                result.ZeroGrad();
+                r.ZeroGrad();
             }
         }
 
