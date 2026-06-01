@@ -1,4 +1,5 @@
 ﻿using NNN;
+using static NNN.UIUtils;
 
 Model model;
 NNN.Environment env = new TicTacToe();
@@ -19,8 +20,6 @@ int minExperiences = 512;
 int episodeMemorySize = 100;
 DQNTrainer dqnTrainer;
 FIFOBuffer<Episode> episodeBuffer = new(episodeMemorySize);
-
-Dictionary<UserInput, string> userInputs = new() { { UserInput.Yes, "y" }, { UserInput.No, "n" }, { UserInput.Quit, "q" } };
 
 InteractionLoop();
 
@@ -68,7 +67,7 @@ void InteractionLoop()
 
     if (GetInput("Save model to a file? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
     {
-        SaveLoop();
+        SaveLoop(model);
     }
 
     Console.WriteLine("\nPress any key to quit...");
@@ -142,7 +141,7 @@ void ViewEpisodes()
         while (true)
         {
             Console.WriteLine();
-            int episode = GetEpisodeSelection();
+            int episode = GetEpisodeSelection(episodeBuffer!);
 
             int step = 0;
             bool viewingEpisode = true;
@@ -176,83 +175,8 @@ void ViewEpisodes()
     }
 }
 
-int GetEpisodeSelection()
-{
-    while (true)
-    {
-        int index = GetInteger($"Enter episode number ({episodeBuffer.Count} episodes cached)");
-        if (index > 0 && index <= episodeBuffer.Count) return index - 1;
-        else Console.WriteLine("Invalid episode number");
-    }
-}
-
-string GetInput(string prompt, List<string>? options = null)
-{
-    options ??= [];
-    for (int i = 0; i < options.Count; i++)
-    {
-        options[i] = options[i].ToLowerInvariant();
-    }
-
-    string input;
-    while (true)
-    {
-        Console.WriteLine($"\n{prompt}");
-        input = Console.ReadLine()?.ToLowerInvariant() ?? "";
-
-        if (input == userInputs[UserInput.Quit]) System.Environment.Exit(0);
-        else if (options.Count == 0 || options.Contains(input)) return input;
-    }
-}
-
-string GetFileName()
-{
-    string input;
-    while (true)
-    {
-        input = GetInput("Enter file name");
-        if (Saver.FileExists(input)) return input;
-        else Console.WriteLine("\nFile not found");
-    }
-}
-
-int GetInteger(string prompt)
-{
-    while (true)
-    {
-        if (int.TryParse(GetInput(prompt), out int integer)) return integer;
-        else Console.WriteLine("\nNot a valid number");
-    }
-}
-
-void SaveLoop()
-{
-    string fileName;
-
-    while (true)
-    {
-        fileName = GetInput("Enter file name");
-        if (Saver.FileExists(fileName))
-        {
-            if (GetInput($"File with name \"{fileName}\" already exists. Overwrite existing file? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
-            {
-                Saver.SaveModel(model, fileName);
-                Console.WriteLine("\nModel saved");
-                break;
-            }
-        }
-        else
-        {
-            Saver.SaveModel(model, fileName);
-            Console.WriteLine("\nModel saved");
-            break;
-        }
-    }
-}
 #pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.
 #pragma warning restore CS8602 // Dereference of a possibly null reference.
-
-enum UserInput { Yes, No, Quit }
 
 enum EpisodeNavigation
 {
@@ -577,35 +501,40 @@ namespace NNN
 
         public void Play(Model agent)
         {
-            Reset();
-            bool playerTurn = Random.Next(2) == 0;
-            string winner = "Draw";
-            bool done = false;
-            while (!done)
+            bool playing = true;
+            while (playing)
             {
-                Console.Clear();
-                DrawState(State);
-
-                int action = playerTurn ? GetPlayerAction() : GetAgentAction(agent);
-                if (action == -1) break;
-
-                State[action] = State[9] == 1.0 ? 1.0 : -1.0;
-
-                if (CheckWin())
+                Reset();
+                bool playerTurn = Random.Next(2) == 0;
+                string winner = "Draw";
+                bool done = false;
+                while (!done)
                 {
-                    winner = State[9] == 1.0 ? "X" : "O";
-                    break;
+                    Console.Clear();
+                    DrawState(State);
+
+                    int action = playerTurn ? GetPlayerAction() : GetAgentAction(agent);
+                    if (action == -1) break;
+
+                    State[action] = State[9] == 1.0 ? 1.0 : -1.0;
+
+                    if (CheckWin())
+                    {
+                        winner = State[9] == 1.0 ? "X" : "O";
+                        break;
+                    }
+
+                    done = BoardFilled();
+
+                    State[9] *= -1.0;
+                    playerTurn = !playerTurn;
                 }
 
-                done = BoardFilled();
+                Console.Clear();
+                DrawState(State);
+                Console.WriteLine($"\n\nWinner: {winner}");
 
-                State[9] *= -1.0;
-                playerTurn = !playerTurn;
             }
-
-            Console.Clear();
-            DrawState(State);
-            Console.WriteLine($"\n\nWinner: {winner}");
         }
 
 #pragma warning disable CS8602 // Dereference of a possibly null reference.
@@ -799,7 +728,7 @@ namespace NNN
 
         List<Int2> GetNeighbors(Int2 pos)
         {
-            List<Int2> neighbors = [ new(pos.X - 1, pos.Y), new(pos.X, pos.Y - 1), new(pos.X + 1, pos.Y), new(pos.X, pos.Y + 1) ];
+            List<Int2> neighbors = [new(pos.X - 1, pos.Y), new(pos.X, pos.Y - 1), new(pos.X + 1, pos.Y), new(pos.X, pos.Y + 1)];
 
             foreach (var neighbor in neighbors.ToList())
             {
@@ -1139,7 +1068,7 @@ namespace NNN
     public record Experience
     {
         public Tensor State { get; init; }
-        public int Action { get; init; } 
+        public int Action { get; init; }
         public double Reward { get; init; }
         public Tensor NextState { get; init; }
         public bool Done { get; init; }
@@ -1268,7 +1197,6 @@ namespace NNN
         Tensor? _currentBatch;
         Tensor? _nextBatch;
         Tensor? _nextState;
-        Tensor? _predictedQs;
         Tensor? _targetQs;
 
         public void Train(ref FIFOBuffer<Episode>? episodeBuffer, int episodes = 1000)
@@ -1399,14 +1327,12 @@ namespace NNN
                 }
             }
 
-            var predictions = Agent.Forward(_currentBatch);
             var nextAgentQs = Agent.Predict(_nextBatch).Copy();
             var nextTargetQs = TargetModel.Predict(_nextBatch).Copy();
-
-            var predictedQs = MaskQValues(predictions, batch);
             var targetQs = MaskQValuesDouble(nextAgentQs, nextTargetQs, batch);
 
-            Agent.ZeroGrad();
+            var predictions = Agent.Forward(_currentBatch);
+            var predictedQs = Tensor.MaskActions(predictions, batch);
 
             var lossResult = Cost.CalculateCostWithPriority(predictedQs, targetQs, weights);
             for (int i = 0; i < BatchSize; i++)
@@ -1434,17 +1360,6 @@ namespace NNN
             }
 
             optimizerSteps++;
-        }
-
-        Tensor MaskQValues(Tensor qValues, List<Experience> batch)
-        {
-            _predictedQs ??= new([BatchSize, 1]);
-            _predictedQs.ClearGraph();
-            for (int i = 0; i < BatchSize; i++)
-            {
-                _predictedQs[i] = qValues[[i, batch[i].Action]];
-            }
-            return _predictedQs;
         }
 
         Tensor MaskQValuesDouble(Tensor agentQValues, Tensor targetQValues, List<Experience> batch)
@@ -1509,7 +1424,6 @@ namespace NNN
             timer.Start();
             for (int e = 0; e < epochs; e++)
             {
-                Model.ZeroGrad();
                 predictions = Model.Forward(inputs);
                 loss = Cost.CalculateCost(predictions, targets);
                 loss.Backward();
@@ -1696,14 +1610,6 @@ namespace NNN
                         param.Grad[i] *= scale;
                     }
                 }
-            }
-        }
-
-        public void ZeroGrad()
-        {
-            foreach (var param in Parameters)
-            {
-                param.ZeroGrad();
             }
         }
 
@@ -2012,17 +1918,6 @@ namespace NNN
             return offset;
         }
 
-        // Zero out the current accumulated gradient
-        public void ZeroGrad()
-        {
-            if (RequiresGrad) Array.Clear(Grad, 0, GradCount);
-
-            foreach (var r in _results)
-            {
-                r.ZeroGrad();
-            }
-        }
-
         // Restores the gradient array to match the data array
         public void RestoreGrad() => Grad = new double[ElementCount];
 
@@ -2063,8 +1958,6 @@ namespace NNN
         // Calculate the gradients of all Tensors in the current graph
         public void Backward()
         {
-            Array.Fill(Grad, 1.0);
-
             _topo ??= [];
             _visited ??= [];
 
@@ -2072,6 +1965,13 @@ namespace NNN
             _visited.Clear();
 
             BuildTopo(this, _topo, _visited);
+
+            foreach (var t in _topo)
+            {
+                if (t.RequiresGrad) Array.Clear(t.Grad, 0, t.GradCount);
+            }
+
+            Array.Fill(Grad, 1.0);
 
             for (int i = _topo.Count - 1; i >= 0; i--)
             {
@@ -2133,7 +2033,7 @@ namespace NNN
             {
                 rVecs[i] = aVecs[i] + bVecs[i];
             }
-            
+
             for (int i = aVecs.Length * VectorSize; i < result.ElementCount; i++)
             {
                 result[i] = a[i] + b[i];
@@ -2214,7 +2114,7 @@ namespace NNN
         }
 
         public static Tensor operator +(double a, Tensor b) => b + a;
-        
+
 
         // Element-wise subtraction operator
         public static Tensor operator -(Tensor a, Tensor b)
@@ -2317,7 +2217,7 @@ namespace NNN
             var va = new Vector<double>(a);
             var bVecs = MemoryMarshal.Cast<double, Vector<double>>(b.Data.AsSpan());
             var rVecs = MemoryMarshal.Cast<double, Vector<double>>(result.Data.AsSpan());
-            
+
             for (int i = 0; i < bVecs.Length; i++)
             {
                 rVecs[i] = va - bVecs[i];
@@ -3006,12 +2906,10 @@ namespace NNN
 
                         if (a.RequiresGrad && b.RequiresGrad)
                         {
-                            double[] bT = ArrayPool<double>.Shared.Rent(bMatSize);
                             double[] aT = ArrayPool<double>.Shared.Rent(aMatSize);
                             double[] dOutT = ArrayPool<double>.Shared.Rent(rMatSize);
                             try
                             {
-                                TransposeMatrix(b.Data, bT, bOff, 0, n, p);
                                 TransposeMatrix(a.Data, aT, aOff, 0, m, n);
                                 TransposeMatrix(result.Grad, dOutT, rOff, 0, m, p);
 
@@ -3021,7 +2919,7 @@ namespace NNN
                                     {
                                         for (int k = 0; k < n; k++)
                                         {
-                                            a.Grad[aOff + i * n + k] += DotProduct(result.Grad, bT, rOff + i * p, k * n, p);
+                                            a.Grad[aOff + i * n + k] += DotProduct(result.Grad, b.Data, rOff + i * p, bOff + k * p, p);
                                         }
                                     });
 
@@ -3039,7 +2937,7 @@ namespace NNN
                                     {
                                         for (int k = 0; k < n; k++)
                                         {
-                                            a.Grad[aOff + i * n + k] += DotProduct(result.Grad, bT, rOff + i * p, k * n, p); 
+                                            a.Grad[aOff + i * n + k] += DotProduct(result.Grad, b.Data, rOff + i * p, bOff + k * p, p);
                                         }
                                     }
 
@@ -3054,42 +2952,31 @@ namespace NNN
                             }
                             finally
                             {
-                                ArrayPool<double>.Shared.Return(bT);
                                 ArrayPool<double>.Shared.Return(aT);
                                 ArrayPool<double>.Shared.Return(dOutT);
                             }
                         }
                         else if (a.RequiresGrad)
                         {
-                            double[] bT = ArrayPool<double>.Shared.Rent(bMatSize);
-                            try
+                            if (par)
                             {
-                                TransposeMatrix(b.Data, bT, bOff, 0, n, p);
-
-                                if (par)
+                                Parallel.For(0, m, i =>
                                 {
-                                    Parallel.For(0, m, i =>
+                                    for (int k = 0; k < n; k++)
                                     {
-                                        for (int k = 0; k < n; k++)
-                                        {
-                                            a.Grad[aOff + i * n + k] += DotProduct(result.Grad, bT, rOff + i * p, k * n, p);
-                                        }
-                                    });
-                                }
-                                else
+                                        a.Grad[aOff + i * n + k] += DotProduct(result.Grad, b.Data, rOff + i * p, bOff + k * p, p);
+                                    }
+                                });
+                            }
+                            else
+                            {
+                                for (int i = 0; i < m; i++)
                                 {
-                                    for (int i = 0; i < m; i++)
+                                    for (int k = 0; k < n; k++)
                                     {
-                                        for (int k = 0; k < n; k++)
-                                        {
-                                            a.Grad[aOff + i * n + k] += DotProduct(result.Grad, bT, rOff + i * p, k * n, p);
-                                        }
+                                        a.Grad[aOff + i * n + k] += DotProduct(result.Grad, b.Data, rOff + i * p, bOff + k * p, p);
                                     }
                                 }
-                            }
-                            finally
-                            {
-                                ArrayPool<double>.Shared.Return(bT);
                             }
                         }
                         else if (b.RequiresGrad)
@@ -3423,7 +3310,7 @@ namespace NNN
                 {
                     rVecs[i] /= vsumSplat;
                 }
-                
+
                 for (int i = rVecs.Length * VectorSize; i < classes; i++)
                 {
                     rSlice[i] /= sum;
@@ -3494,7 +3381,7 @@ namespace NNN
             }
             double sum = Vector.Sum(acc);
 
-            for (int i = tVecs.Length * VectorSize; i < t.ElementCount ; i++)
+            for (int i = tVecs.Length * VectorSize; i < t.ElementCount; i++)
             {
                 sum += t[i];
             }
@@ -3571,6 +3458,37 @@ namespace NNN
                     for (int i = tgVecs.Length * VectorSize; i < t.GradCount; i++)
                     {
                         t.Grad[i] += rg;
+                    }
+                };
+            }
+
+            return result;
+        }
+
+        public static Tensor MaskActions(Tensor qValues, List<Experience> batch)
+        {
+            int batchSize = batch.Count;
+
+            Tensor result = GetResultTensor(qValues, [batchSize, 1], qValues.RequiresGrad);
+
+            int actionCount = qValues.Dimensions[^1];
+
+            for (int i = 0; i < batchSize; i++)
+            {
+                result[i] = qValues[i * actionCount + batch[i].Action];
+            }
+
+            if (!Inference)
+            {
+                result._parents.Add(qValues);
+
+                result._backward = () =>
+                {
+                    if (!qValues.RequiresGrad) return;
+
+                    for (int i = 0; i < batchSize; i++)
+                    {
+                        qValues.Grad[i * actionCount + batch[i].Action] += result.Grad[i];
                     }
                 };
             }
@@ -4103,6 +4021,87 @@ namespace NNN
             public Tensor Weights { get; set; } = weights;
             public Tensor Biases { get; set; } = biases;
             public string Activation { get; set; } = activation;
+        }
+    }
+
+    public static class UIUtils
+    {
+        public static readonly Dictionary<UserInput, string> userInputs = new() { { UserInput.Yes, "y" }, { UserInput.No, "n" }, { UserInput.Quit, "q" } };
+
+        public enum UserInput { Yes, No, Quit }
+
+        public static int GetEpisodeSelection(FIFOBuffer<Episode> episodeBuffer)
+        {
+            while (true)
+            {
+                int index = GetInteger($"Enter episode number ({episodeBuffer.Count} episodes cached)");
+                if (index > 0 && index <= episodeBuffer.Count) return index - 1;
+                else Console.WriteLine("Invalid episode number");
+            }
+        }
+
+        public static string GetInput(string prompt, List<string>? options = null)
+        {
+            options ??= [];
+            for (int i = 0; i < options.Count; i++)
+            {
+                options[i] = options[i].ToLowerInvariant();
+            }
+
+            string input;
+            while (true)
+            {
+                Console.WriteLine($"\n{prompt}");
+                input = Console.ReadLine()?.ToLowerInvariant() ?? "";
+
+                if (input == userInputs[UserInput.Quit]) System.Environment.Exit(0);
+                else if (options.Count == 0 || options.Contains(input)) return input;
+            }
+        }
+
+        public static string GetFileName()
+        {
+            string input;
+            while (true)
+            {
+                input = GetInput("Enter file name");
+                if (Saver.FileExists(input)) return input;
+                else Console.WriteLine("\nFile not found");
+            }
+        }
+
+        public static int GetInteger(string prompt)
+        {
+            while (true)
+            {
+                if (int.TryParse(GetInput(prompt), out int integer)) return integer;
+                else Console.WriteLine("\nNot a valid number");
+            }
+        }
+
+        public static void SaveLoop(Model model)
+        {
+            string fileName;
+
+            while (true)
+            {
+                fileName = GetInput("Enter file name");
+                if (Saver.FileExists(fileName))
+                {
+                    if (GetInput($"File with name \"{fileName}\" already exists. Overwrite existing file? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
+                    {
+                        Saver.SaveModel(model, fileName);
+                        Console.WriteLine("\nModel saved");
+                        break;
+                    }
+                }
+                else
+                {
+                    Saver.SaveModel(model, fileName);
+                    Console.WriteLine("\nModel saved");
+                    break;
+                }
+            }
         }
     }
 }
