@@ -4,19 +4,19 @@ using static NNN.UIUtils;
 Model model;
 NNN.Environment env = new TicTacToe();
 double exploration = 1.0;
-double explorationDecay = 0.999;
+double explorationDecay = 0.998;
 double minExploration = 0.1;
 double discount = 0.99;
 Optimizer optimizer = new Adam(0.001);
 Cost cost = new Huber();
 int replayBufferSize = 10000;
-int batchSize = 256;
+int batchSize = 128;
 int agentBufferSize = 10;
-int opponentCopyRate = 100;
-int minRandomOpponentEpisodes = 100;
-double tau = 0.005;
+int opponentCopyRate = 150;
+int minRandomOpponentEpisodes = 300;
+double tau = 0.01;
 double maxGradNorm = 1.0;
-int minExperiences = 512;
+int minExperiences = 2000;
 int episodeMemorySize = 100;
 DQNTrainer dqnTrainer;
 FIFOBuffer<Episode> episodeBuffer = new(episodeMemorySize);
@@ -38,7 +38,8 @@ void InteractionLoop()
     else
     {
         model = new([
-            new Dense(64, new LeakyReLU()),
+            new Dense(128, new LeakyReLU()),
+            new Dense(128, new LeakyReLU()),
             new Dense(64, new LeakyReLU()),
             new Dense(env.ActionCount, new Linear())
         ], env.StateFormat);
@@ -383,9 +384,9 @@ namespace NNN
         public Random Random { get; init; } = new();
         static readonly int[][] WinOrients = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
         const double WinRewardBase = 1.0;
-        const double BlockRewardBase = 0.1;
-        const double DrawRewardBase = 0.2;
-        const double Penalty = 0.0;
+        const double BlockRewardBase = 0.6;
+        const double DrawRewardBase = 0.15;
+        const double Penalty = 0.05;
 
         public TicTacToe() { }
 
@@ -475,7 +476,7 @@ namespace NNN
                 int ownPositions = orient.Count(p => p == ownValue);
                 reward += ownPositions switch
                 {
-                    2 => 0.05 * WinRewardBase,
+                    2 => 0.1 * WinRewardBase,
                     3 => WinRewardBase,
                     _ => 0.0
                 };
@@ -534,6 +535,7 @@ namespace NNN
                 DrawState(State);
                 Console.WriteLine($"\n\nWinner: {winner}");
 
+                playing = GetInput("Play again? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes];
             }
         }
 
