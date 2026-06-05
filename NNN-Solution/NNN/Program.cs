@@ -655,9 +655,11 @@ namespace NNN
             State[9] = 1.0; // set player to move to X
         }
 
-        public override int PickAgentAction(Tensor qValues, Tensor? state = null)
+        public override int PickAgentAction(Tensor agentQValues, Tensor? state = null)
         {
             state ??= State; // assume current environment state if no state is given
+
+            var qValues = agentQValues.Copy();
 
             // Find valid action with highest Q-Value
             int action = Tensor.ArgMax(qValues);
@@ -1561,7 +1563,7 @@ namespace NNN
         /// <param name="experiences">List of experiences within the episode.</param>
         public Episode(List<Experience> experiences)
         {
-            Experiences = [.. experiences];
+            Experiences = [.. experiences.Select(e => new Experience(e.State, e.Action, e.Reward, e.NextState, e.Done))]; // create a new copy of each experience
         }
     }
 
@@ -1606,10 +1608,10 @@ namespace NNN
         /// <param name="priority">Replay priority of the experience - temporal difference error.</param>
         public Experience(Tensor state, int action, double reward, Tensor nextState, bool done, double priority = 1.0)
         {
-            State = state;
+            State = state.Copy();
             Action = action;
             Reward = reward;
-            NextState = nextState;
+            NextState = nextState.Copy();
             Done = done;
             Priority = Math.Max(priority, 1e-8); // ensure non-zero priority
         }
@@ -2049,8 +2051,8 @@ namespace NNN
             }
 
             // Predict future values of actions
-            var nextAgentQs = Agent.Predict(_nextBatch); // select actions for experience's next states
-            var nextTargetQs = TargetModel.Predict(_nextBatch); // predict Q-Values of actions
+            var nextAgentQs = Agent.Predict(_nextBatch).Copy(); // select actions for experience's next states
+            var nextTargetQs = TargetModel.Predict(_nextBatch).Copy(); // predict Q-Values of actions
             var targetQs = MaskQValuesDouble(nextAgentQs, nextTargetQs, batch);
 
             // Predict Q-Values of actions in the batch
