@@ -940,9 +940,13 @@ namespace NNN
         /// </summary>
         int StepsWithoutApple = 0;
         /// <summary>
-        /// Maximum number of steps the agent can go without eating an apple.
+        /// Current maximum number of steps the agent can go without eating an apple.
         /// </summary>
-        const int MaxStepsWithoutApple = 50;
+        int MaxStepsWithoutApple = 50;
+        /// <summary>
+        /// Initial maximum number of steps the agent can go without eating an apple.
+        /// </summary>
+        const int InitMaxStepsWithoutApple = 50;
         /// <summary>
         /// Reward for eating an apple.
         /// </summary>
@@ -1047,6 +1051,7 @@ namespace NNN
         public override void Reset()
         {
             StepsWithoutApple = 0;
+            MaxStepsWithoutApple = InitMaxStepsWithoutApple;
             SnakeLength = 1;
 
             // Generate new starting snake position and direction
@@ -1178,6 +1183,7 @@ namespace NNN
             {
                 SnakeHead.Grow();
                 SnakeLength++;
+                MaxStepsWithoutApple++;
                 GenerateApple();
                 return true;
             }
