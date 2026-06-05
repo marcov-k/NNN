@@ -2,7 +2,7 @@
 using static NNN.UIUtils;
 
 Model model;
-NNN.Environment env = new TicTacToe();
+NNN.Environment env = new Snake();
 double exploration = 1.0;
 double explorationDecay = 0.999;
 double minExploration = 0.1;
@@ -42,8 +42,8 @@ void InteractionLoop()
         // Create a new model
         model = new([
             new Dense(128, new LeakyReLU()),
-            new Dense(128, new LeakyReLU()),
             new Dense(64, new LeakyReLU()),
+            new Dense(32, new LeakyReLU()),
             new Dense(env.ActionCount, new Linear())
         ], env.StateFormat);
     }
@@ -942,23 +942,23 @@ namespace NNN
         /// <summary>
         /// Reward for eating an apple.
         /// </summary>
-        const double AppleReward = 2.0;
+        const double AppleReward = 5.0;
         /// <summary>
         /// Multiplier for the shaped distance to apple reward.
         /// </summary>
-        const double DistRewardMult = 0.2;
+        const double DistRewardMult = 1.0;
         /// <summary>
         /// Penalty for not reaching the next apple in time.
         /// </summary>
-        const double TimeoutPenalty = -1.0;
+        const double TimeoutPenalty = -1.5;
         /// <summary>
         /// Penalty for colliding with the border or snake body.
         /// </summary>
-        const double CollisionPenalty = -1.0;
+        const double CollisionPenalty = -1.5;
         /// <summary>
         /// Penalty for each step taken.
         /// </summary>
-        const double StepPenalty = -0.01;
+        const double StepPenalty = -0.02;
 
         // Utilities
         /// <summary>
@@ -1355,29 +1355,35 @@ namespace NNN
         /// <param name="agent">Agent to be used to play the game.</param>
         public void Play(Model agent)
         {
-            Reset();
-
-            // Play until the agent collides or fails to reach an apple in time
-            int stepsWithoutApple = 0;
-            while (!Collided())
+            bool playing = true;
+            while (playing)
             {
-                Console.Clear();
-                int action = PickAgentAction(agent.Predict(Tensor.WrapBatch(GetNormalizedState())));
-                SnakeHead.Move(MapAction(action));
+                Reset();
 
-                if (Collided()) break;
+                // Play until the agent collides or fails to reach an apple in time
+                int stepsWithoutApple = 0;
+                while (!Collided())
+                {
+                    Console.Clear();
+                    int action = PickAgentAction(agent.Predict(Tensor.WrapBatch(GetNormalizedState())));
+                    SnakeHead.Move(MapAction(action));
 
-                if (AteApple()) stepsWithoutApple = 0;
-                else stepsWithoutApple++;
+                    if (Collided()) break;
 
-                DrawSnake();
+                    if (AteApple()) stepsWithoutApple = 0;
+                    else stepsWithoutApple++;
 
-                if (stepsWithoutApple >= MaxStepsWithoutApple) break;
+                    DrawSnake();
 
-                Thread.Sleep(FrameTime);
+                    if (stepsWithoutApple >= MaxStepsWithoutApple) break;
+
+                    Thread.Sleep(FrameTime);
+                }
+
+                Console.WriteLine("\nAgent collided or timed out!");
+
+                playing = GetInput("Watch agent play again? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes];
             }
-
-            Console.WriteLine("\nAgent collided or timed out!");
         }
 
         /// <summary>
