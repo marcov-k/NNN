@@ -4,16 +4,16 @@ using static NNN.UIUtils;
 Model model;
 NNN.Environment env = new TicTacToe();
 double exploration = 1.0;
-double explorationDecay = 0.998;
+double explorationDecay = 0.999;
 double minExploration = 0.1;
 double discount = 0.99;
 Optimizer optimizer = new Adam(0.001);
 Cost cost = new Huber();
 int replayBufferSize = 10000;
 int batchSize = 128;
-int agentBufferSize = 10;
-int opponentCopyRate = 150;
-int minRandomOpponentEpisodes = 300;
+int agentBufferSize = 5;
+int opponentCopyRate = 600;
+int minRandomOpponentEpisodes = 600;
 double tau = 0.01;
 double maxGradNorm = 1.0;
 int minExperiences = 2000;
@@ -655,11 +655,9 @@ namespace NNN
             State[9] = 1.0; // set player to move to X
         }
 
-        public override int PickAgentAction(Tensor agentQValues, Tensor? state = null)
+        public override int PickAgentAction(Tensor qValues, Tensor? state = null)
         {
             state ??= State; // assume current environment state if no state is given
-
-            var qValues = agentQValues.Copy();
 
             // Find valid action with highest Q-Value
             int action = Tensor.ArgMax(qValues);
@@ -1563,7 +1561,7 @@ namespace NNN
         /// <param name="experiences">List of experiences within the episode.</param>
         public Episode(List<Experience> experiences)
         {
-            Experiences = [.. experiences.Select(e => new Experience(e.State, e.Action, e.Reward, e.NextState, e.Done))]; // create a new copy of each experience
+            Experiences = [.. experiences];
         }
     }
 
@@ -1608,10 +1606,10 @@ namespace NNN
         /// <param name="priority">Replay priority of the experience - temporal difference error.</param>
         public Experience(Tensor state, int action, double reward, Tensor nextState, bool done, double priority = 1.0)
         {
-            State = state.Copy();
+            State = state;
             Action = action;
             Reward = reward;
-            NextState = nextState.Copy();
+            NextState = nextState;
             Done = done;
             Priority = Math.Max(priority, 1e-8); // ensure non-zero priority
         }
@@ -1689,6 +1687,10 @@ namespace NNN
         /// Linear increment for bias correction scaling factor.
         /// </summary>
         readonly double BetaIncrement = 0.001;
+        /// <summary>
+        /// Persistent weights array buffer.
+        /// </summary>
+        double[]? Weights;
 
         public override void Add(Experience item)
         {
@@ -1709,7 +1711,7 @@ namespace NNN
             double sum = priorities.Sum();
 
             List<Experience> batch = [];
-            var weights = new double[batchSize];
+            Weights ??= new double[batchSize]; // allocate weights array buffer if not already allocated
 
             double maxWeight = 0.0;
 
@@ -1733,7 +1735,7 @@ namespace NNN
                         double prob = priorities[j] / sum;
                         double weight = Math.Pow(1.0 / (Count * prob), Beta);
 
-                        weights[i] = weight;
+                        Weights[i] = weight;
                         maxWeight = Math.Max(maxWeight, weight);
                         break;
                     }
@@ -1741,14 +1743,14 @@ namespace NNN
             }
 
             // Normalize weights to between 0 and 1
-            for (int i = 0; i < weights.Length; i++)
+            for (int i = 0; i < Weights.Length; i++)
             {
-                weights[i] /= maxWeight;
+                Weights[i] /= maxWeight;
             }
 
             Beta = Math.Min(1.0, Beta + BetaIncrement); // increment the bias correction factor
 
-            return (batch, weights);
+            return (batch, Weights);
         }
     }
 
@@ -2047,8 +2049,8 @@ namespace NNN
             }
 
             // Predict future values of actions
-            var nextAgentQs = Agent.Predict(_nextBatch).Copy(); // select actions for experience's next states
-            var nextTargetQs = TargetModel.Predict(_nextBatch).Copy(); // predict Q-Values of actions
+            var nextAgentQs = Agent.Predict(_nextBatch); // select actions for experience's next states
+            var nextTargetQs = TargetModel.Predict(_nextBatch); // predict Q-Values of actions
             var targetQs = MaskQValuesDouble(nextAgentQs, nextTargetQs, batch);
 
             // Predict Q-Values of actions in the batch
