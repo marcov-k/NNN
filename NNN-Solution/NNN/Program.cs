@@ -922,6 +922,10 @@ namespace NNN
         /// </summary>
         SnakeNode SnakeHead = new(); // snake represented as a linked list
         /// <summary>
+        /// Current length of the snake.
+        /// </summary>
+        int SnakeLength = 1;
+        /// <summary>
         /// Current position of the apple.
         /// </summary>
         Int2 ApplePosition = new();
@@ -1043,6 +1047,7 @@ namespace NNN
         public override void Reset()
         {
             StepsWithoutApple = 0;
+            SnakeLength = 1;
 
             // Generate new starting snake position and direction
             int startX = Random.Next(0, GridDims.X);
@@ -1172,6 +1177,7 @@ namespace NNN
             if (SnakeHead.Position == ApplePosition)
             {
                 SnakeHead.Grow();
+                SnakeLength++;
                 GenerateApple();
                 return true;
             }
@@ -1364,7 +1370,6 @@ namespace NNN
                 int stepsWithoutApple = 0;
                 while (!Collided())
                 {
-                    Console.Clear();
                     int action = PickAgentAction(agent.Predict(Tensor.WrapBatch(GetNormalizedState())));
                     SnakeHead.Move(MapAction(action));
 
@@ -1373,6 +1378,7 @@ namespace NNN
                     if (AteApple()) stepsWithoutApple = 0;
                     else stepsWithoutApple++;
 
+                    Console.Clear();
                     DrawSnake();
 
                     if (stepsWithoutApple >= MaxStepsWithoutApple) break;
@@ -1392,6 +1398,10 @@ namespace NNN
         void DrawSnake()
         {
             var state = GetBoardState(); // get the current state of the board
+
+            Console.WriteLine("Key: A - Apple, H - Snake Head, B - Snake Body, T - Snake Tail\n");
+            Console.WriteLine($"Snake Length: {SnakeLength}");
+
             for (int row = -1; row <= GridDims.Y; row++)
             {
                 for (int col = -1; col <= GridDims.X; col++)
