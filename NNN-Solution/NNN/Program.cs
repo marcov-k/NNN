@@ -958,15 +958,15 @@ namespace NNN
         /// <summary>
         /// Penalty for not reaching the next apple in time.
         /// </summary>
-        const double TimeoutPenalty = -1.5;
+        const double TimeoutPenalty = -5.0;
         /// <summary>
         /// Penalty for colliding with the border or snake body.
         /// </summary>
-        const double CollisionPenalty = -1.5;
+        const double CollisionPenalty = -5.0;
         /// <summary>
         /// Penalty for each step taken.
         /// </summary>
-        const double StepPenalty = -0.02;
+        const double StepPenalty = -0.2;
 
         // Utilities
         /// <summary>
