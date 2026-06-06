@@ -41,9 +41,8 @@ void InteractionLoop()
     {
         // Create a new model
         model = new([
-            new Dense(128, new LeakyReLU()),
             new Dense(64, new LeakyReLU()),
-            new Dense(32, new LeakyReLU()),
+            new Dense(64, new LeakyReLU()),
             new Dense(env.ActionCount, new Linear())
         ], env.StateFormat);
     }
@@ -952,13 +951,21 @@ namespace NNN
         /// </summary>
         const double AppleReward = 5.0;
         /// <summary>
+        /// Multiplier for the additional apple reward based on snake length.
+        /// </summary>
+        const double LengthRewardMult = 0.5;
+        /// <summary>
         /// Multiplier for the shaped distance to apple reward.
         /// </summary>
-        const double DistRewardMult = 1.0;
+        const double DistRewardMult = 0.01;
+        /// <summary>
+        /// Multiplier for the shaped reward based on number of reachable positions.
+        /// </summary>
+        const double ReachableRewardMult = 0.1;
         /// <summary>
         /// Penalty for not reaching the next apple in time.
         /// </summary>
-        const double TimeoutPenalty = -5.0;
+        const double TimeoutPenalty = -1.0;
         /// <summary>
         /// Penalty for colliding with the border or snake body.
         /// </summary>
@@ -966,7 +973,7 @@ namespace NNN
         /// <summary>
         /// Penalty for each step taken.
         /// </summary>
-        const double StepPenalty = -0.3;
+        const double StepPenalty = -0.05;
 
         // Utilities
         /// <summary>
@@ -1088,10 +1095,11 @@ namespace NNN
             // Calculate reward of the action
 
             double reward = StepPenalty; // apply per-step penalty
+
             // Add reward for eating the apple
             if (AteApple())
             {
-                reward += AppleReward;
+                reward += AppleReward + LengthRewardMult * SnakeLength;
                 StepsWithoutApple = 0;
                 return (reward, GetNormalizedState(), false);
             }
@@ -1112,6 +1120,10 @@ namespace NNN
             double newDist = Math.Sqrt(Math.Pow(xDiff, 2) + Math.Pow(yDiff, 2));
 
             reward += DistRewardMult * (prevDist - newDist); // add shaped reward based on change in distance
+
+            // Find number of reachable positions
+            double reachable = ReachablePositions(SnakeHead.Position, BlockedCells()) / (double)(GridDims.X * GridDims.Y);
+            reward += ReachableRewardMult * reachable; // add shaped reward based on number of reachable positions
 
             return (reward, GetNormalizedState(), false);
         }
