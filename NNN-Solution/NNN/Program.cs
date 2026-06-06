@@ -966,7 +966,7 @@ namespace NNN
         /// <summary>
         /// Penalty for each step taken.
         /// </summary>
-        const double StepPenalty = -0.2;
+        const double StepPenalty = -0.3;
 
         // Utilities
         /// <summary>
