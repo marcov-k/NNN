@@ -5,7 +5,7 @@ Model model;
 NNN.Environment env = new Snake();
 double exploration = 1.0;
 double explorationDecay = 0.999;
-double minExploration = 0.1;
+double minExploration = 0.01;
 double discount = 0.99;
 Optimizer optimizer = new Adam(0.001);
 Cost cost = new Huber();
@@ -113,7 +113,7 @@ void TestDQNModel()
     List<Experience> episodeExperiences = [];
 
     // Run a single complete episode with no exploration
-    while (!done && steps < 50)
+    while (!done)
     {
         steps++;
         trueState = env.GetState();
@@ -941,11 +941,11 @@ namespace NNN
         /// <summary>
         /// Current maximum number of steps the agent can go without eating an apple.
         /// </summary>
-        int MaxStepsWithoutApple = 50;
+        int MaxStepsWithoutApple = InitMaxStepsWithoutApple;
         /// <summary>
         /// Initial maximum number of steps the agent can go without eating an apple.
         /// </summary>
-        const int InitMaxStepsWithoutApple = 50;
+        const int InitMaxStepsWithoutApple = 200;
         /// <summary>
         /// Reward for eating an apple.
         /// </summary>
@@ -957,11 +957,11 @@ namespace NNN
         /// <summary>
         /// Multiplier for the shaped distance to apple reward.
         /// </summary>
-        const double DistRewardMult = 0.01;
+        const double DistRewardMult = 0.0;
         /// <summary>
         /// Multiplier for the shaped reward based on number of reachable positions.
         /// </summary>
-        const double ReachableRewardMult = 0.1;
+        const double ReachableRewardMult = 0.2;
         /// <summary>
         /// Penalty for not reaching the next apple in time.
         /// </summary>
@@ -1032,7 +1032,9 @@ namespace NNN
             state[3] /= maxDim;
             state[4] /= maxDim;
             state[5] /= maxDim;
-            state[6] /= GridDims.X * GridDims.Y;
+
+            double freeSpace = GridDims.X * GridDims.Y - SnakeLength;
+            state[6] = freeSpace > 0.0 ? state[6] / freeSpace : 0.0;
 
             return state;
         }
@@ -1122,7 +1124,7 @@ namespace NNN
             reward += DistRewardMult * (prevDist - newDist); // add shaped reward based on change in distance
 
             // Find number of reachable positions
-            double reachable = ReachablePositions(SnakeHead.Position, BlockedCells()) / (double)(GridDims.X * GridDims.Y);
+            double reachable = ReachablePositions(SnakeHead.Position, BlockedCells()) / (double)(GridDims.X * GridDims.Y - SnakeLength);
             reward += ReachableRewardMult * reachable; // add shaped reward based on number of reachable positions
 
             return (reward, GetNormalizedState(), false);
