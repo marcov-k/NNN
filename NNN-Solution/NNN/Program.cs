@@ -1,7 +1,7 @@
 ﻿using NNN;
 using static NNN.UIUtils;
 
-bool demoMode = true;
+bool demoMode = false;
 
 Model model;
 NNN.Environment env = new TicTacToe();
