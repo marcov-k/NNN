@@ -1,8 +1,10 @@
 ﻿using NNN;
 using static NNN.UIUtils;
 
+bool demoMode = true;
+
 Model model;
-NNN.Environment env = new Snake();
+NNN.Environment env = new TicTacToe();
 double exploration = 1.0;
 double explorationDecay = 0.999;
 double minExploration = 0.01;
@@ -21,7 +23,8 @@ int episodeMemorySize = 100;
 DQNTrainer dqnTrainer;
 FIFOBuffer<Episode> episodeBuffer = new(episodeMemorySize);
 
-InteractionLoop();
+if (demoMode) DemoHandler.RunDemo();
+else InteractionLoop();
 
 #pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
 #pragma warning disable CS8602 // Dereference of a possibly null reference.
@@ -315,6 +318,10 @@ namespace NNN
         /// The number of discrete actions the agent can make.
         /// </summary>
         public abstract int ActionCount { get; }
+        /// <summary>
+        /// The name of the environment to display to the user.
+        /// </summary>
+        public abstract string EnvironmentName { get; }
 
         /// <summary>
         /// Get the normalized form of the environment's current state.
@@ -369,6 +376,11 @@ namespace NNN
         /// <param name="episode">Episode in which the state is recorded.</param>
         /// <param name="step">Step at which the state occurred in the episode.</param>
         public abstract void Render(Episode episode, int step);
+
+        /// <summary>
+        /// Plays a demonstration of the model trained on the environment.
+        /// </summary>
+        public abstract void PlayDemo();
     }
 
     /// <summary>
@@ -379,6 +391,7 @@ namespace NNN
         // Base Environment API overrides
         public override Tensor StateFormat => new([1, 4]); // encodes agent's and target's grid positions
         public override int ActionCount => 4; // agent can move in one of the 4 cardinal directions
+        public override string EnvironmentName => "2D Movement Grid";
 
         // Internal grid environment representation
         /// <summary>
@@ -570,6 +583,8 @@ namespace NNN
 
             Console.Write($"Step: {step}, Action: {(Enum.IsDefined(typeof(Action), action) ? ((Action)action).ToString() : "None")}, Reward: {reward:F3}");
         }
+
+        public override void PlayDemo() => throw new NotImplementedException();
     }
 
     /// <summary>
@@ -580,6 +595,7 @@ namespace NNN
         // Base Environment API overrides
         public override Tensor StateFormat => new([1, 10]); // encodes state of all 9 board positions + current player to move
         public override int ActionCount => 9; // agent can select one of the 9 board positions
+        public override string EnvironmentName => "Tic-Tac-Toe";
 
         // Self-play interface API overrides
         public bool AgentTurn { get; set; } = true;
@@ -623,6 +639,12 @@ namespace NNN
         /// Environment's Random instance.
         /// </summary>
         public Random Random { get; init; } = new();
+
+        // Demo
+        /// <summary>
+        /// Name of the file containing the demonstration agent for the environment.
+        /// </summary>
+        const string DemoFileName = "tictactoedemo";
 
         /// <summary>
         /// Creates a new TicTacToe environment instance.
@@ -716,6 +738,13 @@ namespace NNN
             DrawState(state);
 
             Console.WriteLine($"\n\nPosition Taken: {action}, Reward: {reward}");
+        }
+
+        public override void PlayDemo()
+        {
+            ShowDemoInstructions();
+            var agent = Saver.LoadModel(DemoFileName);
+            Play(agent);
         }
 
         // Additional self-play interface API overrides
@@ -900,6 +929,24 @@ namespace NNN
                 Console.Write(fill);
             }
         }
+
+        static void ShowDemoInstructions()
+        {
+            Console.WriteLine("Welcome to the Tic-Tac-Toe agent demonstration.");
+            Console.WriteLine("The agent contains a total of 329 neurons.");
+            Console.WriteLine("These are arranged in two layers of 128 neurons each, one layer of 64 neurons, and an output layer of 9 neurons - one for each position on the board.");
+            Console.WriteLine("The agent receives a total of 10 inputs, one encoding each position on the board and a tenth encoding whether X or O is to move.");
+            Console.WriteLine("This agent was trained over the course of around 50,000 games of Tic-Tac-Toe.");
+            Console.WriteLine("During these games, it learned to play both X and O, and trained by playing against past versions of itself.");
+            Console.WriteLine("It is by no means perfect, but it can play relatively well in most situations.");
+            Console.WriteLine("I have personally found a few board states in which it simply fails.");
+            Console.WriteLine("Can you find them as well?\n");
+            Console.WriteLine("The positions on the game board are represented by the indices 0-8.");
+            Console.WriteLine("The indices increase across rows and then down columns, with position 0 being in the top left and position 8 in the bottom right.");
+            Console.WriteLine("When playing, simply select the position you would like to take.\n");
+            Console.WriteLine("Press any key to continue...");
+            Console.ReadKey();
+        }
     }
 
     /// <summary>
@@ -910,6 +957,7 @@ namespace NNN
         // Base Environment API overrides
         public override Tensor StateFormat => new([1, 7]); // X/Y distance form agent to apple, snake head facing direction, nearest obstacle distance forward/left/right, current number of reachable positions
         public override int ActionCount => 3; // agent can move forward, left, or right
+        public override string EnvironmentName => "Snake";
 
         // Internal game representation
         /// <summary>
@@ -984,6 +1032,12 @@ namespace NNN
         /// Time per frame when showing the agent playing the game.
         /// </summary>
         const int FrameTime = 100; // in milliseconds
+
+        // Demo
+        /// <summary>
+        /// Name of the file containing the demonstration agent for the environment.
+        /// </summary>
+        const string DemoFileName = "snakedemo";
 
         /// <summary>
         /// Encoding of agent's actions.
@@ -1145,6 +1199,13 @@ namespace NNN
 
             // Only display basic information about the action taken due to state representation being insufficient to reconstruct the exact board state
             Console.WriteLine($"\nDirection Moved: {dirMoved}, Step: {step}, Reward: {reward}");
+        }
+
+        public override void PlayDemo()
+        {
+            ShowDemoInstructions();
+            var agent = Saver.LoadModel(DemoFileName);
+            Play(agent);
         }
 
         // Additional environment-specific functionality
@@ -1448,6 +1509,29 @@ namespace NNN
 
                 Console.Write("\n");
             }
+        }
+
+        /// <summary>
+        /// Shows the instructions for the environment's demonstration.
+        /// </summary>
+        static void ShowDemoInstructions()
+        {
+            Console.WriteLine("Welcome to the Snake agent demonstration.");
+            Console.WriteLine("The agent contains a total of 131 neurons.");
+            Console.WriteLine("These are arranged in two layers of 64 neurons each and an output layer of 3 neurons - one each for moving forward, left, and right.");
+            Console.WriteLine("The agent receives 7 inputs.");
+            Console.WriteLine("These include: the X and Y distances to the apple, the direction the snake's head is currently facing,");
+            Console.WriteLine("The distances to the nearest obstacle to the front, left, and right, and the proportion of empty spaces which it can currently reach.");
+            Console.WriteLine("This agent was trained over the course of roughly 40,000 games of Snake.");
+            Console.WriteLine("It is nowhere near perfect, and is unlikely to reach high scores.");
+            Console.WriteLine("But this seems to be approaching the limit of what this specific architecture is able to achieve with its limited view of the game.");
+            Console.WriteLine("My next plan is to implement support for convolutional neural networks, which will be far more capable of understanding the full board.");
+            Console.WriteLine("But, until that happens, enjoy watching this current limited version.");
+            Console.WriteLine("I still find it impressive that it was able to learn how to survive as long as it usually does, given it started out being completely random.");
+            Console.WriteLine("Keep in mind that there may be certain initial starting layouts in which it may just simply fail.");
+            Console.WriteLine("Feel free to run the demo again if that were to happen.\n");
+            Console.WriteLine("Press any key to continue...");
+            Console.ReadKey();
         }
 
         /// <summary>
@@ -5977,6 +6061,57 @@ namespace NNN
                 if (input == userInputs[UserInput.Quit]) System.Environment.Exit(0); // terminate the program if the user chooses to quit
                 else if (options.Count == 0 || options.Contains(input)) return input; // return input if valid or no valid inputs given
             }
+        }
+    }
+
+    /// <summary>
+    /// Static class containing demonstration functionality.
+    /// </summary>
+    public static class DemoHandler
+    {
+        /// <summary>
+        /// Array of all environments with trained and implemented demonstrations.
+        /// </summary>
+        static readonly Environment[] DemoEnvs = [new TicTacToe(), new Snake()];
+
+        /// <summary>
+        /// Runs the demonstration user interaction loop.
+        /// </summary>
+        public static void RunDemo()
+        {
+            Console.WriteLine("Welcome to the Neural Network Nonsense library demonstration.");
+            Console.WriteLine("Enter Q at any time to close the demonstration.");
+
+            // Main interaction loop
+            bool done = false;
+            while (!done)
+            {
+                // Get demo index from the user
+                int envIndex = -1;
+                bool validIndex = false;
+                while (!validIndex)
+                {
+                    string prompt = "Please select which environment you would like to see a demo of:";
+                    for (int i = 0; i < DemoEnvs.Length; i++)
+                    {
+                        prompt += $"\n{i + 1} - {DemoEnvs[i].GetType().Name}";
+                    }
+
+                    envIndex = GetInteger(prompt);
+
+                    if (envIndex > 0 && envIndex <= DemoEnvs.Length) validIndex = true;
+                    else Console.WriteLine("Invalid selection...");
+                }
+
+                Console.WriteLine("\n");
+                DemoEnvs[envIndex - 1].PlayDemo();
+
+                Console.Clear();
+                if (GetInput("Continue viewing demos? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.No]) done = true;
+            }
+
+            Console.WriteLine("Press any key to close...");
+            Console.ReadKey();
         }
     }
 }
