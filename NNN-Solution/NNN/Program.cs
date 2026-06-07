@@ -41,7 +41,7 @@ void InteractionLoop()
     {
         // Create a new model
         model = new([
-            new Dense(64, new LeakyReLU()),
+            new Dense(128, new LeakyReLU()),
             new Dense(64, new LeakyReLU()),
             new Dense(env.ActionCount, new Linear())
         ], env.StateFormat);
@@ -608,7 +608,7 @@ namespace NNN
         /// <summary>
         /// Base reward for an action which prevents the opponent from winning.
         /// </summary>
-        const double BlockRewardBase = 0.6;
+        const double BlockRewardBase = 0.8;
         /// <summary>
         /// Base reward for an action which ties the game - optimal outcome if both players play optimally.
         /// </summary>
@@ -616,7 +616,7 @@ namespace NNN
         /// <summary>
         /// Penalty for actions which disadvantage the agent.
         /// </summary>
-        const double Penalty = 0.05;
+        const double Penalty = 0.0;
 
         // Utilities
         /// <summary>
