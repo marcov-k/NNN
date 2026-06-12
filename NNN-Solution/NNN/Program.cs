@@ -4,7 +4,7 @@ using static NNN.UIUtils;
 bool demoMode = false;
 
 Model model;
-NNN.Environment env = new TicTacToe();
+NNN.Environment env = new Snake();
 double exploration = 1.0;
 double explorationDecay = 0.999;
 double minExploration = 0.01;
@@ -1099,9 +1099,12 @@ namespace NNN
             SnakeNode? node = SnakeHead;
             while (node is not null)
             {
-                OneHotEncodeNode(node, contSpan, dirSpan);
-                state[contentIndices] = 1.0;
-                state[directionIndices] = 1.0;
+                if (ValidPosition(node.Position))
+                {
+                    OneHotEncodeNode(node, contSpan, dirSpan);
+                    state[contentIndices] = 1.0;
+                    state[directionIndices] = 1.0;
+                }
 
                 node = node.Child;
             }
@@ -1233,7 +1236,7 @@ namespace NNN
         /// <param name="node">Snake node to encode.</param>
         /// <param name="contentIndices">Span to write one-hot encoding indices for the state content encoding to.</param>
         /// <param name="directionIndices">Span to write one-hot encoding indices for the state direction encoding to.</param>
-        void OneHotEncodeNode(SnakeNode node, Span<int> contentIndices, Span<int> directionIndices)
+        static void OneHotEncodeNode(SnakeNode node, Span<int> contentIndices, Span<int> directionIndices)
         {
             contentIndices[0] = node.Position.Y;
             contentIndices[1] = node.Position.X;
@@ -2093,7 +2096,7 @@ namespace NNN
 
                     // Store experience for training and episode review
                     if (learnerTurn) ReplayBuffer.Add(new(state, action, reward, nextState, done));
-                    episodeExperiences.Add(new(trueState, action, reward, Environment.GetState(), done));
+                    episodeExperiences.Add(new(trueState, action, reward, done ? trueState : Environment.GetState(), done));
 
                     TrainNetwork();
 
