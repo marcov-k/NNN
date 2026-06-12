@@ -44,8 +44,9 @@ void InteractionLoop()
     {
         // Create a new model
         model = new([
+            new Dense(512, new LeakyReLU()),
+            new Dense(256, new LeakyReLU()),
             new Dense(128, new LeakyReLU()),
-            new Dense(64, new LeakyReLU()),
             new Dense(env.ActionCount, new Linear())
         ], env.StateFormat);
     }
@@ -955,7 +956,7 @@ namespace NNN
     public class Snake : Environment
     {
         // Base Environment API overrides
-        public override Tensor StateFormat => new([1, 7]); // X/Y distance form agent to apple, snake head facing direction, nearest obstacle distance forward/left/right, current number of reachable positions
+        public override Tensor StateFormat => new([1, GridDims.Y, GridDims.X, 8]); // 20 x 20 grid with one-hot encoding for contents of each cell and the direction each cell's content will move in
         public override int ActionCount => 3; // agent can move forward, left, or right
         public override string EnvironmentName => "Snake";
 
@@ -1062,6 +1063,11 @@ namespace NNN
         }
 
         /// <summary>
+        /// One-hot encoding indices of board position data.
+        /// </summary>
+        enum BoardEncodingOneHot { Head, Body, Tail, Apple, Left, Up, Right, Down }
+
+        /// <summary>
         /// Creates a new Snake environment instance.
         /// </summary>
         /// <param name="width">Width of the game's grid.</param>
@@ -1076,37 +1082,31 @@ namespace NNN
 
         public override Tensor GetNormalizedState()
         {
-            var state = GetState();
-
-            // Normalize the state encodings to a range of -1 to 1
-            double maxDim = Math.Max(GridDims.X, GridDims.Y);
-
-            state[0] /= GridDims.X;
-            state[1] /= GridDims.Y;
-            state[3] /= maxDim;
-            state[4] /= maxDim;
-            state[5] /= maxDim;
-
-            double freeSpace = GridDims.X * GridDims.Y - SnakeLength;
-            state[6] = freeSpace > 0.0 ? state[6] / freeSpace : 0.0;
-
-            return state;
+            return GetState();
         }
 
         public override Tensor GetState()
         {
-            Tensor state = new([StateFormat.Dimensions[1]]);
+            Tensor state = new(StateFormat.Dimensions[1..]);
 
             // Encode the state based on the internal game representation
-            state[0] = ApplePosition.X - SnakeHead.Position.X;
-            state[1] = ApplePosition.Y - SnakeHead.Position.Y;
+            int[] contentIndices = new int[3];
+            var contSpan = contentIndices.AsSpan();
 
-            state[2] = SnakeHead.Direction;
+            int[] directionIndices = new int[3];
+            var dirSpan = directionIndices.AsSpan();
 
-            state[3] = NearestObstacle(SnakeHead.Direction); // forward
-            state[4] = NearestObstacle((SnakeHead.Direction + 3) % 4); // left
-            state[5] = NearestObstacle((SnakeHead.Direction + 1) % 4); // right
-            state[6] = ReachablePositions(SnakeHead.Position, BlockedCells());
+            SnakeNode? node = SnakeHead;
+            while (node is not null)
+            {
+                OneHotEncodeNode(node, contSpan, dirSpan);
+                state[contentIndices] = 1.0;
+                state[directionIndices] = 1.0;
+
+                node = node.Child;
+            }
+
+            state[ApplePosition.Y, ApplePosition.X, (int)BoardEncodingOneHot.Apple] = 1.0;
 
             return state;
         }
@@ -1224,6 +1224,41 @@ namespace NNN
                 (int)Actions.Left => (SnakeHead.Direction + 3) % 4,
                 (int)Actions.Right => (SnakeHead.Direction + 1) % 4,
                 _ => throw new ArgumentException("Invalid Action")
+            };
+        }
+
+        /// <summary>
+        /// Finds the one-hot encoding of a snake node.
+        /// </summary>
+        /// <param name="node">Snake node to encode.</param>
+        /// <param name="contentIndices">Span to write one-hot encoding indices for the state content encoding to.</param>
+        /// <param name="directionIndices">Span to write one-hot encoding indices for the state direction encoding to.</param>
+        void OneHotEncodeNode(SnakeNode node, Span<int> contentIndices, Span<int> directionIndices)
+        {
+            contentIndices[0] = node.Position.Y;
+            contentIndices[1] = node.Position.X;
+            contentIndices.CopyTo(directionIndices);
+
+            if (node.Parent is not null && node.Child is not null)
+            {
+                contentIndices[2] = (int)BoardEncodingOneHot.Body;
+            }
+            else if (node.Parent is not null)
+            {
+                contentIndices[2] = (int)BoardEncodingOneHot.Tail;
+            }
+            else
+            {
+                contentIndices[2] = (int)BoardEncodingOneHot.Head;
+            }
+
+            directionIndices[2] = node.Direction switch
+            {
+                (int)Movements.Left => (int)BoardEncodingOneHot.Left,
+                (int)Movements.Up => (int)BoardEncodingOneHot.Up,
+                (int)Movements.Right => (int)BoardEncodingOneHot.Right,
+                (int)Movements.Down => (int)BoardEncodingOneHot.Down,
+                _ => throw new Exception("Cannot encode - invalid direction")
             };
         }
 
@@ -3189,7 +3224,7 @@ namespace NNN
         /// </summary>
         /// <param name="indices">Coordinate indices of the value to access.</param>
         /// <returns>Value at the given coordinate indices.</returns>
-        public double this[int[] indices]
+        public double this[params int[] indices]
         {
             get => Data[LinearIndex(indices)];
             set => Data[LinearIndex(indices)] = value;
