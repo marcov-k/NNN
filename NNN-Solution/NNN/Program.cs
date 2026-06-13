@@ -1010,11 +1010,11 @@ namespace NNN
         /// <summary>
         /// Multiplier for the shaped distance to apple reward.
         /// </summary>
-        const double DistRewardMult = 0.0;
+        const double DistRewardMult = 0.2;
         /// <summary>
         /// Multiplier for the shaped reward based on number of reachable positions.
         /// </summary>
-        const double ReachableRewardMult = 0.1;
+        const double ReachableRewardMult = 0.4;
         /// <summary>
         /// Penalty for not reaching the next apple in time.
         /// </summary>
