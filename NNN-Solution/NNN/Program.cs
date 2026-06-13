@@ -6,7 +6,7 @@ bool demoMode = false;
 Model model;
 NNN.Environment env = new Snake();
 double exploration = 1.0;
-double explorationDecay = 0.999;
+double explorationDecay = 0.9995;
 double minExploration = 0.01;
 int trainEvery = 4;
 double discount = 0.99;
