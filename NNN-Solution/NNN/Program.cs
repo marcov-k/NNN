@@ -8,11 +8,12 @@ NNN.Environment env = new Snake();
 double exploration = 1.0;
 double explorationDecay = 0.999;
 double minExploration = 0.01;
+int trainEvery = 4;
 double discount = 0.99;
 Optimizer optimizer = new Adam(0.001);
 Cost cost = new Huber();
 int replayBufferSize = 10000;
-int batchSize = 128;
+int batchSize = 64;
 int agentBufferSize = 5;
 int opponentCopyRate = 600;
 int minRandomOpponentEpisodes = 600;
@@ -44,9 +45,9 @@ void InteractionLoop()
     {
         // Create a new model
         model = new([
-            new Dense(512, new LeakyReLU()),
             new Dense(256, new LeakyReLU()),
             new Dense(128, new LeakyReLU()),
+            new Dense(64, new LeakyReLU()),
             new Dense(env.ActionCount, new Linear())
         ], env.StateFormat);
     }
@@ -57,6 +58,7 @@ void InteractionLoop()
         exploration: exploration,
         explorationDecay: explorationDecay,
         minExploration: minExploration,
+        trainEvery: trainEvery,
         discount: discount,
         optimizer: optimizer,
         cost: cost,
@@ -214,6 +216,8 @@ namespace NNN
     using System.Numerics;
     using System.Runtime.InteropServices;
     using System.Buffers;
+    using System.Data;
+    using System.Threading.Tasks.Dataflow;
 
     /// <summary>
     /// Interface for DQN environments in which the agent plays against itself during training.
@@ -490,7 +494,7 @@ namespace NNN
             // Calculate distance to target before moving
             double xDiff = State[2] - State[0];
             double yDiff = State[3] - State[1];
-            double prevDist = Math.Sqrt(Math.Pow(xDiff, 2.0) + Math.Pow(yDiff, 2.0));
+            double prevDist = Math.Sqrt(xDiff * xDiff + yDiff * yDiff);
 
             // Move the agent's position based on action mapping
             switch (action)
@@ -514,7 +518,7 @@ namespace NNN
             // Calculate distance to target after moving
             xDiff = State[2] - State[0];
             yDiff = State[3] - State[1];
-            double newDist = Math.Sqrt(Math.Pow(xDiff, 2.0) + Math.Pow(yDiff, 2.0));
+            double newDist = Math.Sqrt(xDiff * xDiff + yDiff * yDiff);
             double deltaDist = prevDist - newDist; // change in distance to target
 
             bool reachedTarget = (State[0] == State[2] && State[1] == State[3]);
@@ -1143,7 +1147,7 @@ namespace NNN
             // Calculate distance from agent to apple before moving
             double xDiff = ApplePosition.X - SnakeHead.Position.X;
             double yDiff = ApplePosition.Y - SnakeHead.Position.Y;
-            double prevDist = Math.Sqrt(Math.Pow(xDiff, 2) + Math.Pow(yDiff, 2));
+            double prevDist = Math.Sqrt(xDiff * xDiff + yDiff * yDiff);
 
             var prevState = GetNormalizedState();
 
@@ -1176,7 +1180,7 @@ namespace NNN
             // Calculate distance from agent to the apple after moving
             xDiff = ApplePosition.X - SnakeHead.Position.X;
             yDiff = ApplePosition.Y - SnakeHead.Position.Y;
-            double newDist = Math.Sqrt(Math.Pow(xDiff, 2) + Math.Pow(yDiff, 2));
+            double newDist = Math.Sqrt(xDiff * xDiff + yDiff * yDiff);
 
             reward += DistRewardMult * (prevDist - newDist); // add shaped reward based on change in distance
 
@@ -1338,42 +1342,6 @@ namespace NNN
                 node = node.Child;
             }
             return false;
-        }
-
-        /// <summary>
-        /// Finds the nearest obstacle in the given direction.
-        /// </summary>
-        /// <param name="dir">Direction in which to search.</param>
-        /// <returns>Distance to the closest obstacle in the given direction.</returns>
-        int NearestObstacle(int dir)
-        {
-            // Find all positions occupied by the snake
-            List<Int2> filledPositions = [];
-            SnakeNode? node = SnakeHead;
-            while (node is not null && node.Child is not null) // ignore tail since it cannot be collided with
-            {
-                filledPositions.Add(node.Position);
-                node = node.Child;
-            }
-
-            // Step forward until the nearest filled position or the border is reached
-            int steps = 0;
-            bool xDir = dir % 2 == 0; // whether the step is along the x or y axis
-            bool posDir = dir >= 2; // whether the step is in the + or - direction
-            int pos = xDir ? SnakeHead.Position.X : SnakeHead.Position.Y; // initial position along the given axis
-            bool hit = false;
-            while (!hit)
-            {
-                // Iterate in given direction
-                steps++;
-                pos += posDir ? 1 : -1;
-
-                // Check whether the iteration has reached a filled position or the border
-                hit = pos < 0 || pos >= (xDir ? GridDims.X : GridDims.Y) ||
-                    filledPositions.Any(p => xDir ? (p.X == pos && p.Y == SnakeHead.Position.Y) : (p.X == SnakeHead.Position.X && p.Y == pos));
-            }
-
-            return steps;
         }
 
         /// <summary>
@@ -1824,93 +1792,137 @@ namespace NNN
         }
     }
 
-    /// <summary>
-    /// FIFO buffer storing DQN training experiences.
-    /// </summary>
-    /// <param name="maxSize">Maximum size of the buffer.</param>
-    /// <param name="alpha">Scaling factor for favoring highest-error experiences.</param>
-    public class ReplayBuffer(int maxSize, double alpha = 0.6) : FIFOBuffer<Experience>(maxSize)
+    public class SumTree<T>(int capacity)
     {
-        /// <summary>
-        /// Buffer's Random instance.
-        /// </summary>
-        readonly Random Random = new();
-        /// <summary>
-        /// Scaling factor for favoring highest-error experiences.
-        /// </summary>
-        readonly double Alpha = alpha;
-        /// <summary>
-        /// Scaling factor for bias correction.
-        /// </summary>
-        double Beta = 0.4; // Beta = 1 -> full bias correction
-        /// <summary>
-        /// Linear increment for bias correction scaling factor.
-        /// </summary>
-        readonly double BetaIncrement = 0.001;
-        /// <summary>
-        /// Persistent weights array buffer.
-        /// </summary>
-        double[]? Weights;
+        readonly int Capacity = capacity;
+        readonly double[] Tree = new double[2 * capacity - 1];
+        readonly T[] Data = new T[capacity];
+        int WritePointer = 0;
+        public int Count { get; private set; } = 0;
+        public double TotalPriority => Tree[0];
 
-        public override void Add(Experience item)
+        public void Add(T item, double priority)
         {
-            double maxPriority = Count > 0 ? Buffer.Max(e => e.Priority) : 1.0;
-            item.Priority = maxPriority;
-            base.Add(item);
+            Data[WritePointer] = item;
+
+            int treeIndex = WritePointer + Capacity - 1;
+            Update(treeIndex, priority);
+
+            WritePointer = (WritePointer + 1) % Capacity;
+            if (Count < Capacity) Count++;
         }
 
-        /// <summary>
-        /// Selects a batch of experiences using prioritized experience replay (PER).
-        /// </summary>
-        /// <param name="batchSize">Number of experiences to include in the batch.</param>
-        /// <returns>List of experiences included in the batch and corresponding weights array.</returns>
-        public (List<Experience> batch, double[] weights) GetBatch(int batchSize)
+        public void Update(int treeIndex, double priority)
         {
-            // Scale priorities for all experiences by the scaling factor.
-            double[] priorities = [.. Buffer.Select(e => Math.Pow(e.Priority, Alpha))];
-            double sum = priorities.Sum();
+            double change = priority - Tree[treeIndex];
+            Tree[treeIndex] = priority;
 
-            List<Experience> batch = [];
-            Weights ??= new double[batchSize]; // allocate weights array buffer if not already allocated
-
-            double maxWeight = 0.0;
-
-            // Fill batch with experiences using PER
-            double r;
-            double cumulative;
-            for (int i = 0; i < batchSize; i++)
+            while (treeIndex > 0)
             {
-                r = Random.NextDouble() * sum;
-                cumulative = 0.0;
+                treeIndex = (treeIndex - 1) / 2;
+                Tree[treeIndex] += change;
+            }
+        }
 
-                // Select next experience using priorities
-                for (int j = 0; j < Count; j++)
+        public (int treeIndex, double priority, T item) Get(double value)
+        {
+            int parentIndex = 0;
+
+            while (parentIndex < Capacity - 1)
+            {
+                int leftChild = 2 * parentIndex + 1;
+                int rightChild = leftChild + 1;
+
+                if (value <= Tree[leftChild])
                 {
-                    cumulative += priorities[j];
-                    if (cumulative >= r)
-                    {
-                        batch.Add(Buffer[j]);
-
-                        // Calculate the weight of the experience accounting for bias
-                        double prob = priorities[j] / sum;
-                        double weight = Math.Pow(1.0 / (Count * prob), Beta);
-
-                        Weights[i] = weight;
-                        maxWeight = Math.Max(maxWeight, weight);
-                        break;
-                    }
+                    parentIndex = leftChild;
+                }
+                else
+                {
+                    value -= Tree[leftChild];
+                    parentIndex = rightChild;
                 }
             }
 
-            // Normalize weights to between 0 and 1
-            for (int i = 0; i < Weights.Length; i++)
+            int dataIndex = parentIndex - (Capacity - 1);
+            return (parentIndex, Tree[parentIndex], Data[dataIndex]);
+        }
+    }
+
+    public class ReplayBuffer(int capacity, double alpha = 0.6)
+    {
+        readonly SumTree<Experience> SumTree = new(capacity);
+        readonly Random Random = new();
+        double MaxPriority = 1.0;
+        readonly double Alpha = alpha;
+        double Beta = 0.4;
+        const double BetaIncrement = 0.001;
+        public int Count => SumTree.Count;
+
+        public void Add(Experience experience)
+        {
+            double priority = Math.Pow(MaxPriority, Alpha);
+            SumTree.Add(experience, priority);
+        }
+
+        public (List<Experience> batch, int[] indices, double[] weights) GetBatch(int batchSize)
+        {
+            List<Experience> batch = new(batchSize);
+            var indices = new int[batchSize];
+            var weights = new double[batchSize];
+
+            double totalPriority = SumTree.TotalPriority;
+            double segment = totalPriority / batchSize;
+            double maxWeight = 0;
+
+            for (int i = 0; i < batchSize; i++)
             {
-                Weights[i] /= maxWeight;
+                double low = segment * i;
+                double high = segment * (i + 1);
+                double sampleVal = low + (Random.NextDouble() * (high - low));
+
+                var (treeIndex, priority, item) = SumTree.Get(sampleVal);
+
+                batch.Add(item);
+                indices[i] = treeIndex;
+                weights[i] = priority;
             }
 
-            Beta = Math.Min(1.0, Beta + BetaIncrement); // increment the bias correction factor
+            for (int i = 0; i < batchSize; i++)
+            {
+                double prob = weights[i] / totalPriority;
+                if (prob == 0) prob = 1e-8;
 
-            return (batch, Weights);
+                double weight = Math.Pow(1.0 / (SumTree.Count * prob), Beta);
+                weights[i] = weight;
+                if (weight > maxWeight) maxWeight = weight;
+            }
+
+            if (maxWeight > 0)
+            {
+                for (int i = 0; i < batchSize; i++)
+                {
+                    weights[i] /= maxWeight;
+                }
+            }
+
+            Beta = Math.Min(1.0, Beta + BetaIncrement);
+
+            return (batch, indices, weights);
+        }
+
+        public void UpdatePriorities(int[] indices, double[] priorities)
+        {
+            for (int i = 0; i < indices.Length; i++)
+            {
+                if (priorities[i] > MaxPriority)
+                {
+                    MaxPriority = priorities[i];
+                }
+
+                double powerPriority = Math.Pow(priorities[i], Alpha);
+                SumTree.Update(indices[i], powerPriority);
+            }
         }
     }
 
@@ -1933,7 +1945,7 @@ namespace NNN
     /// <param name="tau">Target model parameter update factor.</param>
     /// <param name="maxGradNorm">Maximum total magnitude of gradients without normalization.</param>
     /// <param name="minExperiences">Minimum number of experiences before training can begin.</param>
-    public class DQNTrainer(Model agent, Environment environment, Optimizer optimizer, Cost cost, double discount = 0.995,
+    public class DQNTrainer(Model agent, Environment environment, Optimizer optimizer, Cost cost, int trainEvery = 4, double discount = 0.995,
         double exploration = 1.0, double explorationDecay = 0.99, double minExploration = 0.01, int replayBufferSize = 10000, int batchSize = 64,
         int agentBufferSize = 5, int opponentCopyRate = 100, int minRandomOpponentEpisodes = 200, double tau = 0.005, double maxGradNorm = 1.0,
         int minExperiences = 1000)
@@ -1976,6 +1988,10 @@ namespace NNN
 
         // Training parameters
         /// <summary>
+        /// Number of environment steps between DQN training passes.
+        /// </summary>
+        readonly int TrainEvery = trainEvery;
+        /// <summary>
         /// Discount factor of future rewards.
         /// </summary>
         readonly double Discount = discount;
@@ -2003,6 +2019,9 @@ namespace NNN
         /// Target model parameter update factor.
         /// </summary>
         readonly double Tau = tau;
+        readonly double OneMinusTau = 1.0 - tau;
+        readonly Vector<double> TauVec = new(tau);
+        readonly Vector<double> OneMinusTauVec = new(1.0 - tau);
 
         // Self-play parameters
         /// <summary>
@@ -2031,6 +2050,7 @@ namespace NNN
         /// Total loss accumulated during the episode.
         /// </summary>
         double totalLoss = 0.0;
+        static readonly int VectorSize = Vector<double>.Count;
 
         // Persistent training buffers
         /// <summary>
@@ -2066,6 +2086,7 @@ namespace NNN
             double reward;
             double totalReward;
             int step;
+            int trainSteps;
             Tensor nextState;
             TimeSpan avgElapsed = new(0);
             Stopwatch stopwatch = new();
@@ -2083,6 +2104,7 @@ namespace NNN
                 // Run full episode until it has finished
                 done = false;
                 step = 0;
+                trainSteps = 0;
                 totalReward = 0;
                 while (!done)
                 {
@@ -2098,7 +2120,11 @@ namespace NNN
                     if (learnerTurn) ReplayBuffer.Add(new(state, action, reward, nextState, done));
                     episodeExperiences.Add(new(trueState, action, reward, done ? trueState : Environment.GetState(), done));
 
-                    TrainNetwork();
+                    if (step % TrainEvery == 0)
+                    {
+                        TrainNetwork();
+                        trainSteps++;
+                    }
 
                     state = nextState;
                 }
@@ -2115,7 +2141,7 @@ namespace NNN
                 // Log episode diagnostics in the console
                 Console.WriteLine($"\nEpisode {e + 1}/{episodes} finished...");
                 Console.WriteLine($"Total Reward: {totalReward:F2},");
-                Console.WriteLine($"Average Loss: {(totalLoss / step):F3}");
+                Console.WriteLine($"Average Loss: {(totalLoss / trainSteps):F3}");
                 Console.WriteLine($"Exploration Rate: {Exploration:F2}, Experience Count: {ReplayBuffer.Count}");
                 if (Environment is ISelfPlay selfPlayEnv)
                 {
@@ -2185,7 +2211,7 @@ namespace NNN
         {
             if (ReplayBuffer.Count < MinExperiences) return; // skip training until minimum number of experiences are stored
 
-            var (batch, weights) = ReplayBuffer.GetBatch(BatchSize);
+            var (batch, indices, weights) = ReplayBuffer.GetBatch(BatchSize);
 
             // Initialize persistent buffers if not yet initialized
             if (_currentBatch is null || _nextBatch is null)
@@ -2199,13 +2225,12 @@ namespace NNN
             }
 
             // Copy current training batch into batch buffers
+            int batchOffset;
             for (int b = 0; b < BatchSize; b++)
             {
-                for (int i = 0; i < Environment.StateSize; i++)
-                {
-                    _currentBatch[b * Environment.StateSize + i] = batch[b].State[i];
-                    _nextBatch[b * Environment.StateSize + i] = batch[b].NextState[i];
-                }
+                batchOffset = b * Environment.StateSize;
+                Array.Copy(batch[b].State.Data, 0, _currentBatch.Data, batchOffset, Environment.StateSize);
+                Array.Copy(batch[b].NextState.Data, 0, _nextBatch.Data, batchOffset, Environment.StateSize);
             }
 
             // Predict future values of actions
@@ -2219,10 +2244,7 @@ namespace NNN
 
             // Calculate the agent's loss and new priorities of each experience
             var lossResult = Cost.CalculateCostWithPriority(predictedQs, targetQs, weights);
-            for (int i = 0; i < BatchSize; i++)
-            {
-                batch[i].Priority = lossResult.Priorities[i];
-            }
+            ReplayBuffer.UpdatePriorities(indices, lossResult.Priorities);
             var loss = Tensor.Mean(lossResult.Losses);
             totalLoss += loss[0];
 
@@ -2239,10 +2261,16 @@ namespace NNN
             // Gradually update target model parameters
             for (int i = 0; i < TargetModel.ParameterCount; i++)
             {
-                for (int j = 0; j < TargetModel.Parameters[i].ElementCount; j++)
+                var agentParamVecs = MemoryMarshal.Cast<double, Vector<double>>(Agent.Parameters[i].Data.AsSpan());
+                var targetParamVecs = MemoryMarshal.Cast<double, Vector<double>>(TargetModel.Parameters[i].Data.AsSpan());
+                for (int j = 0; j < agentParamVecs.Length; j++)
                 {
-                    TargetModel.Parameters[i][j] = Tau * Agent.Parameters[i][j]
-                        + (1.0 - Tau) * TargetModel.Parameters[i][j];
+                    targetParamVecs[j] = (TauVec * agentParamVecs[j]) + (OneMinusTauVec * targetParamVecs[j]);
+                }
+
+                for (int j = agentParamVecs.Length * VectorSize; j < TargetModel.Parameters[i].ElementCount; j++)
+                {
+                    TargetModel.Parameters[i][j] = (Tau * Agent.Parameters[i][j]) + (OneMinusTau * TargetModel.Parameters[i][j]);
                 }
             }
 
@@ -2375,6 +2403,8 @@ namespace NNN
         /// Gradient scaling factor for parameter updates.
         /// </summary>
         protected readonly double LR = learningRate;
+        protected readonly Vector<double> LRVec = new(learningRate);
+        protected static readonly int VectorSize = Vector<double>.Count;
 
         /// <summary>
         /// Updates the parameter based on its gradient.
@@ -2392,9 +2422,16 @@ namespace NNN
     {
         public override void Step(Tensor parameter, int iterations)
         {
-            for (int i = 0; i < parameter.ElementCount; i++)
+            var paramVecs = MemoryMarshal.Cast<double, Vector<double>>(parameter.Data.AsSpan());
+            var gradVecs = MemoryMarshal.Cast<double, Vector<double>>(parameter.Grad.AsSpan());
+            for (int i = 0; i < paramVecs.Length; i++)
             {
-                parameter[i] -= parameter.Grad[i] * LR; // move parameter down the gradient
+                paramVecs[i] -= gradVecs[i] * LRVec;
+            }
+            
+            for (int i = paramVecs.Length * VectorSize; i < parameter.ElementCount; i++)
+            {
+                parameter[i] -= parameter.Grad[i] * LR;
             }
         }
     }
@@ -2412,14 +2449,21 @@ namespace NNN
         /// Exponential decay rate of first moment estimates.
         /// </summary>
         readonly double Beta1 = beta1;
+        readonly double OneMinusBeta1 = 1.0 - beta1;
+        readonly Vector<double> Beta1Vec = new(beta1);
+        readonly Vector<double> OneMinusBeta1Vec = new(1.0 - beta1);
         /// <summary>
         /// Exponential decay rate of second moment estimates.
         /// </summary>
         readonly double Beta2 = beta2;
+        readonly double OneMinusBeta2 = 1.0 - beta2;
+        readonly Vector<double> Beta2Vec = new(beta2);
+        readonly Vector<double> OneMinusBeta2Vec = new(1.0 - beta2);
         /// <summary>
         /// Epsilon value to use.
         /// </summary>
         readonly double Epsilon = epsilon;
+        readonly Vector<double> EpsilonVec = new(epsilon);
 
         /// <summary>
         /// Dictionary of per-parameter persistent buffers for first and second moments.
@@ -2436,16 +2480,40 @@ namespace NNN
             }
 
             // Update moments and parameter values
+            double biasCorrection1 = 1.0 - Math.Pow(Beta1, iteration + 1);
+            var biasCorr1Vec = new Vector<double>(biasCorrection1);
+
+            double biasCorrection2 = 1.0 - Math.Pow(Beta2, iteration + 1);
+            var biasCorr2Vec = new Vector<double>(biasCorrection2);
             var (m, v) = moments;
-            for (int i = 0; i < parameter.ElementCount; i++)
+
+            var mVecs = MemoryMarshal.Cast<double, Vector<double>>(m.AsSpan());
+            var vVecs = MemoryMarshal.Cast<double, Vector<double>>(v.AsSpan());
+            var gradVecs = MemoryMarshal.Cast<double, Vector<double>>(parameter.Grad.AsSpan());
+            var paramVecs = MemoryMarshal.Cast<double, Vector<double>>(parameter.Data.AsSpan());
+
+            for (int i = 0; i < paramVecs.Length; i++)
             {
+                mVecs[i] = (Beta1Vec * mVecs[i]) + (OneMinusBeta1Vec * gradVecs[i]);
+                vVecs[i] = (Beta2Vec * vVecs[i]) + (OneMinusBeta2Vec * (gradVecs[i] * gradVecs[i]));
+
+                var mHatVec = mVecs[i] / biasCorr1Vec;
+                var vHatVec = vVecs[i] / biasCorr2Vec;
+
+                paramVecs[i] -= (LRVec * mHatVec) / (Vector.SquareRoot(vHatVec) + EpsilonVec);
+            }
+
+            for (int i = paramVecs.Length * VectorSize; i < parameter.ElementCount; i++)
+            {
+                double grad = parameter.Grad[i];
+
                 // Update parameter moments
-                m[i] = Beta1 * m[i] + (1.0 - Beta1) * parameter.Grad[i];
-                v[i] = Beta2 * v[i] + (1.0 - Beta2) * Math.Pow(parameter.Grad[i], 2.0);
+                m[i] = Beta1 * m[i] + (1.0 - Beta1) * grad;
+                v[i] = Beta2 * v[i] + (1.0 - Beta2) * (grad * grad);
 
                 // Correct moment estimate bias due to 0 initialization
-                double mHat = m[i] / (1.0 - Math.Pow(Beta1, iteration + 1));
-                double vHat = v[i] / (1.0 - Math.Pow(Beta2, iteration + 1));
+                double mHat = m[i] / biasCorrection1;
+                double vHat = v[i] / biasCorrection2;
 
                 parameter.Data[i] -= (LR * mHat) / (Math.Sqrt(vHat) + Epsilon); // update parameter based on moments
             }
@@ -2536,7 +2604,7 @@ namespace NNN
             // Apply pseudo-Huber function -> delta^2 * (sqrt(1 + (diff/delta)^2) - 1)
             var scaled = diff / Delta;
             var inner = Tensor.Pow(scaled, 2.0) + 1.0;
-            return (Tensor.Pow(inner, 0.5) - 1.0) * Math.Pow(Delta, 2.0);
+            return (Tensor.Pow(inner, 0.5) - 1.0) * (Delta * Delta);
         }
     }
 
@@ -2578,6 +2646,9 @@ namespace NNN
         /// Internal list of all player parameters.
         /// </summary>
         List<Tensor>? _parameters;
+
+        // Utilities
+        static readonly int VectorSize = Vector<double>.Count;
 
         /// <summary>
         /// Initializes a new model with the given layers.
@@ -2712,9 +2783,19 @@ namespace NNN
             double totalNorm = 0.0;
             foreach (var param in Parameters)
             {
-                for (int i = 0; i < param.GradCount; i++)
+                var gradVecs = MemoryMarshal.Cast<double, Vector<double>>(param.Grad.AsSpan());
+                var acc = Vector<double>.Zero;
+                for (int i = 0; i < gradVecs.Length; i++)
                 {
-                    totalNorm += Math.Pow(param.Grad[i], 2.0);
+                    acc += gradVecs[i] * gradVecs[i];
+                }
+                totalNorm += Vector.Sum(acc);
+
+                for (int i = gradVecs.Length * VectorSize; i < param.GradCount; i++)
+                {
+                    double grad = param.Grad[i];
+
+                    totalNorm += grad * grad;
                 }
             }
             totalNorm = Math.Sqrt(totalNorm);
@@ -2723,9 +2804,17 @@ namespace NNN
             if (totalNorm > maxNorm)
             {
                 double scale = maxNorm / (totalNorm + 1e-8);
+                var scaleVec = new Vector<double>(scale);
+
                 foreach (var param in Parameters)
                 {
-                    for (int i = 0; i < param.GradCount; i++)
+                    var gradVecs = MemoryMarshal.Cast<double, Vector<double>>(param.Grad.AsSpan());
+                    for (int i = 0; i < gradVecs.Length; i++)
+                    {
+                        gradVecs[i] *= scaleVec;
+                    }
+
+                    for (int i = gradVecs.Length * VectorSize; i < param.GradCount; i++)
                     {
                         param.Grad[i] *= scale;
                     }
@@ -3926,7 +4015,7 @@ namespace NNN
                     for (int i = rgVecs.Length * VectorSize; i < result.ElementCount; i++)
                     {
                         if (a.RequiresGrad) a.Grad[i] += result.Grad[i] / b[i];
-                        if (b.RequiresGrad) b.Grad[i] -= (a[i] / Math.Pow(b[i], 2.0)) * result.Grad[i];
+                        if (b.RequiresGrad) b.Grad[i] -= (a[i] / (b[i] * b[i])) * result.Grad[i];
                     }
                 };
             }
@@ -4045,7 +4134,7 @@ namespace NNN
                     // Clean up unvectorized tail
                     for (int i = bgVecs.Length * VectorSize; i < b.ElementCount; i++)
                     {
-                        b.Grad[i] -= (a / Math.Pow(b[i], 2.0)) * result.Grad[i];
+                        b.Grad[i] -= (a / (b[i] * b[i])) * result.Grad[i];
                     }
                 };
             }
@@ -4338,7 +4427,7 @@ namespace NNN
                     for (int i = rgVecs.Length * VectorSize; i < result.ElementCount; i++)
                     {
                         double lnb = Math.Log(logBase[i]);
-                        if (logBase.RequiresGrad) logBase.Grad[i] -= (Math.Log(arg[i]) / (logBase[i] * Math.Pow(lnb, 2.0))) * result.Grad[i];
+                        if (logBase.RequiresGrad) logBase.Grad[i] -= (Math.Log(arg[i]) / (logBase[i] * (lnb * lnb))) * result.Grad[i];
                         if (arg.RequiresGrad) arg.Grad[i] += (1.0 / (arg[i] * lnb)) * result.Grad[i];
                     }
                 };
@@ -4401,7 +4490,8 @@ namespace NNN
                     // Clean up unvectorized tail
                     for (int i = rgVecs.Length * VectorSize; i < result.ElementCount; i++)
                     {
-                        logBase.Grad[i] -= (lnarg / (logBase[i] * Math.Pow(Math.Log(logBase[i]), 2.0))) * result.Grad[i];
+                        double lnb = Math.Log(logBase[i]);
+                        logBase.Grad[i] -= (lnarg / (logBase[i] * (lnb * lnb))) * result.Grad[i];
                     }
                 };
             }
@@ -5016,7 +5106,7 @@ namespace NNN
                     for (int i = rgVecs.Length * VectorSize; i < result.ElementCount; i++)
                     {
                         // Reuse forward results as Tanh(t)
-                        t.Grad[i] += (1.0 - Math.Pow(result[i], 2.0)) * result.Grad[i];
+                        t.Grad[i] += (1.0 - (result[i] * result[i])) * result.Grad[i];
                     }
                 };
             }
