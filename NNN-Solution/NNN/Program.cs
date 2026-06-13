@@ -1002,7 +1002,7 @@ namespace NNN
         /// <summary>
         /// Reward for eating an apple.
         /// </summary>
-        const double AppleReward = 10.0;
+        const double AppleReward = 20.0;
         /// <summary>
         /// Multiplier for the additional apple reward based on snake length.
         /// </summary>
@@ -1014,7 +1014,7 @@ namespace NNN
         /// <summary>
         /// Multiplier for the shaped reward based on number of reachable positions.
         /// </summary>
-        const double ReachableRewardMult = 0.3;
+        const double ReachableRewardMult = 0.1;
         /// <summary>
         /// Penalty for not reaching the next apple in time.
         /// </summary>
