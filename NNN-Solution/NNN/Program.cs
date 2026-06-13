@@ -2120,7 +2120,7 @@ namespace NNN
                     if (learnerTurn) ReplayBuffer.Add(new(state, action, reward, nextState, done));
                     episodeExperiences.Add(new(trueState, action, reward, done ? trueState : Environment.GetState(), done));
 
-                    if (step % TrainEvery == 0)
+                    if ((step - 1) % TrainEvery == 0)
                     {
                         TrainNetwork();
                         trainSteps++;
