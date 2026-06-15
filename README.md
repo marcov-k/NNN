@@ -12,6 +12,17 @@ A neural network framework created from scratch in C# implementing automatic dif
 - Standard optimizers (SGD, Adam)
 - Performance optimizations via SIMD vectorization and parallelization
 
+## Results
+### Tic-Tac-Toe (DQN + Self-Play)
+Architecture Used:\
+128 -> 128 -> 64 -> 9
+| Metric | Value |
+|--------|-------|
+| Training Games | 50,000|
+| Training Time | 7:44.617 |
+| Test Games vs Randomly-Acting Opponent | 10,000 |
+| Win Rate vs Randomly-Acting Opponent | 91.15% |
+
 ## Motivation
 I originally intended for this project to simply be my experimentation with implementing the systems described in Seth Weidman's _Deep Learning from Scratch_. However, after seeing my basic neural networks successfully
  train using the Boston housing dataset highlighted in Weidman's book, I became increasingly interested in creating a framework which could support Deep Q-Network training (DQN) for complex environments. After a number
@@ -34,9 +45,6 @@ Cost cost = new Huber();
 Trainer trainer = new Trainer(network, optimizer, cost);
 trainer.Train(x, y, epochs: 1000);
 ```
-
-## Results
-
 
 ## Architecture
 ### Tensor
@@ -83,8 +91,8 @@ dz/dy = x
 ### Autograd Engine
 The framework's equivalent of an autograd engine relies on functionality built directly into the tensor objects, rather than a separate distinct system. Each mathematical operation (element-wise addition, matrix
  multiplication, sigmoid, mean, etc.) is provided as a static function or operator in the tensor class. These functions handle the result calculation while also defining a "backward" function which calculates the
- gradients of each input using their respective partial derivative formulas multiplied by the gradient of the result to account for the chain rule. Each tensor also exposes a Backward() method handles sorting the
- topography of the function graph and then calculates the gradient of each "node" tensor starting at the last tensor in the topography - usually the final loss value of the forward pass.
+ gradients of each input using their respective partial derivative formulas multiplied by the gradient of the result to account for the chain rule. Each tensor also exposes a Backward() method which performs a topological
+ of the computation graph before propagating gradients in reverse-order.
 
 ## Implementation Details
 ### Reverse-mode Autograd
