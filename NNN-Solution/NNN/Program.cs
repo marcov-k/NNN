@@ -210,14 +210,18 @@ enum EpisodeNavigation
 // Neural Network Nonsense library for training neural networks
 namespace NNN
 {
-    using System.Diagnostics;
-    using System.Linq;
-    using System.Text.Json;
-    using System.Numerics;
-    using System.Runtime.InteropServices;
+    using ILGPU.IR.Types;
+    using ILGPU.Runtime;
+    using ILGPU.Runtime.Cuda;
     using System.Buffers;
     using System.Data;
+    using System.Diagnostics;
+    using System.Linq;
+    using System.Numerics;
+    using System.Runtime.InteropServices;
+    using System.Text.Json;
     using System.Threading.Tasks.Dataflow;
+    using TorchSharp.Modules;
 
     /// <summary>
     /// Interface for DQN environments in which the agent plays against itself during training.
@@ -2713,18 +2717,13 @@ namespace NNN
         /// <param name="inputFormat">Tensor representing the expected input format.</param>
         public void SetUpLayers(Tensor inputFormat)
         {
-            // Calculate number of inputs per batch
-            int inputs = 1;
-            for (int i = 1; i < inputFormat.Rank; i++)
-            {
-                inputs *= inputFormat.Dimensions[i];
-            }
+            var format = inputFormat.Copy();
 
             // Initialize parameters of each layer
             foreach (var layer in Layers)
             {
-                layer.SetUpLayer(inputs);
-                inputs = layer.NeuronCount; // every subsequent layer receives output dimensions of the previous layer
+                layer.SetUpLayer(format);
+                format = layer.OutputFormat; // every subsequent layer receives output dimensions of the previous layer
             }
         }
 
@@ -2850,10 +2849,6 @@ namespace NNN
     public abstract class Layer
     {
         /// <summary>
-        /// Number of neurons in the layer.
-        /// </summary>
-        public int NeuronCount { get; protected set; }
-        /// <summary>
         /// Tensor containing the bias parameters of the layer.
         /// </summary>
         public Tensor Biases { get; protected set; } = new();
@@ -2861,17 +2856,7 @@ namespace NNN
         /// Activation function used by the layer.
         /// </summary>
         public Activation Activation { get; protected set; } = new Linear();
-
-        /// <summary>
-        /// Creates a new neural network layer instance.
-        /// </summary>
-        /// <param name="neuronCount">Number of neurons in the new layer.</param>
-        /// <param name="activation">Activation function of the new layer.</param>
-        public Layer(int neuronCount, Activation activation)
-        {
-            NeuronCount = neuronCount;
-            Activation = activation;
-        }
+        public Tensor OutputFormat { get; protected set; } = new();
 
         /// <summary>
         /// Parameterless constructor for model reconstruction from save data.
@@ -2881,8 +2866,8 @@ namespace NNN
         /// <summary>
         /// Initializes the layer's parameters for the given number of inputs.
         /// </summary>
-        /// <param name="inputCount">Expected number of inputs.</param>
-        public abstract void SetUpLayer(int inputCount);
+        /// <param name="inputFormat">Expected format of input tensors.</param>
+        public abstract void SetUpLayer(Tensor inputFormat);
 
         /// <summary>
         /// Processes the input using the layer's parameters and activation function.
@@ -2915,6 +2900,7 @@ namespace NNN
     /// </summary>
     public class Dense : Layer
     {
+        public int NeuronCount { get; private set; }
         /// <summary>
         /// Tensor containing the weights parameters of the layer.
         /// </summary>
@@ -2953,10 +2939,11 @@ namespace NNN
 
         // Base Layer API overrides
 
-        public override void SetUpLayer(int inputCount)
+        public override void SetUpLayer(Tensor inputFormat)
         {
-            Weights = Tensor.InitWeights(inputCount, NeuronCount);
+            Weights = Tensor.InitWeights(inputFormat.ElementCount, NeuronCount);
             Biases = Tensor.InitBiases(NeuronCount);
+            OutputFormat = new([1, NeuronCount]);
         }
 
         public override Tensor Forward(Tensor input)
@@ -2981,12 +2968,87 @@ namespace NNN
 
         public override void BuildFromData(Saver.LayerData data)
         {
-            NeuronCount = data.NeuronCount;
+            if (data.NeuronCount is not null) NeuronCount = data.NeuronCount.Value;
 
-            Weights = data.Weights;
+            if (data.Weights is not null) Weights = data.Weights;
             Weights.RestoreGrad();
 
             Biases = data.Biases;
+            Biases.RestoreGrad();
+
+            var activType = Type.GetType(data.Activation);
+            if (activType is not null)
+            {
+                Activation = Activator.CreateInstance(activType) as Activation ?? new Linear();
+            }
+        }
+    }
+
+    public class Conv : Layer
+    {
+        public int FilterCount { get; private set; }
+        public int[] KernelDims { get; private set; } = [];
+        public Tensor Kernels { get; private set; } = new();
+
+        public Conv(int filterCount, int[] kernelDims, Activation activation)
+        {
+            FilterCount = filterCount;
+            KernelDims = kernelDims;
+            Activation = activation;
+        }
+
+        public Conv(int filterCount, int[] kernelDims, Tensor kernels, Tensor biases, Activation activation)
+        {
+            FilterCount = filterCount;
+            KernelDims = kernelDims;
+            Kernels = kernels;
+            Biases = biases;
+            Activation = activation;
+        }
+
+        public Conv() { }
+
+        public override void SetUpLayer(Tensor inputFormat)
+        {
+            Kernels = Tensor.InitKernels(FilterCount, KernelDims, inputFormat.Dimensions[^1]);
+            Biases = Tensor.InitBiases(FilterCount);
+
+            var outputDims = new int[inputFormat.Rank];
+            outputDims[0] = 1;
+            for (int i = 0; i < KernelDims.Length; i++)
+            {
+                outputDims[i + 1] = inputFormat.Dimensions[i + 1] - KernelDims[i] + 1;
+            }
+            outputDims[^1] = FilterCount;
+            OutputFormat = new(outputDims);
+        }
+
+        public override Tensor Forward(Tensor input)
+        {
+            var output = Tensor.Convolve(input, Kernels, Biases);
+            return Activation.Forward(output);
+        }
+
+        public override IEnumerable<Tensor> GetParameters()
+        {
+            yield return Kernels;
+            yield return Biases;
+        }
+
+        public override Layer Copy()
+        {
+            return new Conv(FilterCount, [.. KernelDims], Kernels.Copy(), Biases.Copy(), Activation.Copy());
+        }
+
+        public override void BuildFromData(Saver.LayerData data)
+        {
+            if (data.FilterCount is not null) FilterCount = data.FilterCount.Value;
+            if (data.KernelDims is not null) KernelDims = data.KernelDims;
+
+            if (data.Kernels is not null) Kernels = data.Kernels;
+            Kernels.RestoreGrad();
+
+            if (data.Biases is not null) Biases = data.Biases;
             Biases.RestoreGrad();
 
             var activType = Type.GetType(data.Activation);
@@ -3263,9 +3325,10 @@ namespace NNN
         {
             Tensor weights = new([inputCount, neuronCount], true);
 
+            double stdDev = Math.Sqrt(2.0 / inputCount);
             for (int i = 0; i < weights.ElementCount; i++)
             {
-                weights[i] = MathUtils.NextGaussian(0, Math.Sqrt(2.0 / inputCount));
+                weights[i] = MathUtils.NextGaussian(0, stdDev);
             }
 
             return weights;
@@ -3277,6 +3340,30 @@ namespace NNN
         /// <param name="neuronCount">Number of neurons in the layer.</param>
         /// <returns>Bias tensor with non-zero values.</returns>
         public static Tensor InitBiases(int neuronCount) => Scalar(0.01, [neuronCount], true);
+
+        public static Tensor InitKernels(int filterCount, int[] kernelDims, int inputChannels)
+        {
+            var dims = new int[kernelDims.Length + 2];
+            dims[0] = filterCount;
+            Array.Copy(kernelDims, 0, dims, 1, kernelDims.Length);
+            dims[^1] = inputChannels;
+
+            int fanIn = inputChannels;
+            foreach (var dim in kernelDims)
+            {
+                fanIn *= dim;
+            }
+
+            Tensor kernels = new(dims, true);
+
+            double stdDev = Math.Sqrt(2.0 / fanIn);
+            for (int i = 0; i < kernels.ElementCount; i++)
+            {
+                kernels[i] = MathUtils.NextGaussian(0, stdDev);
+            }
+
+            return kernels;
+        }
 
         /// <summary>
         /// Creates a deep copy of the current tensor.
@@ -4830,6 +4917,357 @@ namespace NNN
             }
         }
 
+        public static Tensor Convolve(Tensor input, Tensor kernels, Tensor biases)
+        {
+            int batch = input.Dimensions[0];
+            int spatialRank = kernels.Rank - 2;
+            int filterCount = kernels.Dimensions[0];
+            int inputChannels = kernels.Dimensions[^1];
+
+            var outSpatialDims = new int[spatialRank];
+            for (int i = 0; i < spatialRank; i++)
+            {
+                outSpatialDims[i] = input.Dimensions[i + 1] - kernels.Dimensions[i + 1] + 1;
+            }
+
+            int inSpatialSize = 1;
+            for (int i = 1; i <= spatialRank; i++)
+            {
+                inSpatialSize *= input.Dimensions[i];
+            }
+
+            int outSpatialSize = 1;
+            foreach (var dim in outSpatialDims)
+            {
+                outSpatialSize *= dim;
+            }
+
+            int kernelSpatialSize = 1;
+            for (int i = 1; i <= spatialRank; i++)
+            {
+                kernelSpatialSize *= kernels.Dimensions[i];
+            }
+
+            int kernelVolumeSize = kernelSpatialSize * inputChannels;
+
+            var inSpatialStrides = new int[spatialRank];
+            inSpatialStrides[^1] = 1;
+            for (int i = spatialRank - 2; i >= 0; i--)
+            {
+                inSpatialStrides[i] = inSpatialStrides[i + 1] * input.Dimensions[i + 2];
+            }
+
+            var outSpatialStrides = new int[spatialRank];
+            outSpatialStrides[^1] = 1;
+            for (int i = spatialRank - 2; i >= 0; i--)
+            {
+                outSpatialStrides[i] = outSpatialStrides[i + 1] * outSpatialDims[i + 1];
+            }
+
+            var kernelSpatialStrides = new int[spatialRank];
+            kernelSpatialStrides[^1] = 1;
+            for (int i = spatialRank - 2; i >= 0; i--)
+            {
+                kernelSpatialStrides[i] = kernelSpatialStrides[i + 1] * kernels.Dimensions[i + 2];
+            }
+
+            var resultDims = new int[input.Rank];
+            resultDims[0] = batch;
+            Array.Copy(outSpatialDims, 0, resultDims, 1, outSpatialDims.Length);
+            resultDims[^1] = filterCount;
+
+            var result = GetResultTensor(input, resultDims, input.RequiresGrad || kernels.RequiresGrad || biases.RequiresGrad);
+
+            bool useParallel = (long)batch * outSpatialSize * filterCount * kernelVolumeSize > ParallelThreshold;
+
+            if (useParallel)
+            {
+                Parallel.For(0, batch * outSpatialSize, i => ComputeOutputPosition(i, spatialRank, outSpatialSize, filterCount,
+                    kernelSpatialSize, inputChannels, outSpatialStrides, kernelSpatialStrides, input.Strides, kernels.Strides, result.Strides,
+                    input.Data, kernels.Data, biases.Data, result.Data));
+            }
+            else
+            {
+                for (int i = 0; i < batch * outSpatialSize; i++)
+                {
+                    ComputeOutputPosition(i, spatialRank, outSpatialSize, filterCount, kernelSpatialSize, inputChannels, outSpatialStrides,
+                        kernelSpatialStrides, input.Strides, kernels.Strides, result.Strides, input.Data, kernels.Data, biases.Data, 
+                        result.Data);
+                }
+            }
+
+            if (!Inference)
+            {
+                result._parents.AddRange([input, kernels, biases]);
+
+                result._backward = () =>
+                {
+                    bool par = (long)batch * outSpatialSize * filterCount * kernelVolumeSize > ParallelThreshold;
+
+                    if (biases.RequiresGrad)
+                    {
+                        if (par)
+                        {
+                            Parallel.For(0, filterCount, f => ComputeBiasGrad(f, filterCount, result.Grad, biases.Grad));
+                        }
+                        else
+                        {
+                            for (int f = 0; f < filterCount; f++)
+                            {
+                                ComputeBiasGrad(f, filterCount, result.Grad, biases.Grad);
+                            }
+                        }
+                    }
+
+                    if (kernels.RequiresGrad)
+                    {
+                        if (par)
+                        {
+                            Parallel.For(0, filterCount * kernelSpatialSize, fkp => ComputeKernelGrad(fkp, spatialRank,
+                                batch, outSpatialSize, filterCount, kernelSpatialSize, inputChannels, outSpatialStrides,
+                                kernelSpatialStrides, input.Strides, kernels.Strides, result.Strides, input.Data, kernels.Data,
+                                result.Grad));
+                        }
+                        else
+                        {
+                            for (int fkp = 0; fkp < filterCount * kernelSpatialSize; fkp++)
+                            {
+                                ComputeKernelGrad(fkp, spatialRank, batch, outSpatialSize, filterCount, kernelSpatialSize,
+                                    inputChannels, outSpatialStrides, kernelSpatialStrides, input.Strides, kernels.Strides,
+                                    result.Strides, input.Data, kernels.Grad, result.Grad);
+                            }
+                        }
+                    }
+
+                    if (input.RequiresGrad)
+                    {
+                        if (par)
+                        {
+                            Parallel.For(0, batch * inSpatialSize, batchInPos => ComputeInputGrad(batchInPos, spatialRank,
+                                inSpatialSize, filterCount, kernelSpatialSize, inputChannels, inSpatialStrides, kernelSpatialStrides,
+                                outSpatialDims, outSpatialStrides, input.Strides, kernels.Strides, result.Strides, input.Grad, kernels.Data,
+                                result.Grad));
+                        }
+                        else
+                        {
+                            for (int batchInPos = 0; batchInPos < batch * inSpatialSize; batchInPos++)
+                            {
+                                ComputeInputGrad(batchInPos, spatialRank, inSpatialSize, filterCount, kernelSpatialSize, inputChannels,
+                                    inSpatialStrides, kernelSpatialStrides, outSpatialDims, outSpatialStrides, input.Strides, kernels.Strides,
+                                    result.Strides, input.Grad, kernels.Data, result.Grad);
+                            }
+                        }
+                    }
+                };
+            }
+
+            return result;
+        }
+
+        static void ComputeOutputPosition(int batchOutPos, int spatialRank, int outSpatialSize, int filterCount, int kernelSpatialSize,
+            int inputChannels, int[] outSpatialStrides, int[] kernelSpatialStrides, int[] inputStrides, int[] kernelStrides, int[] resultStrides,
+            double[] inputData, double[] kernelData, double[] biasData, double[] resultData)
+        {
+            int b = batchOutPos / outSpatialSize;
+
+            Span<int> outCoords = stackalloc int[spatialRank];
+            int rem = batchOutPos % outSpatialSize;
+            for (int i = 0; i < spatialRank; i++)
+            {
+                outCoords[i] = rem / outSpatialStrides[i];
+                rem %= outSpatialStrides[i];
+            }
+
+            Span<int> kernelCoords = stackalloc int[spatialRank];
+            int inputOffsetBase = b * inputStrides[0];
+            int resultOffsetBase = b * resultStrides[0];
+            for (int f = 0; f < filterCount; f++)
+            {
+                double sum = biasData[f];
+
+                int kernelOffsetBase = f * kernelSpatialSize * inputChannels;
+                for (int kp = 0; kp < kernelSpatialSize; kp++)
+                {
+                    rem = kp;
+                    for (int i = 0; i < spatialRank; i++)
+                    {
+                        kernelCoords[i] = rem / kernelSpatialStrides[i];
+                        rem %= kernelSpatialStrides[i];
+                    }
+
+                    int inputOffset = inputOffsetBase;
+                    for (int i = 0; i < spatialRank; i++)
+                    {
+                        inputOffset += (outCoords[i] + kernelCoords[i]) * inputStrides[i + 1];
+                    }
+
+                    int kernelOffset = kernelOffsetBase;
+                    for (int i = 0; i < spatialRank; i++)
+                    {
+                        kernelOffset += kernelCoords[i] * kernelStrides[i + 1];
+                    }
+
+                    sum += DotProduct(inputData, kernelData, inputOffset, kernelOffset, inputChannels);
+                }
+
+                int resultOffset = resultOffsetBase + f;
+                for (int i = 0; i < spatialRank; i++)
+                {
+                    resultOffset += outCoords[i] * resultStrides[i + 1];
+                }
+                resultData[resultOffset] = sum;
+            }
+        }
+
+        static void ComputeBiasGrad(int f, int filterCount, double[] resultGrad, double[] biasGrad)
+        {
+            double sum = 0.0;
+            for (int i = f; i < resultGrad.Length; i += filterCount)
+            {
+                sum += resultGrad[i];
+            }
+            biasGrad[f] += sum;
+        }
+
+        static void ComputeKernelGrad(int fkp, int spatialRank, int batch, int outSpatialSize, int filterCount,
+            int kernelSpatialSize, int inputChannels, int[] outSpatialStrides, int[] kernelSpatialStrides,
+            int[] inputStrides, int[] kernelStrides, int[] resultStrides, double[] inputData, double[] kernelGrad,
+            double[] resultGrad)
+        {
+            int f = fkp / kernelSpatialSize;
+
+            Span<int> kernelCoords = stackalloc int[spatialRank];
+            int rem = fkp % kernelSpatialSize;
+            for (int i = 0; i < spatialRank; i++)
+            {
+                kernelCoords[i] = rem / kernelSpatialStrides[i];
+                rem %= kernelSpatialStrides[i];
+            }
+
+            int kernelOffset = f * kernelSpatialSize * inputChannels;
+            for (int i = 0; i < spatialRank; i++)
+            {
+                kernelOffset += kernelCoords[i] * kernelStrides[i + 1];
+            }
+
+            Span<int> outCoords = stackalloc int[spatialRank];
+            for (int b = 0; b < batch; b++)
+            {
+                int inputOffsetBase = b * inputStrides[0];
+                int resultOffsetBase = b * resultStrides[0] + f;
+
+                for (int op = 0; op < outSpatialSize; op++)
+                {
+                    rem = op;
+                    for (int i = 0; i < spatialRank; i++)
+                    {
+                        outCoords[i] = rem / outSpatialStrides[i];
+                        rem %= outSpatialStrides[i];
+                    }
+
+                    int inputOffset = inputOffsetBase;
+                    for (int i = 0; i < spatialRank; i++)
+                    {
+                        inputOffset += (outCoords[i] + kernelCoords[i]) * inputStrides[i + 1];
+                    }
+
+                    int resultOffset = resultOffsetBase;
+                    for (int i = 0; i < spatialRank; i++)
+                    {
+                        resultOffset += outCoords[i] * resultStrides[i + 1];
+                    }
+                    double dOut = resultGrad[resultOffset];
+
+                    var kgVecs = MemoryMarshal.Cast<double, Vector<double>>(kernelGrad.AsSpan(kernelOffset, inputChannels));
+                    var inVecs = MemoryMarshal.Cast<double, Vector<double>>(inputData.AsSpan(inputOffset, inputChannels));
+                    var vdOut = new Vector<double>(dOut);
+
+                    for (int i = 0; i < kgVecs.Length; i++)
+                    {
+                        kgVecs[i] += inVecs[i] * vdOut;
+                    }
+
+                    for (int i = kgVecs.Length * VectorSize; i < inputChannels; i++)
+                    {
+                        kernelGrad[kernelOffset + i] += inputData[inputOffset + i] * dOut;
+                    }
+                }
+            }
+        }
+
+        static void ComputeInputGrad(int batchInPos, int spatialRank, int inSpatialSize, int filterCount, int kernelSpatialSize,
+            int inputChannels, int[] inSpatialStrides, int[] kernelSpatialStrides, int[] outSpatialDims, int[] outSpatialStrides,
+            int[] inputStrides, int[] kernelStrides, int[] resultStrides, double[] inputGrad, double[] kernelData, double[] resultGrad)
+        {
+            int b = batchInPos / inSpatialSize;
+
+            Span<int> inCoords = stackalloc int[spatialRank];
+            int rem = batchInPos % inSpatialSize;
+            for (int i = 0; i < spatialRank; i++)
+            {
+                inCoords[i] = rem / inSpatialStrides[i];
+                rem %= inSpatialStrides[i];
+            }
+
+            int inputOffset = b * inputStrides[0];
+            for (int i = 0; i < spatialRank; i++)
+            {
+                inputOffset += inCoords[i] * inputStrides[i + 1];
+            }
+
+            Span<int> kernelCoords = stackalloc int[spatialRank];
+            int resultOffsetBase = b * resultStrides[0];
+            for (int f = 0; f < filterCount; f++)
+            {
+                int kernelOffsetBase = f * kernelSpatialSize * inputChannels;
+                for (int kp = 0; kp < kernelSpatialSize; kp++)
+                {
+                    rem = kp;
+                    for (int i = 0; i < spatialRank; i++)
+                    {
+                        kernelCoords[i] = rem / kernelSpatialStrides[i];
+                        rem %= kernelSpatialStrides[i];
+                    }
+
+                    bool valid = true;
+                    int resultOffset = resultOffsetBase + f;
+                    for (int i = 0; i < spatialRank; i++)
+                    {
+                        int outCoord = inCoords[i] - kernelCoords[i];
+                        if (outCoord < 0 || outCoord >= outSpatialDims[i])
+                        {
+                            valid = false;
+                            break;
+                        }
+                        resultOffset += outCoord * resultStrides[i + 1];
+                    }
+                    if (!valid) continue;
+
+                    double dOut = resultGrad[resultOffset];
+
+                    int kernelOffset = kernelOffsetBase;
+                    for (int i = 0; i < spatialRank; i++)
+                    {
+                        kernelOffset += kernelCoords[i] * kernelStrides[i + 1];
+                    }
+
+                    var igVecs = MemoryMarshal.Cast<double, Vector<double>>(inputGrad.AsSpan(inputOffset, inputChannels));
+                    var kVecs = MemoryMarshal.Cast<double, Vector<double>>(kernelData.AsSpan(kernelOffset, inputChannels));
+                    var vdOut = new Vector<double>(dOut);
+
+                    for (int i = 0; i < igVecs.Length; i++)
+                    {
+                        igVecs[i] += kVecs[i] * vdOut;
+                    }
+
+                    for (int i = igVecs.Length * VectorSize; i < inputChannels; i++)
+                    {
+                        inputGrad[inputOffset + i] += kernelData[kernelOffset + i] * dOut;
+                    }
+                }
+            }
+        }
+
         /// <summary>
         /// Calculates the dot product of a subrange of two vectors.
         /// </summary>
@@ -5960,9 +6398,15 @@ namespace NNN
                 switch (layer)
                 {
                     case Dense dense:
-                        LayerData layerData = new(dense.NeuronCount, dense.GetType().AssemblyQualifiedName, dense.Weights,
-                            dense.Biases, dense.Activation.GetType().AssemblyQualifiedName);
-                        layers[i] = layerData;
+                        layers[i] = new(layerName: dense.GetType().AssemblyQualifiedName,
+                            activation: dense.Activation.GetType().AssemblyQualifiedName, biases: dense.Biases,
+                            neuronCount: dense.NeuronCount, weights: dense.Weights);
+
+                        break;
+                    case Conv conv:
+                        layers[i] = new(layerName: conv.GetType().AssemblyQualifiedName,
+                            activation: conv.Activation.GetType().AssemblyQualifiedName, biases: conv.Biases,
+                            filterCount: conv.FilterCount, kernelDims: conv.KernelDims, kernels: conv.Kernels);
 
                         break;
                 }
@@ -6050,28 +6494,41 @@ namespace NNN
         /// <param name="biases">Bias parameter of the layer.</param>
         /// <param name="activation">Name of the activation function of the layer.</param>
         [Serializable]
-        public class LayerData(int neuronCount, string layerName, Tensor weights, Tensor biases, string activation)
+        public class LayerData(string layerName, string activation, Tensor biases, int? neuronCount = null, Tensor? weights = null,
+            int? filterCount = null, int[]? kernelDims = null, Tensor? kernels = null)
         {
-            /// <summary>
-            /// Number of neurons in the layer.
-            /// </summary>
-            public int NeuronCount { get; set; } = neuronCount;
             /// <summary>
             /// Name of the specific layer subclass.
             /// </summary>
             public string LayerName { get; set; } = layerName;
             /// <summary>
-            /// Weights parameter of the layer.
+            /// Name of the activation function of the layer.
             /// </summary>
-            public Tensor Weights { get; set; } = weights;
+            public string Activation { get; set; } = activation;
             /// <summary>
             /// Bias parameter of the layer.
             /// </summary>
             public Tensor Biases { get; set; } = biases;
             /// <summary>
-            /// Name of the activation function of the layer.
+            /// Number of neurons in the layer.
             /// </summary>
-            public string Activation { get; set; } = activation;
+            public int? NeuronCount { get; set; } = neuronCount;
+            /// <summary>
+            /// Weights parameter of the layer.
+            /// </summary>
+            public Tensor? Weights { get; set; } = weights;
+            /// <summary>
+            /// Number of filters used by the layer.
+            /// </summary>
+            public int? FilterCount { get; set; } = filterCount;
+            /// <summary>
+            /// Dimensions of the layer's kernels.
+            /// </summary>
+            public int[]? KernelDims { get; set; } = kernelDims;
+            /// <summary>
+            /// Kernels parameter of the layer.
+            /// </summary>
+            public Tensor? Kernels { get; set; } = kernels;
         }
     }
 
