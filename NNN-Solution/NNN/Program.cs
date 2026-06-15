@@ -45,9 +45,9 @@ void InteractionLoop()
     {
         // Create a new model
         model = new([
+            new Conv(16, [3, 3], new LeakyReLU()),
+            new Conv(32, [3, 3], new LeakyReLU()),
             new Dense(256, new LeakyReLU()),
-            new Dense(128, new LeakyReLU()),
-            new Dense(64, new LeakyReLU()),
             new Dense(env.ActionCount, new Linear())
         ], env.StateFormat);
     }
@@ -5006,16 +5006,9 @@ namespace NNN
 
                     if (biases.RequiresGrad)
                     {
-                        if (par)
+                        for (int f = 0; f < filterCount; f++)
                         {
-                            Parallel.For(0, filterCount, f => ComputeBiasGrad(f, filterCount, result.Grad, biases.Grad));
-                        }
-                        else
-                        {
-                            for (int f = 0; f < filterCount; f++)
-                            {
-                                ComputeBiasGrad(f, filterCount, result.Grad, biases.Grad);
-                            }
+                            ComputeBiasGrad(f, filterCount, result.Grad, biases.Grad);
                         }
                     }
 
@@ -5025,7 +5018,7 @@ namespace NNN
                         {
                             Parallel.For(0, filterCount * kernelSpatialSize, fkp => ComputeKernelGrad(fkp, spatialRank,
                                 batch, outSpatialSize, filterCount, kernelSpatialSize, inputChannels, outSpatialStrides,
-                                kernelSpatialStrides, input.Strides, kernels.Strides, result.Strides, input.Data, kernels.Data,
+                                kernelSpatialStrides, input.Strides, kernels.Strides, result.Strides, input.Data, kernels.Grad,
                                 result.Grad));
                         }
                         else
@@ -5079,44 +5072,43 @@ namespace NNN
             }
 
             Span<int> kernelCoords = stackalloc int[spatialRank];
+            Span<double> sums = stackalloc double[filterCount];
+            biasData.AsSpan(0, filterCount).CopyTo(sums);
             int inputOffsetBase = b * inputStrides[0];
-            int resultOffsetBase = b * resultStrides[0];
-            for (int f = 0; f < filterCount; f++)
+            int kernelOffsetBase = kernelSpatialSize * inputChannels;
+            for (int kp = 0; kp < kernelSpatialSize; kp++)
             {
-                double sum = biasData[f];
-
-                int kernelOffsetBase = f * kernelSpatialSize * inputChannels;
-                for (int kp = 0; kp < kernelSpatialSize; kp++)
+                rem = kp;
+                for (int i = 0; i < spatialRank; i++)
                 {
-                    rem = kp;
-                    for (int i = 0; i < spatialRank; i++)
-                    {
-                        kernelCoords[i] = rem / kernelSpatialStrides[i];
-                        rem %= kernelSpatialStrides[i];
-                    }
+                    kernelCoords[i] = rem / kernelSpatialStrides[i];
+                    rem %= kernelSpatialStrides[i];
+                }
 
-                    int inputOffset = inputOffsetBase;
-                    for (int i = 0; i < spatialRank; i++)
-                    {
-                        inputOffset += (outCoords[i] + kernelCoords[i]) * inputStrides[i + 1];
-                    }
+                int inputOffset = inputOffsetBase;
+                for (int i = 0; i < spatialRank; i++)
+                {
+                    inputOffset += (outCoords[i] + kernelCoords[i]) * inputStrides[i + 1];
+                }
 
-                    int kernelOffset = kernelOffsetBase;
+                for (int f = 0; f < filterCount; f++)
+                {
+                    int kernelOffset = kernelOffsetBase * f;
                     for (int i = 0; i < spatialRank; i++)
                     {
                         kernelOffset += kernelCoords[i] * kernelStrides[i + 1];
                     }
 
-                    sum += DotProduct(inputData, kernelData, inputOffset, kernelOffset, inputChannels);
+                    sums[f] += DotProduct(inputData, kernelData, inputOffset, kernelOffset, inputChannels);
                 }
-
-                int resultOffset = resultOffsetBase + f;
-                for (int i = 0; i < spatialRank; i++)
-                {
-                    resultOffset += outCoords[i] * resultStrides[i + 1];
-                }
-                resultData[resultOffset] = sum;
             }
+
+            int resultOffset = b * resultStrides[0];
+            for (int i = 0; i < spatialRank; i++)
+            {
+                resultOffset += outCoords[i] * resultStrides[i + 1];
+            }
+            sums.CopyTo(resultData.AsSpan(resultOffset, filterCount));
         }
 
         static void ComputeBiasGrad(int f, int filterCount, double[] resultGrad, double[] biasGrad)
