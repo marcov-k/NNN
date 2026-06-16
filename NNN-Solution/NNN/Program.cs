@@ -2169,7 +2169,7 @@ namespace NNN
                 // Log episode diagnostics in the console
                 if ((e + 1) % testEvery == 0 || (e + 1) == episodes)
                 {
-                    Console.WriteLine($"Episodes completed: {e + 1}/{episodes}");
+                    Console.WriteLine($"\n\nEpisodes completed: {e + 1}/{episodes}");
                     Console.WriteLine($"Total reward for last episode: {totalReward:F2},");
                     Console.WriteLine($"Average loss for last episode: {(totalLoss / trainSteps):F3}");
                     Console.WriteLine($"Exploration rate: {Exploration:F2}");
