@@ -45,7 +45,8 @@ Func<Tensor[], double> loss = inputs =>
 };
 
 MathUtils.GradientTest(inputs, testOp, loss);
-
+```
+```
 public static void GradientTest(Tensor[] inputs, Func<Tensor[], Tensor> testOp, Func<Tensor[], double> loss)
 {
     var result = testOp(inputs);
