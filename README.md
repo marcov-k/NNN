@@ -27,7 +27,7 @@ Specifications:\
 Architecture: 4 -> 1 (Sigmoid -> Linear)\
 Optimizer: Adam\
 Learning Rate: 0.01\
-Target MSE: < 0.01\
+Target MSE: < 0.01
 | Test # | Epochs Taken |
 |--------|--------------|
 | 1 | 788 |
