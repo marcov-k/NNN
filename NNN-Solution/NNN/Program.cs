@@ -4,7 +4,7 @@ using static NNN.UIUtils;
 bool demoMode = false;
 
 Model model;
-NNN.Environment env = new Snake();
+NNN.Environment env = new TicTacToe();
 double exploration = 1.0;
 double explorationDecay = 0.9995;
 double minExploration = 0.01;
@@ -13,8 +13,8 @@ double discount = 0.99;
 Optimizer optimizer = new Adam(0.001);
 Cost cost = new Huber();
 int replayBufferSize = 10000;
-int batchSize = 64;
-int agentBufferSize = 5;
+int batchSize = 128;
+int agentBufferSize = 4;
 int opponentCopyRate = 600;
 int minRandomOpponentEpisodes = 600;
 double tau = 0.01;
@@ -45,9 +45,9 @@ void InteractionLoop()
     {
         // Create a new model
         model = new([
-            new Conv(16, [3, 3], new LeakyReLU()),
-            new Conv(32, [3, 3], new LeakyReLU()),
-            new Dense(256, new LeakyReLU()),
+            new Dense(128, new LeakyReLU()),
+            new Dense(128, new LeakyReLU()),
+            new Dense(64, new LeakyReLU()),
             new Dense(env.ActionCount, new Linear())
         ], env.StateFormat);
     }
@@ -210,9 +210,6 @@ enum EpisodeNavigation
 // Neural Network Nonsense library for training neural networks
 namespace NNN
 {
-    using ILGPU.IR.Types;
-    using ILGPU.Runtime;
-    using ILGPU.Runtime.Cuda;
     using System.Buffers;
     using System.Data;
     using System.Diagnostics;
@@ -220,8 +217,6 @@ namespace NNN
     using System.Numerics;
     using System.Runtime.InteropServices;
     using System.Text.Json;
-    using System.Threading.Tasks.Dataflow;
-    using TorchSharp.Modules;
 
     /// <summary>
     /// Interface for DQN environments in which the agent plays against itself during training.
@@ -937,6 +932,26 @@ namespace NNN
                 };
                 Console.Write(fill);
             }
+        }
+
+        public bool PlayRandom(Model agent)
+        {
+            Reset();
+
+            bool agentTurn = Random.Next(2) == 1;
+            while (!CheckWin() && !BoardFilled())
+            {
+                int action = agentTurn ? GetAgentAction(agent) : PickRandomAction();
+
+                State[action] = State[9] == 1.0 ? 1.0 : -1.0;
+
+                if (agentTurn && CheckWin()) return true;
+
+                State[9] *= -1.0;
+                agentTurn = !agentTurn;
+            }
+
+            return false;
         }
 
         static void ShowDemoInstructions()
@@ -1777,6 +1792,8 @@ namespace NNN
         /// <param name="item">Element to append.</param>
         public virtual void Add(T item)
         {
+            if (MaxSize <= 0) return;
+
             if (Count < MaxSize) Buffer.Add(item);
             else
             {
@@ -2093,7 +2110,9 @@ namespace NNN
             int trainSteps;
             Tensor nextState;
             TimeSpan avgElapsed = new(0);
+            Stopwatch totalStopwatch = new();
             Stopwatch stopwatch = new();
+            totalStopwatch.Start();
             stopwatch.Start();
             for (int e = 0; e < episodes; e++)
             {
@@ -2158,6 +2177,9 @@ namespace NNN
                 Console.WriteLine($"Episode Duration: {MathUtils.RoundToMS(elapsed):g}, Estimated Time Remaining: {MathUtils.RoundToMS(eta):g}");
                 stopwatch.Restart();
             }
+
+            totalStopwatch.Stop();
+            Console.WriteLine($"Total Training Duration: {MathUtils.RoundToMS(totalStopwatch.Elapsed):g}");
         }
 
         /// <summary>
@@ -6348,6 +6370,44 @@ namespace NNN
         public static TimeSpan RoundToMS(TimeSpan input)
         {
             return TimeSpan.FromMilliseconds(Math.Round(input.TotalMilliseconds));
+        }
+
+        public static void GradientTest(Tensor a, Tensor b, Func<Tensor[], Tensor> testOp, Func<Tensor[], double> loss)
+        {
+            var result = testOp([a, b]);
+            var mean = Tensor.Mean(result);
+            mean.Backward();
+
+            for (int i = 0; i < a.ElementCount; i++)
+            {
+                var (aNumerical, bNumerical) = NumericalGradient(a, b, i, loss);
+                double aAnalytical = a.Grad[i];
+                double bAnalytical = b.Grad[i];
+                double relError = Math.Abs(aNumerical - aAnalytical) / (Math.Abs(aNumerical) + 1e-8);
+                Console.WriteLine($"a[{i}]: numerical = {aNumerical}, analytical = {aAnalytical}, relError = {relError}");
+                relError = Math.Abs(bNumerical - bAnalytical) / (Math.Abs(bNumerical) + 1e-8);
+                Console.WriteLine($"b[{i}]: numerical = {bNumerical}, analytical = {bAnalytical}, relError = {relError}");
+            }
+        }
+
+        static (double aNumerical, double bNumberical) NumericalGradient(Tensor a, Tensor b, int i, Func<Tensor[], double> loss)
+        {
+            double eps = 1e-8;
+            a[i] += eps;
+            double lossPlus = loss([a, b]);
+            a[i] -= 2 * eps;
+            double lossMinus = loss([a, b]);
+            a[i] += eps;
+            double aNumerical = (lossPlus - lossMinus) / (2 * eps);
+
+            b[i] += eps;
+            lossPlus = loss([a, b]);
+            b[i] -= 2 * eps;
+            lossMinus = loss([a, b]);
+            b[i] += eps;
+            double bNumerical = (lossPlus - lossMinus) / (2 * eps);
+
+            return (aNumerical, bNumerical);
         }
     }
 
