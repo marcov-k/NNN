@@ -3,7 +3,7 @@ A neural network framework created from scratch in C# implementing automatic dif
  purpose of experimenting with neural networks.
 
 ## Key Features
-- Deep Q-Network (DQN) training capabilties
+- Deep Q-Network (DQN) training capabilities
 - Prioritized experience replay (PER) buffer implementation
 - Reverse-mode automatic differentiation
 - Dynamic computation graph reused across forward passes
@@ -24,12 +24,12 @@ A neural network framework created from scratch in C# implementing automatic dif
 | Tanh | 4.34e-7 |
 
 ### Supervised Learning Convergence Test (XOR Classification)
-Specifications:\
+#### Specifications:
 Architecture: 4 -> 1 (Sigmoid -> Linear)\
 Optimizer: Adam\
 Learning Rate: 0.01\
 Target MSE: < 0.01
-| Test # | Epochs Taken |
+| Test # | Epochs Required |
 |--------|--------------|
 | 1 | 788 |
 | 2 | 1009 |
@@ -75,7 +75,7 @@ Console.ReadKey();
 ```
 
 ### Tic-Tac-Toe (DQN + Self-Play)
-Specifications:\
+#### Specifications:
 Architecture: 128 -> 128 -> 64 -> 9 (Leaky ReLU -> Leaky ReLU -> Leaky ReLU -> Linear)\
 Loss Function: Pseudo-Huber\
 Optimizer: Adam\
