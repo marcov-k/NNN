@@ -22,6 +22,7 @@ double tau = 0.01;
 double maxGradNorm = 1.0;
 int minExperiences = 2000;
 int episodeMemorySize = 100;
+int testEpisodes = 5000;
 DQNTrainer dqnTrainer;
 FIFOBuffer<Episode> episodeBuffer = new(episodeMemorySize);
 
@@ -46,9 +47,9 @@ void InteractionLoop()
     {
         // Create a new model
         model = new([
+            new Dense(256, new LeakyReLU()),
+            new Dense(256, new LeakyReLU()),
             new Dense(128, new LeakyReLU()),
-            new Dense(128, new LeakyReLU()),
-            new Dense(64, new LeakyReLU()),
             new Dense(env.ActionCount, new Linear())
         ], env.StateFormat);
     }
@@ -95,58 +96,23 @@ void TrainingLoop()
         {
             // Train agent for a given number of episodes
             int episodes = GetInteger("Enter number of episodes to train");
+            int testEvery = GetInteger("Enter episodes per training progress test");
             Console.WriteLine($"Training for {episodes} episodes...");
-            dqnTrainer.Train(ref episodeBuffer, episodes);
+            dqnTrainer.Train(ref episodeBuffer, episodes, testEvery, testEpisodes);
 
-            TestDQNModel();
+            if (env is TicTacToe ticTacToe && GetInput("Play against model? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
+            {
+                ticTacToe.Play(model);
+            }
+
+            if (env is Snake snake && GetInput("Watch agent play? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
+            {
+                snake.Play(model);
+            }
 
             ViewEpisodes();
         }
         else break;
-    }
-}
-
-// Test the performance of the current trained model through running a single episode with no exploration
-void TestDQNModel()
-{
-    Console.WriteLine("\n--- Testing Agent Performance ---");
-    env.Reset();
-    var state = env.GetNormalizedState();
-    Tensor trueState;
-    bool done = false;
-    double totalReward = 0;
-    int steps = 0;
-
-    List<Experience> episodeExperiences = [];
-
-    // Run a single complete episode with no exploration
-    while (!done)
-    {
-        steps++;
-        trueState = env.GetState();
-        int action = env.PickAgentAction(model.Predict(Tensor.WrapBatch(state)));
-        var (reward, nextState, isDone) = env.Step(action, steps);
-
-        totalReward += reward;
-        state = nextState;
-        done = isDone;
-
-        episodeExperiences.Add(new(trueState, action, reward, env.GetState(), done));
-    }
-
-    episodeBuffer?.Add(new(episodeExperiences));
-
-    Console.WriteLine($"Total Reward: {totalReward:F2}");
-    env.Render(episodeBuffer[^1], steps);
-
-    if (env is TicTacToe ticTacToe && GetInput("Play against model? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
-    {
-        ticTacToe.Play(model);
-    }
-
-    if (env is Snake snake && GetInput("Watch agent play? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
-    {
-        snake.Play(model);
     }
 }
 
@@ -217,6 +183,7 @@ namespace NNN
     using System.Linq;
     using System.Numerics;
     using System.Runtime.InteropServices;
+    using System.Text;
     using System.Text.Json;
 
     /// <summary>
@@ -383,6 +350,13 @@ namespace NNN
         public abstract void Render(Episode episode, int step);
 
         /// <summary>
+        /// Tests an agent's performance in the environment.
+        /// </summary>
+        /// <param name="agent">Agen to test.</param>
+        /// <param name="testEpisodes">Number of episodes to test for.</param>
+        public abstract void TestTrainingProgress(Model agent, int testEpisodes);
+
+        /// <summary>
         /// Plays a demonstration of the model trained on the environment.
         /// </summary>
         public abstract void PlayDemo();
@@ -537,12 +511,18 @@ namespace NNN
             return (reward, GetNormalizedState(), done);
         }
 
+        // TODO: Impelement training progress test
+        public override void TestTrainingProgress(Model agent, int testEpisodes)
+        {
+            throw new NotImplementedException();
+        }
+
         public override void Render(Episode episode, int step)
         {
             // Extract the state at the given step from the episode
             step = Math.Clamp(step, 0, episode.Experiences.Count);
             var exp = step == episode.Experiences.Count ? episode.Experiences[step - 1] : episode.Experiences[step];
-            var state = step == episode.Experiences.Count ? exp.NextState : exp.State;
+            var state = exp.NextState;
             (int action, double reward) = step > 0 ? (episode.Experiences[step - 1].Action, episode.Experiences[step - 1].Reward) : (-1, 0);
 
             // Draw the grid for the given state
@@ -732,12 +712,30 @@ namespace NNN
             return (reward, nextState, done);
         }
 
+        public override void TestTrainingProgress(Model agent, int testEpisodes)
+        {
+            int wins = 0;
+            int ties = 0;
+            for (int e = 0; e < testEpisodes; e++)
+            {
+                var (won, tied) = PlayRandom(agent);
+                if (won) wins++;
+                else if (tied) ties++;
+            }
+
+            double winPercent = ((double)wins / testEpisodes) * 100.0;
+            double tiePercent = ((double)ties / testEpisodes) * 100.0;
+            Console.WriteLine($"Win percentage vs randomly-acting opponent: {winPercent:F2}");
+            Console.WriteLine($"Tie percentage vs randomly-acting opponent: {tiePercent:F2}");
+            Console.WriteLine($"Win + tie percentage vs randomly-acting opponent: {(winPercent + tiePercent):F2}");
+        }
+
         public override void Render(Episode episode, int step)
         {
             // Extract the state at the given step from the episode
             step = Math.Clamp(step, 0, episode.Experiences.Count);
             var exp = step == episode.Experiences.Count ? episode.Experiences[step - 1] : episode.Experiences[step];
-            var state = step == episode.Experiences.Count ? exp.NextState : exp.State;
+            var state = exp.NextState;
             (int action, double reward) = step > 0 ? (episode.Experiences[step - 1].Action, episode.Experiences[step - 1].Reward) : (-1, 0);
 
             DrawState(state);
@@ -935,7 +933,7 @@ namespace NNN
             }
         }
 
-        public bool PlayRandom(Model agent)
+        public (bool won, bool tied) PlayRandom(Model agent)
         {
             Reset();
 
@@ -946,13 +944,13 @@ namespace NNN
 
                 State[action] = State[9] == 1.0 ? 1.0 : -1.0;
 
-                if (agentTurn && CheckWin()) return true;
+                if (agentTurn && CheckWin()) return (true, false);
 
                 State[9] *= -1.0;
                 agentTurn = !agentTurn;
             }
 
-            return false;
+            return (false, !CheckWin() && BoardFilled());
         }
 
         static void ShowDemoInstructions()
@@ -1209,6 +1207,12 @@ namespace NNN
             reward += ReachableRewardMult * reachable; // add shaped reward based on number of reachable positions
 
             return (reward, GetNormalizedState(), false);
+        }
+
+        // TODO: implement training progress test
+        public override void TestTrainingProgress(Model agent, int testEpisodes)
+        {
+            throw new NotImplementedException();
         }
 
         public override void Render(Episode episode, int step)
@@ -2097,7 +2101,7 @@ namespace NNN
         /// </summary>
         /// <param name="episodeBuffer">Buffer in which to store episodes for reviewing.</param>
         /// <param name="episodes">Number of episodes to train for.</param>
-        public void Train(ref FIFOBuffer<Episode>? episodeBuffer, int episodes = 1000)
+        public void Train(ref FIFOBuffer<Episode>? episodeBuffer, int episodes = 1000, int testEvery = 100, int testEpisodes = 5000)
         {
             List<Experience> episodeExperiences = [];
             Tensor state; // normalized state
@@ -2142,7 +2146,7 @@ namespace NNN
 
                     // Store experience for training and episode review
                     if (learnerTurn) ReplayBuffer.Add(new(state, action, reward, nextState, done));
-                    episodeExperiences.Add(new(trueState, action, reward, done ? trueState : Environment.GetState(), done));
+                    episodeExperiences.Add(new(trueState, action, reward, Environment.GetState(), done));
 
                     if ((step - 1) % TrainEvery == 0)
                     {
@@ -2163,19 +2167,27 @@ namespace NNN
                 var eta = avgElapsed * (episodes - e - 1);
 
                 // Log episode diagnostics in the console
-                Console.WriteLine($"\nEpisode {e + 1}/{episodes} finished...");
-                Console.WriteLine($"Total Reward: {totalReward:F2},");
-                Console.WriteLine($"Average Loss: {(totalLoss / trainSteps):F3}");
-                Console.WriteLine($"Exploration Rate: {Exploration:F2}, Experience Count: {ReplayBuffer.Count}");
-                if (Environment is ISelfPlay selfPlayEnv)
+                if ((e + 1) % testEvery == 0 || (e + 1) == episodes)
                 {
-                    Console.WriteLine($"Opponent agent: {(selfPlayEnv.OpponentIndex < selfPlayEnv.OpponentCount ?
-                        $"{selfPlayEnv.OpponentIndex + 1}/{selfPlayEnv.OpponentCount}" : "Random")}");
+                    Console.WriteLine($"Episodes completed: {e + 1}/{episodes}");
+                    Console.WriteLine($"Total reward for last episode: {totalReward:F2},");
+                    Console.WriteLine($"Average loss for last episode: {(totalLoss / trainSteps):F3}");
+                    Console.WriteLine($"Exploration rate: {Exploration:F2}");
+                    Console.WriteLine($"Experience count: {ReplayBuffer.Count}");
+                    if (Environment is ISelfPlay selfPlayEnv)
+                    {
+                        Console.WriteLine($"Opponent agent for last episode: {(selfPlayEnv.OpponentIndex < selfPlayEnv.OpponentCount ?
+                            $"{selfPlayEnv.OpponentIndex + 1}/{selfPlayEnv.OpponentCount}" : "Random")}");
+                    }
+                    Console.WriteLine($"Final state of last episode:");
+                    if (episodeBuffer is not null) Environment.Render(episodeBuffer[^1], step + 1);
+                    Console.WriteLine($"Ended on step: {step}");
+                    Console.WriteLine($"Episode duration: {MathUtils.RoundToMS(elapsed):g}");
+                    Console.WriteLine($"\nAverage time per episode: {MathUtils.RoundToMS(avgElapsed)}");
+                    Console.WriteLine($"Estimated time remaining: {MathUtils.RoundToMS(eta)}");
+                    Console.WriteLine($"Evaluating agent performance...\n");
+                    Environment.TestTrainingProgress(Agent, testEpisodes);
                 }
-                Console.WriteLine($"Final State:");
-                if (episodeBuffer is not null) Environment.Render(episodeBuffer[^1], step);
-                Console.WriteLine($"Ended on step: {step}");
-                Console.WriteLine($"Episode Duration: {MathUtils.RoundToMS(elapsed):g}, Estimated Time Remaining: {MathUtils.RoundToMS(eta):g}");
                 stopwatch.Restart();
             }
 
