@@ -139,116 +139,87 @@ Console.ReadKey();
 
 ### Tic-Tac-Toe (DQN + Self-Play)
 #### Specifications:
-Architecture: 128 -> 128 -> 64 -> 9 (Leaky ReLU -> Leaky ReLU -> Leaky ReLU -> Linear)\
+Architecture: 256 -> 256 -> 128 -> 9 (Leaky ReLU -> Leaky ReLU -> Leaky ReLU -> Linear)\
 Loss Function: Pseudo-Huber\
 Optimizer: Adam\
 Learning Rate: 0.001\
-Games per Win Rate Test: 5000
-| Training Episodes | Win Rate vs Randomly-Acting Opponent |
-|-------------------|--------------------------------------|
-| 300 | 52.5% |
-| 600 | 80.2% |
-| 900 | 89.9% |
-| 1200 | 92.8% |
-| 1500 | 93.5% |
-| 1800 | 91.6% |
-| 2100 | 92.1% |
-| 2400 | 92.8% |
-| 2700 | 94.2% |
-| 3000 | 93.8% |
+Games per Performance Test: 5000\
+Opponent for Performance Tests: Randomly-acting\
+Total time required for training and evaluation: 3:15.919
+| Training Episodes | Win Rate | Tie Rate | Win + Tie Rate |
+|-------------------|----------|----------|----------------|
+| 200* | 42.06% | 30.32% | 72.38% |
+| 400* | 42.18% | 30.14% | 72.32% |
+| 600* | 92.04% | 6.08% | 98.12% |
+| 800 | 93.94% | 5.20% | 99.14% |
+| 1000 | 93.16% | 5.50% | 98.66% |
+| 1200 | 94.20% | 5.14% | 99.34% |
+| 1400 | 92.96% | 6.18% | 99.14% |
+| 1600 | 95.60% | 4.26% | 99.86% |
+| 1800 | 95.24% | 4.54% | 99.78% |
+| 2000 | 94.60% | 5.40% | 100.00% |
 
-Total time required for training and evaluation: 32.574 seconds
+*Note that the majority of the first 600 episodes were used to collect initial experiences without training
 #### Code Used for Testing:
+##### Training Hyperparameters:
 ```
-Model model;
 NNN.Environment env = new TicTacToe();
 double exploration = 1.0;
 double explorationDecay = 0.9995;
 double minExploration = 0.01;
-int trainEvery = 4;
+int trainEvery = 1;
 double discount = 0.99;
 Optimizer optimizer = new Adam(0.001);
 Cost cost = new Huber();
 int replayBufferSize = 10000;
 int batchSize = 128;
-int agentBufferSize = 4;
+int agentBufferSize = 2;
 int opponentCopyRate = 600;
 int minRandomOpponentEpisodes = 600;
 double tau = 0.01;
 double maxGradNorm = 1.0;
 int minExperiences = 2000;
 int episodeMemorySize = 100;
-DQNTrainer dqnTrainer;
-FIFOBuffer<Episode> episodeBuffer = new(episodeMemorySize);
-
-TestTicTacToeTraining();
-
-void TestTicTacToeTraining()
+int testEpisodes = 5000;
+```
+##### Performance Evaluation (in Tic-Tac-Toe Environment):
+```
+public override void TestTrainingProgress(Model agent, int testEpisodes)
 {
-    // Initialize model and trainer
-
-    model = new([
-        new Dense(128, new LeakyReLU()),
-        new Dense(128, new LeakyReLU()),
-        new Dense(64, new LeakyReLU()),
-        new Dense(env.ActionCount, new Linear())
-        ], env.StateFormat);
-    dqnTrainer = new(
-        agent: model,
-        environment: env,
-        optimizer: optimizer,
-        cost: cost,
-        trainEvery: trainEvery,
-        discount: discount,
-        exploration: exploration,
-        explorationDecay: explorationDecay,
-        minExploration: minExploration,
-        replayBufferSize: replayBufferSize,
-        batchSize: batchSize,
-        agentBufferSize: agentBufferSize,
-        opponentCopyRate: opponentCopyRate,
-        minRandomOpponentEpisodes: minRandomOpponentEpisodes,
-        tau: tau,
-        maxGradNorm: maxGradNorm,
-        minExperiences: minExperiences
-    );
-
-    // Prepare training with periodic logs
-
-    int totalEpisodes = 3000;
-    int episodeChunks = 10; // number of logged blocks to split training into
-    int episodesPerChunk = totalEpisodes / episodeChunks;
-    string[] progressLogs = new string[episodeChunks]; // array of performance logs from each training chunk
-    int progressTestLength = 5000; // number of games to play during performance testing
-    int progressTestWins;
-    Stopwatch stopwatch = new();
-    stopwatch.Start();
-    for (int chunk = 0; chunk < episodeChunks; chunk++)
+    int wins = 0;
+    int ties = 0;
+    for (int e = 0; e < testEpisodes; e++)
     {
-        dqnTrainer.Train(ref episodeBuffer!, episodesPerChunk);
-
-        // Evaluate agent performance after episodesPerChunk training episodes
-
-        Console.WriteLine($"Evaluating performance after chunk {chunk + 1}...");
-        progressTestWins = 0;
-        for (int t = 0; t < progressTestLength; t++)
-        {
-            if (env is TicTacToe tictactoe && tictactoe.PlayRandom(model)) progressTestWins++;
-        }
-        progressLogs[chunk] = $"Win rate after {(chunk + 1) * episodesPerChunk} episodes: {((double)progressTestWins / (double)progressTestLength) * 100.0}%";
+        var (won, tied) = PlayRandom(agent);
+        if (won) wins++;
+        else if (tied) ties++;
     }
-    stopwatch.Stop();
-    Console.WriteLine($"Total training and evaluation time: {MathUtils.RoundToMS(stopwatch.Elapsed)}");
 
-    // Log performance testing results
+    double winPercent = ((double)wins / testEpisodes) * 100.0;
+    double tiePercent = ((double)ties / testEpisodes) * 100.0;
+    Console.WriteLine($"Win percentage vs randomly-acting opponent: {winPercent:F2}");
+    Console.WriteLine($"Tie percentage vs randomly-acting opponent: {tiePercent:F2}");
+    Console.WriteLine($"Win + tie percentage vs randomly-acting opponent: {(winPercent + tiePercent):F2}");
+}
 
-    Console.WriteLine();
-    foreach (var log in progressLogs)
+public (bool won, bool tied) PlayRandom(Model agent)
+{
+    Reset();
+
+    bool agentTurn = Random.Next(2) == 1;
+    while (!CheckWin() && !BoardFilled())
     {
-        Console.WriteLine(log);
+        int action = agentTurn ? GetAgentAction(agent) : PickRandomAction();
+
+        State[action] = State[9] == 1.0 ? 1.0 : -1.0;
+
+        if (agentTurn && CheckWin()) return (true, false);
+
+        State[9] *= -1.0;
+        agentTurn = !agentTurn;
     }
-    Console.WriteLine("\nPress any key to close...");
-    Console.ReadKey();
+
+    return (false, !CheckWin() && BoardFilled());
 }
 ```
 
