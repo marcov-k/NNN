@@ -75,14 +75,119 @@ Console.ReadKey();
 ```
 
 ### Tic-Tac-Toe (DQN + Self-Play)
-Architecture Used:\
-128 -> 128 -> 64 -> 9 (Leaky ReLU -> Leaky ReLU -> Leaky ReLU -> Linear)
-| Metric | Value |
-|--------|-------|
-| Training Games | 50,000|
-| Training Time | 7:44.617 |
-| Test Games vs Randomly-Acting Opponent | 10,000 |
-| Win Rate vs Randomly-Acting Opponent | 91.15% |
+Specifications:\
+Architecture: 128 -> 128 -> 64 -> 9 (Leaky ReLU -> Leaky ReLU -> Leaky ReLU -> Linear)\
+Loss Function: Pseudo-Huber\
+Optimizer: Adam\
+Learning Rate: 0.001\
+Games per Win Rate Test: 5000
+| Training Episodes | Win Rate vs Randomly-Acting Opponent |
+|-------------------|--------------------------------------|
+| 300 | 52.5% |
+| 600 | 80.2% |
+| 900 | 89.9% |
+| 1200 | 92.8% |
+| 1500 | 93.5% |
+| 1800 | 91.6% |
+| 2100 | 92.1% |
+| 2400 | 92.8% |
+| 2700 | 94.2% |
+| 3000 | 93.8% |
+
+Total time required for training and evaluation: 32.574 seconds
+#### Code Used for Testing:
+```
+Model model;
+NNN.Environment env = new TicTacToe();
+double exploration = 1.0;
+double explorationDecay = 0.9995;
+double minExploration = 0.01;
+int trainEvery = 4;
+double discount = 0.99;
+Optimizer optimizer = new Adam(0.001);
+Cost cost = new Huber();
+int replayBufferSize = 10000;
+int batchSize = 128;
+int agentBufferSize = 4;
+int opponentCopyRate = 600;
+int minRandomOpponentEpisodes = 600;
+double tau = 0.01;
+double maxGradNorm = 1.0;
+int minExperiences = 2000;
+int episodeMemorySize = 100;
+DQNTrainer dqnTrainer;
+FIFOBuffer<Episode> episodeBuffer = new(episodeMemorySize);
+
+TestTicTacToeTraining();
+
+void TestTicTacToeTraining()
+{
+    // Initialize model and trainer
+
+    model = new([
+        new Dense(128, new LeakyReLU()),
+        new Dense(128, new LeakyReLU()),
+        new Dense(64, new LeakyReLU()),
+        new Dense(env.ActionCount, new Linear())
+        ], env.StateFormat);
+    dqnTrainer = new(
+        agent: model,
+        environment: env,
+        optimizer: optimizer,
+        cost: cost,
+        trainEvery: trainEvery,
+        discount: discount,
+        exploration: exploration,
+        explorationDecay: explorationDecay,
+        minExploration: minExploration,
+        replayBufferSize: replayBufferSize,
+        batchSize: batchSize,
+        agentBufferSize: agentBufferSize,
+        opponentCopyRate: opponentCopyRate,
+        minRandomOpponentEpisodes: minRandomOpponentEpisodes,
+        tau: tau,
+        maxGradNorm: maxGradNorm,
+        minExperiences: minExperiences
+    );
+
+    // Prepare training with periodic logs
+
+    int totalEpisodes = 3000;
+    int episodeChunks = 10; // number of logged blocks to split training into
+    int episodesPerChunk = totalEpisodes / episodeChunks;
+    string[] progressLogs = new string[episodeChunks]; // array of performance logs from each training chunk
+    int progressTestLength = 5000; // number of games to play during performance testing
+    int progressTestWins;
+    Stopwatch stopwatch = new();
+    stopwatch.Start();
+    for (int chunk = 0; chunk < episodeChunks; chunk++)
+    {
+        dqnTrainer.Train(ref episodeBuffer!, episodesPerChunk);
+
+        // Evaluate agent performance after episodesPerChunk training episodes
+
+        Console.WriteLine($"Evaluating performance after chunk {chunk + 1}...");
+        progressTestWins = 0;
+        for (int t = 0; t < progressTestLength; t++)
+        {
+            if (env is TicTacToe tictactoe && tictactoe.PlayRandom(model)) progressTestWins++;
+        }
+        progressLogs[chunk] = $"Win rate after {(chunk + 1) * episodesPerChunk} episodes: {((double)progressTestWins / (double)progressTestLength) * 100.0}%";
+    }
+    stopwatch.Stop();
+    Console.WriteLine($"Total training and evaluation time: {MathUtils.RoundToMS(stopwatch.Elapsed)}");
+
+    // Log performance testing results
+
+    Console.WriteLine();
+    foreach (var log in progressLogs)
+    {
+        Console.WriteLine(log);
+    }
+    Console.WriteLine("\nPress any key to close...");
+    Console.ReadKey();
+}
+```
 
 ## Motivation
 I originally intended for this project to simply be my experimentation with implementing the systems described in Seth Weidman's _Deep Learning from Scratch_. However, after seeing my basic neural networks successfully
