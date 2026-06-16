@@ -13,9 +13,69 @@ A neural network framework created from scratch in C# implementing automatic dif
 - Performance optimizations via SIMD vectorization and parallelization
 
 ## Results
+### Gradient Correctness Tests (Autograd Verification)
+| Operation | Max Relative Error |
+|-----------|--------------------|
+| Addition | 8.27e-8 |
+| Multiplication | 6.08e-9 |
+| Matrix Multiplication | 7.93e-7 |
+| Pow(a, 2.0) | 1.08e-7 |
+| Tanh | 4.34e-7 |
+
+### Supervised Learning Convergence Test (XOR Classification)
+Specifications:\
+Architecture: 4 -> 1 (Sigmoid -> Linear)\
+Optimizer: Adam\
+Learning Rate: 0.01\
+Target MSE: < 0.01\
+| Test # | Epochs Taken |
+|--------|--------------|
+| 1 | 788 |
+| 2 | 1009 |
+| 3 | 2428 |
+| 4 | 309 |
+| 5 | 843 |
+| 6 | 841 |
+| 7 | 899 |
+| 8 | 600 |
+| 9 | 570 |
+| 10 | 497 |
+| Average | 878.4 |
+#### Code Used for Testing:
+```
+Tensor inputFormat = new([1, 2], false);
+Tensor inputs = new([4, 2], false)
+{
+    Data = [0, 0, 1, 0, 0, 1, 1, 1]
+};
+Tensor targets = new([4, 1], false)
+{
+    Data = [0, 1, 1, 0]
+};
+Model testModel = new([
+    new Dense(4, new Sigmoid()),
+    new Dense(1, new Linear())
+    ], inputFormat);
+Cost testCost = new MSE();
+Optimizer testOptimizer = new Adam(0.01);
+Trainer testTrainer = new(testModel, testOptimizer, testCost);
+
+int maxEpochs = 10000;
+int epochs = 0;
+while (epochs < maxEpochs && testCost.CalculateCost(testModel.Predict(inputs), targets)[0] >= 0.01)
+{
+    testTrainer.Train(inputs, targets, 1);
+    epochs++;
+}
+
+Console.WriteLine($"Reached MSE below 0.01 in {epochs} epochs");
+Console.WriteLine("Press any key to close...");
+Console.ReadKey();
+```
+
 ### Tic-Tac-Toe (DQN + Self-Play)
 Architecture Used:\
-128 -> 128 -> 64 -> 9
+128 -> 128 -> 64 -> 9 (Leaky ReLU -> Leaky ReLU -> Leaky ReLU -> Linear)
 | Metric | Value |
 |--------|-------|
 | Training Games | 50,000|
