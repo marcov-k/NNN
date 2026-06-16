@@ -1,4 +1,5 @@
 ﻿using NNN;
+using System.Diagnostics;
 using static NNN.UIUtils;
 
 bool demoMode = false;
