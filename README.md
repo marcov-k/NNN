@@ -3,7 +3,7 @@ A neural network framework created from scratch in C# implementing automatic dif
  purpose of experimenting with neural networks.
 
 ## Key Features
-- Deep Q-Network (DQN) training capabilties
+- Deep Q-Network (DQN) training capabilities
 - Prioritized experience replay (PER) buffer implementation
 - Reverse-mode automatic differentiation
 - Dynamic computation graph reused across forward passes
@@ -22,14 +22,77 @@ A neural network framework created from scratch in C# implementing automatic dif
 | Matrix Multiplication | 7.93e-7 |
 | Pow(a, 2.0) | 1.08e-7 |
 | Tanh | 4.34e-7 |
+#### Code Used for Testing (Addition Example):
+```
+Tensor a = new([3])
+{
+    Data = [1.0, 2.0, 3.0]
+};
+Tensor b = new([3])
+{
+    Data = [4.0, 5.0, 6.0]
+};
+Tensor[] inputs = [a, b];
+
+Func<Tensor[], Tensor> testOp = inputs =>
+{
+    return inputs[0] + inputs[1];
+};
+Func<Tensor[], double> loss = inputs =>
+{
+    var result = inputs[0] + inputs[1];
+    return Tensor.Mean(result)[0];
+};
+
+MathUtils.GradientTest(inputs, testOp, loss);
+```
+```
+public static void GradientTest(Tensor[] inputs, Func<Tensor[], Tensor> testOp, Func<Tensor[], double> loss)
+{
+    var result = testOp(inputs);
+    var mean = Tensor.Mean(result);
+    mean.Backward();
+
+    for (int i = 0; i < inputs[0].ElementCount; i++)
+    {
+        var (aNumerical, bNumerical) = NumericalGradient(inputs, i, loss);
+        double aAnalytical = inputs[0].Grad[i];
+        double bAnalytical = inputs[1].Grad[i];
+        double relError = Math.Abs(aNumerical - aAnalytical) / (Math.Abs(aNumerical) + 1e-8);
+        Console.WriteLine($"a[{i}]: numerical = {aNumerical}, analytical = {aAnalytical}, relError = {relError}");
+        relError = Math.Abs(bNumerical - bAnalytical) / (Math.Abs(bNumerical) + 1e-8);
+        Console.WriteLine($"b[{i}]: numerical = {bNumerical}, analytical = {bAnalytical}, relError = {relError}");
+    }
+}
+
+static (double aNumerical, double bNumerical) NumericalGradient(Tensor[] inputs, int i, Func<Tensor[], double> loss)
+{
+    double eps = 1e-8;
+    inputs[0][i] += eps;
+    double lossPlus = loss(inputs);
+    inputs[0][i] -= 2 * eps;
+    double lossMinus = loss(inputs);
+    inputs[0][i] += eps;
+    double aNumerical = (lossPlus - lossMinus) / (2 * eps);
+
+    inputs[1][i] += eps;
+    lossPlus = loss(inputs);
+    inputs[1][i] -= 2 * eps;
+    lossMinus = loss(inputs);
+    inputs[1][i] += eps;
+    double bNumerical = (lossPlus - lossMinus) / (2 * eps);
+
+    return (aNumerical, bNumerical);
+}
+```
 
 ### Supervised Learning Convergence Test (XOR Classification)
-Specifications:\
+#### Specifications:
 Architecture: 4 -> 1 (Sigmoid -> Linear)\
 Optimizer: Adam\
 Learning Rate: 0.01\
 Target MSE: < 0.01
-| Test # | Epochs Taken |
+| Test # | Epochs Required |
 |--------|--------------|
 | 1 | 788 |
 | 2 | 1009 |
@@ -75,7 +138,7 @@ Console.ReadKey();
 ```
 
 ### Tic-Tac-Toe (DQN + Self-Play)
-Specifications:\
+#### Specifications:
 Architecture: 128 -> 128 -> 64 -> 9 (Leaky ReLU -> Leaky ReLU -> Leaky ReLU -> Linear)\
 Loss Function: Pseudo-Huber\
 Optimizer: Adam\
