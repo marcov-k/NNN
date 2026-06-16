@@ -1,5 +1,4 @@
 ﻿using NNN;
-using System.Diagnostics;
 using static NNN.UIUtils;
 
 bool demoMode = false;
@@ -9,13 +8,13 @@ NNN.Environment env = new TicTacToe();
 double exploration = 1.0;
 double explorationDecay = 0.9995;
 double minExploration = 0.01;
-int trainEvery = 4;
+int trainEvery = 1;
 double discount = 0.99;
 Optimizer optimizer = new Adam(0.001);
 Cost cost = new Huber();
 int replayBufferSize = 10000;
 int batchSize = 128;
-int agentBufferSize = 4;
+int agentBufferSize = 2;
 int opponentCopyRate = 600;
 int minRandomOpponentEpisodes = 600;
 double tau = 0.01;
@@ -97,7 +96,7 @@ void TrainingLoop()
             // Train agent for a given number of episodes
             int episodes = GetInteger("Enter number of episodes to train");
             int testEvery = GetInteger("Enter episodes per training progress test");
-            Console.WriteLine($"Training for {episodes} episodes...");
+            Console.WriteLine($"\n\nTraining for {episodes} episodes...");
             dqnTrainer.Train(ref episodeBuffer, episodes, testEvery, testEpisodes);
 
             if (env is TicTacToe ticTacToe && GetInput("Play against model? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
@@ -605,7 +604,7 @@ namespace NNN
         /// <summary>
         /// Base reward for a winning action.
         /// </summary>
-        const double WinRewardBase = 1.0;
+        const double WinRewardBase = 2.0;
         /// <summary>
         /// Base reward for an action which prevents the opponent from winning.
         /// </summary>
@@ -2159,7 +2158,7 @@ namespace NNN
 
                 episodeBuffer?.Add(new(episodeExperiences));
 
-                Exploration = Math.Max(Exploration * ExplorationDecay, MinExploration); // exponentially decay exploration rate
+                if (ReplayBuffer.Count >= MinExperiences) Exploration = Math.Max(Exploration * ExplorationDecay, MinExploration); // exponentially decay exploration rate
 
                 // Calculate diagnostic data
                 var elapsed = stopwatch.Elapsed;
@@ -2185,7 +2184,7 @@ namespace NNN
                     Console.WriteLine($"Episode duration: {MathUtils.RoundToMS(elapsed):g}");
                     Console.WriteLine($"\nAverage time per episode: {MathUtils.RoundToMS(avgElapsed)}");
                     Console.WriteLine($"Estimated time remaining: {MathUtils.RoundToMS(eta)}");
-                    Console.WriteLine($"Evaluating agent performance...\n");
+                    Console.WriteLine($"\nEvaluating agent performance...");
                     Environment.TestTrainingProgress(Agent, testEpisodes);
                 }
                 stopwatch.Restart();
