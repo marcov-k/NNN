@@ -1,5 +1,6 @@
 # Neural Network Nonsense
-A neural network framework created from scratch in C# implementing automatic differentiation, backpropagation, and customizable architectures for neural networks.
+A neural network framework created from scratch in C# implementing automatic differentiation, backpropagation, and customizable architectures for neural networks. The name is a relic of the project's original intended
+ purpose of experimenting with neural networks.
 
 ## Key Features
 - Deep Q-Network (DQN) training capabilties
