@@ -65,7 +65,7 @@ public static void GradientTest(Tensor[] inputs, Func<Tensor[], Tensor> testOp, 
     }
 }
 
-static (double aNumerical, double bNumberical) NumericalGradient(Tensor[] inputs, int i, Func<Tensor[], double> loss)
+static (double aNumerical, double bNumerical) NumericalGradient(Tensor[] inputs, int i, Func<Tensor[], double> loss)
 {
     double eps = 1e-8;
     inputs[0][i] += eps;
