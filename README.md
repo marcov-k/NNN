@@ -144,8 +144,8 @@ Loss Function: Pseudo-Huber\
 Optimizer: Adam\
 Learning Rate: 0.001\
 Games per Performance Test: 5000\
-Opponent for Performance Tests: Randomly-acting\
-Total time required for training and evaluation: 3:15.919
+Opponent for Performance Tests: Randomly-Acting\
+Total Time Required for Training and Evaluation: 3:15.919
 | Training Episodes | Win Rate | Tie Rate | Win + Tie Rate |
 |-------------------|----------|----------|----------------|
 | 200* | 42.06% | 30.32% | 72.38% |
