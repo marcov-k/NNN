@@ -1,3 +1,4 @@
+<div style="font-family: monospace; list-style-type: none; padding-left: 0; line-height: 1.5;">
 # Neural Network Nonsense
 A neural network framework created from scratch in C# implementing automatic differentiation, backpropagation, and customizable architectures for neural networks. The name is a relic of the project's original intended
  purpose of experimenting with neural networks.
@@ -294,6 +295,75 @@ The framework's equivalent of an autograd engine relies on functionality built d
  gradients of each input using their respective partial derivative formulas multiplied by the gradient of the result to account for the chain rule. Each tensor also exposes a Backward() method which performs a topological
  of the computation graph before propagating gradients in reverse-order.
 
+## Organization
+NNN\
+├── ModelTrainer (Script for training neural networks using the NNN framework)\
+│\
+└── Components\
+&emsp;&emsp;├── Activations (Activation function classes)\
+&emsp;&emsp;│&emsp;&ensp;├── Activation (Base class)\
+&emsp;&emsp;│&emsp;&ensp;├── LeakyReLU\
+&emsp;&emsp;│&emsp;&ensp;├── Linear\
+&emsp;&emsp;│&emsp;&ensp;├── ReLU\
+&emsp;&emsp;│&emsp;&ensp;├── Sigmoid\
+&emsp;&emsp;│&emsp;&ensp;└── Tanh\
+&emsp;&emsp;│\
+&emsp;&emsp;├── Autodiff (Automatic differentation and tensor logic)\
+&emsp;&emsp;│&emsp;&ensp;├── TensorActivations (Tensor implementations of activation functions)\
+&emsp;&emsp;│&emsp;&ensp;├── TensorGraph (Functions for handling computation graph)\
+&emsp;&emsp;│&emsp;&ensp;├── TensorIndexing (Functions for handling indexing tensors)\
+&emsp;&emsp;│&emsp;&ensp;├── TensorInitializations (Functions for initializing tensors)\
+&emsp;&emsp;│&emsp;&ensp;├── TensorOperations (Tensor implementations of mathematical operations)\
+&emsp;&emsp;│&emsp;&ensp;├── TensorProperties (All tensor class properties)\
+&emsp;&emsp;│&emsp;&ensp;└── TensorUtilities (Various utility functions for tensors)\
+&emsp;&emsp;│\
+&emsp;&emsp;├── Buffers\
+&emsp;&emsp;│&emsp;&ensp;├── FIFOBuffer (Standard First-In First-Out buffer)\
+&emsp;&emsp;│&emsp;&ensp;├── ReplayBuffer (PER buffer for DQN experience replay)\
+&emsp;&emsp;│&emsp;&ensp;└── SumTree (Standard sum tree data structure)\
+&emsp;&emsp;│\
+&emsp;&emsp;├── Costs\
+&emsp;&emsp;│&emsp;&ensp;├── Cost (Base class)\
+&emsp;&emsp;│&emsp;&ensp;├── Huber\
+&emsp;&emsp;│&emsp;&ensp;└── MSE\
+&emsp;&emsp;│\
+&emsp;&emsp;├── Environments (DQN)\
+&emsp;&emsp;│&emsp;&ensp;├── Environment (Base class)\
+&emsp;&emsp;│&emsp;&ensp;├── MovementGrid2D\
+&emsp;&emsp;│&emsp;&ensp;├── Snake\
+&emsp;&emsp;│&emsp;&ensp;└── TicTacToe\
+&emsp;&emsp;│\
+&emsp;&emsp;├── Episodes (Data structures for DQN experience storage)\
+&emsp;&emsp;│&emsp;&ensp;├── Episode (Data structure for a full DQN training episode)\
+&emsp;&emsp;│&emsp;&ensp;└── Experience (Data structure for a single DQN training experience)\
+&emsp;&emsp;│\
+&emsp;&emsp;├── Models\
+&emsp;&emsp;│&emsp;&ensp;├── Layers\
+&emsp;&emsp;│&emsp;&ensp;│&emsp;&ensp;├── Conv (Convolutional)\
+&emsp;&emsp;│&emsp;&ensp;│&emsp;&ensp;├── Dense\
+&emsp;&emsp;│&emsp;&ensp;│&emsp;&ensp;└── Layer (Base class)\
+&emsp;&emsp;│&emsp;&ensp;│\
+&emsp;&emsp;│&emsp;&ensp;└── Model (Full neural network container class)\
+&emsp;&emsp;│\
+&emsp;&emsp;├── Optimizers\
+&emsp;&emsp;│&emsp;&ensp;├── Adam\
+&emsp;&emsp;│&emsp;&ensp;├── Optimizer (Base class)\
+&emsp;&emsp;│&emsp;&ensp;└── SGD\
+&emsp;&emsp;│\
+&emsp;&emsp;├── Trainers\
+&emsp;&emsp;│&emsp;&ensp;├── DQNTrainer\
+&emsp;&emsp;│&emsp;&ensp;└── Trainer (Standard supervised training)\
+&emsp;&emsp;│\
+&emsp;&emsp;└── Utilities\
+&emsp;&emsp;&emsp;&emsp;├── SaveSystem\
+&emsp;&emsp;&emsp;&emsp;│&emsp;&ensp;├── LayerData (JSON serializable class storing data for a single layer)\
+&emsp;&emsp;&emsp;&emsp;│&emsp;&ensp;├── ModelData (JSON serializable class storing data for a single neural network)\
+&emsp;&emsp;&emsp;&emsp;│&emsp;&ensp;└── Saver (Static class for handling model saving/loading)\
+&emsp;&emsp;&emsp;&emsp;│\
+&emsp;&emsp;&emsp;&emsp;├── DemoHandler (Static class for handling demonstrations)\
+&emsp;&emsp;&emsp;&emsp;├── MathUtils\
+&emsp;&emsp;&emsp;&emsp;└── UIUtils
+
 ## Implementation Details
 ### Reverse-mode Autograd
 - Computation graph dynamically constructed and updated during each forward pass
@@ -317,3 +387,4 @@ The framework's equivalent of an autograd engine relies on functionality built d
 - Recursive neural networks
 - More DQN training environments
 - Proximal policy optimization (PPO)
+</div>
