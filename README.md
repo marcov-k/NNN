@@ -55,36 +55,29 @@ public static void GradientTest(Tensor[] inputs, Func<Tensor[], Tensor> testOp, 
     var mean = Tensor.Mean(result);
     mean.Backward();
 
-    for (int i = 0; i < inputs[0].ElementCount; i++)
+    // Calculate relative error for every gradient of each input
+    for (int input = 0; input < inputs.Length; input++)
     {
-        var (aNumerical, bNumerical) = NumericalGradient(inputs, i, loss);
-        double aAnalytical = inputs[0].Grad[i];
-        double bAnalytical = inputs[1].Grad[i];
-        double relError = Math.Abs(aNumerical - aAnalytical) / (Math.Abs(aNumerical) + 1e-8);
-        Console.WriteLine($"a[{i}]: numerical = {aNumerical}, analytical = {aAnalytical}, relError = {relError}");
-        relError = Math.Abs(bNumerical - bAnalytical) / (Math.Abs(bNumerical) + 1e-8);
-        Console.WriteLine($"b[{i}]: numerical = {bNumerical}, analytical = {bAnalytical}, relError = {relError}");
+        for (int e = 0; e < inputs[input].ElementCount; e++)
+        {
+            var numerical = NumericalGradient(inputs, input, e, loss);
+            double analytical = inputs[input].Grad[e];
+            double relError = Math.Abs(numerical - analytical) / (Math.Abs(numerical) + 1e-8);
+            Console.WriteLine($"inputs[{input}][{e}]: numerical = {numerical}, analytical = {analytical}, relError = {relError}");
+        }
     }
 }
 
-static (double aNumerical, double bNumerical) NumericalGradient(Tensor[] inputs, int i, Func<Tensor[], double> loss)
+static double NumericalGradient(Tensor[] inputs, int inputIndex, int e, Func<Tensor[], double> loss)
 {
+    // Estimate gradient via finite difference
     double eps = 1e-8;
-    inputs[0][i] += eps;
+    inputs[inputIndex][e] += eps;
     double lossPlus = loss(inputs);
-    inputs[0][i] -= 2 * eps;
+    inputs[inputIndex][e] -= 2 * eps;
     double lossMinus = loss(inputs);
-    inputs[0][i] += eps;
-    double aNumerical = (lossPlus - lossMinus) / (2 * eps);
-
-    inputs[1][i] += eps;
-    lossPlus = loss(inputs);
-    inputs[1][i] -= 2 * eps;
-    lossMinus = loss(inputs);
-    inputs[1][i] += eps;
-    double bNumerical = (lossPlus - lossMinus) / (2 * eps);
-
-    return (aNumerical, bNumerical);
+    inputs[inputIndex][e] += eps;
+    return (lossPlus - lossMinus) / (2 * eps);
 }
 ```
 
