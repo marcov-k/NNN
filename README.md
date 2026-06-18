@@ -309,10 +309,10 @@ NNN\
 &emsp;&emsp;│&emsp;&ensp;├── Sigmoid\
 &emsp;&emsp;│&emsp;&ensp;└── Tanh\
 &emsp;&emsp;│\
-&emsp;&emsp;├── Autodiff (Automatic differentation and tensor logic)\
+&emsp;&emsp;├── Autodiff (Automatic differentation and tensor logic - implemented via a partial Tensor class)\
 &emsp;&emsp;│&emsp;&ensp;├── TensorActivations (Tensor implementations of activation functions)\
 &emsp;&emsp;│&emsp;&ensp;├── TensorGraph (Functions for handling computation graph)\
-&emsp;&emsp;│&emsp;&ensp;├── TensorIndexing (Functions for handling indexing tensors)\
+&emsp;&emsp;│&emsp;&ensp;├── TensorIndexing (Functions for indexing tensors)\
 &emsp;&emsp;│&emsp;&ensp;├── TensorInitializations (Functions for initializing tensors)\
 &emsp;&emsp;│&emsp;&ensp;├── TensorOperations (Tensor implementations of mathematical operations)\
 &emsp;&emsp;│&emsp;&ensp;├── TensorProperties (All tensor class properties)\
