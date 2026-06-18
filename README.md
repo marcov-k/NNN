@@ -338,7 +338,7 @@ NNN\
 &emsp;&emsp;│&emsp;&ensp;├── Episode (Data structure for a full DQN training episode)\
 &emsp;&emsp;│&emsp;&ensp;└── Experience (Data structure for a single DQN training experience)\
 &emsp;&emsp;│\
-&emsp;&emsp;├── Models\
+&emsp;&emsp;├── Models (Neural network functionality)\
 &emsp;&emsp;│&emsp;&ensp;├── Layers\
 &emsp;&emsp;│&emsp;&ensp;│&emsp;&ensp;├── Conv (Convolutional)\
 &emsp;&emsp;│&emsp;&ensp;│&emsp;&ensp;├── Dense\
