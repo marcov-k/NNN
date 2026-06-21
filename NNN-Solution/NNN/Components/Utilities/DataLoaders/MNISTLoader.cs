@@ -94,7 +94,7 @@ public static class MNISTLoader
 
             for (int p = 0; p < imageBytes; p++)
             {
-                images[i][p] = Extract1ByteInt32(bytes, ref offset);
+                images[i][p] = Extract1ByteInt32(bytes, ref offset) / 255.0; // normalize to range 0-1
             }
         }
 

@@ -16,7 +16,8 @@ public partial class Tensor
     /// <returns>Tensor containing the element-wise sum of the two input tensors.</returns>
     public static Tensor operator +(Tensor a, Tensor b)
     {
-        Tensor result = GetResultTensor(a, a.Dimensions, a.RequiresGrad || b.RequiresGrad);
+        var owner = a.RequiresGrad ? a : b;
+        Tensor result = GetResultTensor(owner, owner.Dimensions, a.RequiresGrad || b.RequiresGrad);
 
         // Vectorize inputs and results
         var aVecs = MemoryMarshal.Cast<double, Vector<double>>(a.Data.AsSpan());
@@ -143,7 +144,8 @@ public partial class Tensor
     /// <returns>Tensor containing the element-wise difference of the two input tensors.</returns>
     public static Tensor operator -(Tensor a, Tensor b)
     {
-        Tensor result = GetResultTensor(a, a.Dimensions, a.RequiresGrad || b.RequiresGrad);
+        var owner = a.RequiresGrad ? a : b;
+        Tensor result = GetResultTensor(owner, owner.Dimensions, a.RequiresGrad || b.RequiresGrad);
 
         // Vectorize inputs and results
         var aVecs = MemoryMarshal.Cast<double, Vector<double>>(a.Data.AsSpan());
@@ -320,7 +322,8 @@ public partial class Tensor
     /// <returns>Tensor containing the element-wise product of the two input tensors.</returns>
     public static Tensor operator *(Tensor a, Tensor b)
     {
-        Tensor result = GetResultTensor(a, a.Dimensions, a.RequiresGrad || b.RequiresGrad);
+        var owner = a.RequiresGrad ? a : b;
+        Tensor result = GetResultTensor(owner, owner.Dimensions, a.RequiresGrad || b.RequiresGrad);
 
         // Vectorize inputs and results
         var aVecs = MemoryMarshal.Cast<double, Vector<double>>(a.Data.AsSpan());
@@ -450,7 +453,8 @@ public partial class Tensor
     /// <returns>Tensor containing the element-wise quotient of the two input tensors.</returns>
     public static Tensor operator /(Tensor a, Tensor b)
     {
-        Tensor result = GetResultTensor(a, a.Dimensions, a.RequiresGrad || b.RequiresGrad);
+        var owner = a.RequiresGrad ? a : b;
+        Tensor result = GetResultTensor(owner, owner.Dimensions, a.RequiresGrad || b.RequiresGrad);
 
         // Vectorize inputs and results
         var aVecs = MemoryMarshal.Cast<double, Vector<double>>(a.Data.AsSpan());
@@ -632,7 +636,8 @@ public partial class Tensor
     /// <returns>Tensor containing the element-wise power of the two input tensors.</returns>
     public static Tensor Pow(Tensor a, Tensor exp)
     {
-        Tensor result = GetResultTensor(a, a.Dimensions, a.RequiresGrad || exp.RequiresGrad);
+        var owner = a.RequiresGrad ? a : exp;
+        Tensor result = GetResultTensor(owner, owner.Dimensions, a.RequiresGrad || exp.RequiresGrad);
 
         // Calculate power sequentially - no general exponentiation vectorization available
         for (int i = 0; i < result.ElementCount; i++)
@@ -858,7 +863,8 @@ public partial class Tensor
     /// <returns>Tensor containing the element-wise logarithm of the two input tensors.</returns>
     public static Tensor Log(Tensor logBase, Tensor arg)
     {
-        Tensor result = GetResultTensor(logBase, logBase.Dimensions, logBase.RequiresGrad || arg.RequiresGrad);
+        var owner = logBase.RequiresGrad ? logBase : arg;
+        Tensor result = GetResultTensor(owner, owner.Dimensions, logBase.RequiresGrad || arg.RequiresGrad);
 
         // Vectorize inputs and results
         var lbVecs = MemoryMarshal.Cast<double, Vector<double>>(logBase.Data.AsSpan());
@@ -1073,7 +1079,8 @@ public partial class Tensor
         var resultDims = (int[])a.Dimensions.Clone();
         resultDims[^1] = p;
 
-        Tensor result = GetResultTensor(a, resultDims, a.RequiresGrad || b.RequiresGrad);
+        var owner = a.RequiresGrad ? a : b;
+        Tensor result = GetResultTensor(owner, resultDims, a.RequiresGrad || b.RequiresGrad);
 
         // Calculate matrix multiplication product
         bool useParallel = (long)totalRows * n * p > ParallelThreshold; // whether inputs are large enough to warrant parallelizing (multithreading)
@@ -1380,7 +1387,8 @@ public partial class Tensor
         Array.Copy(outSpatialDims, 0, resultDims, 1, outSpatialDims.Length);
         resultDims[^1] = filterCount;
 
-        var result = GetResultTensor(input, resultDims, input.RequiresGrad || kernels.RequiresGrad || biases.RequiresGrad);
+        var owner = input.RequiresGrad ? input : (kernels.RequiresGrad ? kernels : biases);
+        Tensor result = GetResultTensor(owner, resultDims, input.RequiresGrad || kernels.RequiresGrad || biases.RequiresGrad);
 
         // Calculate convolution result
         bool useParallel = (long)batch * outSpatialSize * filterCount * kernelVolumeSize > ParallelThreshold; // whether the inputs are large enough to warrant parallelizations

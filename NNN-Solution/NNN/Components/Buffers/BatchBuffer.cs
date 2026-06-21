@@ -26,6 +26,14 @@ public class BatchBuffer(Tensor[] data, Tensor[] targets)
     /// Dimensions of an unbatched training target.
     /// </summary>
     readonly int[] TargetDims = targets[0].Dimensions;
+    /// <summary>
+    /// Persistent array of batch input tensors.
+    /// </summary>
+    Tensor[]? BatchInputs = null;
+    /// <summary>
+    /// Persistent array of batch target tensors.
+    /// </summary>
+    Tensor[]? BatchTargets = null;
 
     /// <summary>
     /// Randomly selects a training batch from the full training inputs and targets.
@@ -42,30 +50,119 @@ public class BatchBuffer(Tensor[] data, Tensor[] targets)
         batchDims[0] = batchSize;
         Array.Copy(DataDims, 0, batchDims, 1, DataDims.Length);
 
-        Tensor batchInputs = new(batchDims);
+        // Compute batched target tensor dimensions
+        var targetDims = new int[Targets[0].Rank + 1];
+        targetDims[0] = batchSize;
+        Array.Copy(TargetDims, 0, targetDims, 1, TargetDims.Length);
+
+        // Allocate persistent batch arrays if not yet allocated
+        if (BatchInputs is null)
+        {
+            BatchInputs = new Tensor[1];
+            BatchInputs[0] = new(batchDims);
+        }
+        if (BatchTargets is null)
+        {
+            BatchTargets = new Tensor[1];
+            BatchTargets[0] = new(targetDims);
+        }
 
         // Fill batched input tensor with randomly selected inputs
         int itemLength = Data[0].ElementCount;
         var batchItems = ArrayUtils.GetRandomElements(Data, batchSize);
         for (int i = 0; i < batchSize; i++)
         {
-            Array.Copy(batchItems[i].Element.Data, 0, batchInputs.Data, i * itemLength, itemLength);
+            Array.Copy(batchItems[i].Element.Data, 0, BatchInputs[0].Data, i * itemLength, itemLength);
         }
-
-        // Compute batched target tensor dimensions
-        var targetDims = new int[Targets[0].Rank + 1];
-        targetDims[0] = batchSize;
-        Array.Copy(TargetDims, 0, targetDims, 1, TargetDims.Length);
-
-        Tensor batchTargets = new(targetDims);
 
         // Fill batched target tensor with targets corresponding to selected inputs
         int targetLength = Targets[0].ElementCount;
         for (int i = 0; i < batchSize; i++)
         {
-            Array.Copy(Targets[batchItems[i].OriginalIndex].Data, 0, batchTargets.Data, i * targetLength, targetLength);
+            Array.Copy(Targets[batchItems[i].OriginalIndex].Data, 0, BatchTargets[0].Data, i * targetLength, targetLength);
         }
 
-        return (batchInputs, batchTargets);
+        return (BatchInputs[0], BatchTargets[0]);
+    }
+
+    public (Tensor[] BatchInputs, Tensor[] BatchTargets) GetBatches(int batchSize)
+    {
+        if (batchSize <= 0 || batchSize > Data.Length) throw new ArgumentOutOfRangeException(nameof(batchSize), "Batch size out of range.");
+
+        var shuffledData = ArrayUtils.GetRandomElements(Data, Data.Length);
+        var shuffledTargets = new Tensor[shuffledData.Length];
+        for (int i = 0; i < shuffledData.Length; i++)
+        {
+            shuffledTargets[i] = Targets[shuffledData[i].OriginalIndex];
+        }
+
+        var batchInputDims = new int[Data[0].Rank + 1];
+        batchInputDims[0] = batchSize;
+        Array.Copy(DataDims, 0, batchInputDims, 1, DataDims.Length);
+
+        var batchTargetDims = new int[Targets[0].Rank + 1];
+        batchTargetDims[0] = batchSize;
+        Array.Copy(TargetDims, 0, batchTargetDims, 1, TargetDims.Length);
+
+        int fullBatchCount = Data.Length / batchSize;
+        int tailBatchLength = Data.Length % batchSize;
+        int batchCount = tailBatchLength > 0 ? fullBatchCount + 1 : fullBatchCount;
+
+        var tailBatchInputDims = new int[batchInputDims.Length];
+        tailBatchInputDims[0] = tailBatchLength;
+        Array.Copy(DataDims, 0, tailBatchInputDims, 1, DataDims.Length);
+
+        var tailBatchTargetDims = new int[batchTargetDims.Length];
+        tailBatchTargetDims[0] = tailBatchLength;
+        Array.Copy(TargetDims, 0, tailBatchTargetDims, 1, TargetDims.Length);
+
+        // Allocate persistent batch arrays if not yet allocated
+        if (BatchInputs is null || BatchInputs.Length < batchCount)
+        {
+            BatchInputs = new Tensor[batchCount];
+            for (int i = 0; i < fullBatchCount; i++)
+            {
+                BatchInputs[i] = new(batchInputDims);
+            }
+            if (tailBatchLength > 0)
+            {
+                BatchInputs[fullBatchCount] = new(tailBatchInputDims);
+            }
+        }
+        if (BatchTargets is null || BatchTargets.Length < batchCount)
+        {
+            BatchTargets = new Tensor[batchCount];
+            for (int i = 0; i < fullBatchCount; i++)
+            {
+                BatchTargets[i] = new(batchTargetDims);
+            }
+            if (tailBatchLength > 0)
+            {
+                BatchTargets[fullBatchCount] = new(tailBatchTargetDims);
+            }
+        }
+
+        int itemLength = Data[0].ElementCount;
+        int targetLength = Targets[0].ElementCount;
+        for (int b = 0; b < fullBatchCount; b++)
+        {
+            int batchOffset = b * batchSize;
+            for (int i = 0; i < batchSize; i++)
+            {
+                Array.Copy(shuffledData[batchOffset + i].Element.Data, 0, BatchInputs[b].Data, i * itemLength, itemLength);
+                Array.Copy(shuffledTargets[batchOffset + i].Data, 0, BatchTargets[b].Data, i * targetLength, targetLength);
+            }
+        }
+        if (tailBatchLength > 0)
+        {
+            int batchOffset = fullBatchCount * batchSize;
+            for (int i = 0; i < tailBatchLength; i++)
+            {
+                Array.Copy(shuffledData[batchOffset + i].Element.Data, 0, BatchInputs[fullBatchCount].Data, i * itemLength, itemLength);
+                Array.Copy(shuffledTargets[batchOffset + i].Data, 0, BatchTargets[fullBatchCount].Data, i * targetLength, targetLength);
+            }
+        }
+
+        return (BatchInputs, BatchTargets);
     }
 }

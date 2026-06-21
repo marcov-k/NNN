@@ -35,43 +35,59 @@ public class Trainer(Model model, Optimizer optimizer, Cost cost)
     /// <param name="inputs">Tensor representing the input values of the dataset.</param>
     /// <param name="targets">Tensor representing the target outputs of the dataset.</param>
     /// <param name="epochs">Number of epochs to train for.</param>
-    public void Train(BatchBuffer batchBuffer, int batchSize, int epochs, Func<Model, bool>? testFunc = null,
-        int testEvery = 100, int testLength = 1000)
+    public void Train(BatchBuffer batchBuffer, int batchSize, int epochs, bool batchAllInputs = true,
+        Func<Model, int, bool>? testFunc = null, int testEvery = 100, int testLength = 1000)
     {
         Stopwatch totalTimer = new();
         Stopwatch epochTimer = new();
         TimeSpan avgElapsed = new(0);
 
-        Tensor inputs;
-        Tensor targets;
+        Tensor[] inputs = new Tensor[1];
+        Tensor[] targets = new Tensor[1];
         Tensor predictions;
         Tensor loss;
+
+        double totalLoss;
 
         // Train for the given number of epochs
         totalTimer.Start();
         epochTimer.Start();
         for (int e = 0; e < epochs; e++)
         {
-            (inputs, targets) = batchBuffer.GetBatch(batchSize);
+            totalLoss = 0.0;
 
-            predictions = Model.Forward(inputs);
-            loss = Cost.CalculateCost(predictions, targets);
-            loss.Backward();
-
-            foreach (var param in Model.Parameters)
+            if (batchAllInputs)
             {
-                Optimizer.Step(param, epochs);
+                (inputs, targets) = batchBuffer.GetBatches(batchSize);
+            }
+            else
+            {
+                (inputs[0], targets[0]) = batchBuffer.GetBatch(batchSize);
+            }
+
+            for (int i = 0; i < inputs.Length; i++)
+            {
+                predictions = Model.Forward(inputs[i]);
+                loss = Cost.CalculateCost(predictions, targets[i]);
+                totalLoss += loss[0];
+                loss.Backward();
+
+                foreach (var param in Model.Parameters)
+                {
+                    Optimizer.Step(param, epochs);
+                }
             }
 
             var elapsed = epochTimer.Elapsed;
             avgElapsed += (elapsed - avgElapsed) / (e + 1);
+            epochTimer.Restart();
 
             // Log diagnostic data to the console
             if ((e + 1) % testEvery == 0 || (e + 1) == epochs)
             {
                 var eta = avgElapsed * (epochs - e - 1);
                 Console.WriteLine($"\n\nEpochs completed: {e + 1}/{epochs}");
-                Console.WriteLine($"Loss for last epoch: {loss[0]:F3}");
+                Console.WriteLine($"Average loss for last epoch: {(totalLoss / inputs.Length):F3}");
                 Console.WriteLine($"Epoch duration: {MathUtils.RoundToMS(elapsed)}");
                 Console.WriteLine($"\nAverage time per epoch: {MathUtils.RoundToMS(avgElapsed)}");
                 Console.WriteLine($"Estimated time remaining: {MathUtils.RoundToMS(eta)}");
@@ -81,14 +97,12 @@ public class Trainer(Model model, Optimizer optimizer, Cost cost)
                     int successes = 0;
                     for (int i = 0; i < testLength; i++)
                     {
-                        if (testFunc(Model)) successes++;
+                        if (testFunc(Model, i)) successes++;
                     }
                     double successPercent = ((double)successes / testLength) * 100.0;
                     Console.WriteLine($"Model success percentage: {successPercent:F2}%");
                 }
             }
-
-            epochTimer.Restart();
         }
 
         totalTimer.Stop();

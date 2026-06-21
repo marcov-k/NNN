@@ -14,69 +14,40 @@ using NNN.Components.Utilities.SaveSystem;
 using static NNN.Components.Utilities.UIUtils;
 
 bool demoMode = false;
+bool dqnMode = false;
 
-Model model;
-NNN.Components.Environments.Environment env = new TicTacToe();
-double exploration = 1.0;
-double explorationDecay = 0.9995;
-double minExploration = 0.01;
-int trainEvery = 1;
-double discount = 0.99;
-Optimizer optimizer = new Adam(0.001);
-Cost cost = new Huber();
-int replayBufferSize = 10000;
-int batchSize = 128;
-int agentBufferSize = 2;
-int opponentCopyRate = 600;
-int minRandomOpponentEpisodes = 600;
-double tau = 0.01;
-double maxGradNorm = 1.0;
-int minExperiences = 2000;
-int episodeMemorySize = 100;
-int testEpisodes = 5000;
-DQNTrainer dqnTrainer;
-FIFOBuffer<Episode> episodeBuffer = new(episodeMemorySize);
-
-Model mnistModel = new([
-    new Conv(8, [5, 5], new LeakyReLU()),
-    new Conv(16, [5, 5], new LeakyReLU()),
-    new Dense(128, new LeakyReLU()),
-    new Dense(10, new Linear())
-    ], new([1, 28, 28, 1]));
-Optimizer mnistOptimizer = new Adam(0.01);
-Cost mnistCost = new SoftmaxCrossEntropy();
-Trainer mnistTrainer = new(mnistModel, mnistOptimizer, mnistCost);
-
-Console.WriteLine("Loading MNIST dataset...");
-var (trainImages, trainLabels) = MNISTLoader.GetTrainingData();
-var (testImages, testLabels) = MNISTLoader.GetTestData();
-Console.WriteLine("MNIST dataset loaded");
-
-Func<Model, bool> testFunc = (model) =>
-{
-    int testIndex = Random.Shared.Next(testImages.Length);
-    var predicts = model.Predict(Tensor.WrapBatch(testImages[testIndex]));
-    return Tensor.ArgMax(predicts) == Tensor.ArgMax(testLabels[testIndex]);
-};
-
-BatchBuffer batchBuffer = new(trainImages, trainLabels);
-
-Console.WriteLine("Starting model training...");
-mnistTrainer.Train(batchBuffer, 32, 1000, testFunc, testEvery: 10, testLength: 100);
-
-Console.WriteLine("Press any key to close...");
-Console.ReadKey();
-
-/*
 if (demoMode) DemoHandler.RunDemo();
-else InteractionLoop();
-*/
+else if (dqnMode) DQNTraining();
+else StandardTraining();
+
 
 #pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
 #pragma warning disable CS8602 // Dereference of a possibly null reference.
-// Primary loop for model training UI - entry point
-void InteractionLoop()
+// Primary loop for DQN model training UI - entry point
+void DQNTraining()
 {
+    Model model;
+    NNN.Components.Environments.Environment env = new TicTacToe();
+    double exploration = 1.0;
+    double explorationDecay = 0.9995;
+    double minExploration = 0.01;
+    int trainEvery = 1;
+    double discount = 0.99;
+    Optimizer optimizer = new Adam(0.001);
+    Cost cost = new Huber();
+    int replayBufferSize = 10000;
+    int batchSize = 128;
+    int agentBufferSize = 2;
+    int opponentCopyRate = 600;
+    int minRandomOpponentEpisodes = 600;
+    double tau = 0.01;
+    double maxGradNorm = 1.0;
+    int minExperiences = 2000;
+    int episodeMemorySize = 100;
+    int testEpisodes = 5000;
+    DQNTrainer dqnTrainer;
+    FIFOBuffer<Episode> episodeBuffer = new(episodeMemorySize);
+
     Console.WriteLine("Welcome to the DQN Training Terminal (Enter Q to quit)");
 
     if (GetInput("Load model from file? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
@@ -117,7 +88,7 @@ void InteractionLoop()
         minExperiences: minExperiences
     );
 
-    TrainingLoop();
+    DQNTrainingLoop(dqnTrainer, env, model, ref episodeBuffer, testEpisodes);
 
     if (GetInput("Save model to a file? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
     {
@@ -129,8 +100,72 @@ void InteractionLoop()
     System.Environment.Exit(0);
 }
 
-// UI loop for training models for a specified number of episodes
-void TrainingLoop()
+// Primary loop for standard supervised model training UI - entry point
+void StandardTraining()
+{
+    Console.WriteLine("Loading MNIST dataset...");
+    var (trainImages, trainLabels) = MNISTLoader.GetTrainingData();
+    var (testImages, testLabels) = MNISTLoader.GetTestData();
+    Console.WriteLine("MNIST dataset loaded");
+
+    Model model;
+    if (GetInput("Load model from file? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
+    {
+        // Load model from file
+        string fileName = GetFileName();
+        model = Saver.LoadModel(fileName);
+    }
+    else
+    {
+        model = new([
+            new Conv(8, [5, 5], new LeakyReLU()),
+            new Conv(16, [5, 5], new LeakyReLU()),
+            new Dense(128, new LeakyReLU()),
+            new Dense(10, new Linear())
+        ], new([1, 28, 28, 1]));
+    }
+
+    Optimizer optimizer = new Adam(0.01);
+    Cost cost = new SoftmaxCrossEntropy();
+    Trainer trainer = new(model, optimizer, cost);
+
+    var wrappedImages = new Tensor[testImages.Length];
+    for (int i = 0; i < testImages.Length; i++)
+    {
+        wrappedImages[i] = Tensor.WrapBatch(testImages[i]);
+    }
+
+    Func<Model, int, bool> testFunc = (model, i) =>
+    {
+        var predicts = model.Predict(wrappedImages[i]);
+        return Tensor.ArgMax(predicts) == Tensor.ArgMax(testLabels[i]);
+    };
+
+    BatchBuffer batchBuffer = new(trainImages, trainLabels);
+    int batchSize = 128;
+    int testLength = testLabels.Length;
+
+    StandardTrainingLoop(trainer, batchBuffer, batchSize, testFunc, testLength);
+
+    bool testing = GetInput("View MNIST prediction? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes];
+    while (testing)
+    {
+        TestMNIST(testImages, wrappedImages, testLabels, model);
+        testing = GetInput("View another MNIST prediction? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes];
+    }
+
+    if (GetInput("Save model to a file? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
+    {
+        SaveLoop(model);
+    }
+
+    Console.WriteLine("\nPress any key to close...");
+    Console.ReadKey();
+}
+
+// UI loop for training DQN models for a specified number of episodes
+void DQNTrainingLoop(DQNTrainer dqnTrainer, NNN.Components.Environments.Environment env, Model model,
+    ref FIFOBuffer<Episode> episodeBuffer, int testEpisodes)
 {
     // Train agent until user indicates to stop
     while (true)
@@ -141,7 +176,7 @@ void TrainingLoop()
             int episodes = GetInteger("Enter number of episodes to train");
             int testEvery = GetInteger("Enter episodes per training progress test");
             Console.WriteLine($"\n\nTraining for {episodes} episodes...");
-            dqnTrainer.Train(ref episodeBuffer, episodes, testEvery, testEpisodes);
+            dqnTrainer.Train(ref episodeBuffer!, episodes, testEvery, testEpisodes);
 
             if (env is TicTacToe ticTacToe && GetInput("Play against model? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
             {
@@ -153,14 +188,31 @@ void TrainingLoop()
                 snake.Play(model);
             }
 
-            ViewEpisodes();
+            ViewEpisodes(env, ref episodeBuffer);
+        }
+        else break;
+    }
+}
+
+// UI loop for training standard supervised models for a specified number of epochs
+void StandardTrainingLoop(Trainer trainer, BatchBuffer batchBuffer, int batchSize, Func<Model, int, bool> testFunc, int testLength)
+{
+    // Train model until user indicates to stop
+    while (true)
+    {
+        if (GetInput("Run supervised training epochs? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
+        {
+            int epochs = GetInteger("Enter number of epochs to train");
+            int testEvery = GetInteger("Enter epochs per training progress test");
+            Console.WriteLine($"\n\nTraining for {epochs} epochs...");
+            trainer.Train(batchBuffer, batchSize, epochs, batchAllInputs: true, testFunc, testEvery, testLength);
         }
         else break;
     }
 }
 
 // UI loop for viewing and navigating through past training episodes
-void ViewEpisodes()
+void ViewEpisodes(NNN.Components.Environments.Environment env, ref FIFOBuffer<Episode> episodeBuffer)
 {
     if (GetInput("Replay past episodes? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
     {
@@ -201,6 +253,18 @@ void ViewEpisodes()
             if (GetInput("View another episode? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.No]) break;
         }
     }
+}
+
+void TestMNIST(Tensor[] testImages, Tensor[] wrappedImages, Tensor[] testLabels, Model model)
+{
+    int index = Random.Shared.Next(wrappedImages.Length);
+    var image = testImages[index];
+    var wrappedImage = wrappedImages[index];
+    var label = testLabels[index];
+
+    int predictLabel = Tensor.ArgMax(model.Predict(wrappedImage));
+    DrawMNISTImage(image, label, 0.5);
+    Console.WriteLine($"Model prediction: {predictLabel}");
 }
 
 #pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.

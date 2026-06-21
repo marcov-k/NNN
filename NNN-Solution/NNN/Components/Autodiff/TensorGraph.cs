@@ -26,7 +26,7 @@ public partial class Tensor
     /// </summary>
     public static void BeginForward()
     {
-        if (!Inference) _forwardGen++;
+        _forwardGen++;
     }
 
     /// <summary>
