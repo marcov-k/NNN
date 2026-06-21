@@ -1,4 +1,5 @@
-﻿using NNN.Components.Buffers;
+﻿using NNN.Components.Autodiff;
+using NNN.Components.Buffers;
 using NNN.Components.Episodes;
 using NNN.Components.Models;
 using NNN.Components.Utilities.SaveSystem;
@@ -116,8 +117,28 @@ public static class UIUtils
             Console.WriteLine($"\n{prompt}");
             input = Console.ReadLine()?.ToLowerInvariant() ?? string.Empty;
 
-            if (input == userInputs[UserInput.Quit]) System.Environment.Exit(0); // terminate the program if the user chooses to quit
+            if (input == userInputs[UserInput.Quit]) Environment.Exit(0); // terminate the program if the user chooses to quit
             else if (options.Count == 0 || options.Contains(input)) return input; // return input if valid or no valid inputs given
         }
+    }
+
+    /// <summary>
+    /// Draws a MNIST dataset image in the console.
+    /// </summary>
+    /// <param name="image">Image data to draw.</param>
+    /// <param name="label">Label of the image.</param>
+    /// <param name="renderThreshold">Opacity threshold to draw a pixel at.</param>
+    public static void DrawMNISTImage(Tensor image, Tensor label, double renderThreshold)
+    {
+        for (int row = 0; row < image.Dimensions[0]; row++)
+        {
+            for (int col = 0; col < image.Dimensions[1]; col++)
+            {
+                Console.Write(image[row, col] > renderThreshold ? "@" : " ");
+            }
+
+            Console.WriteLine();
+        }
+        Console.WriteLine($"Label: {Tensor.ArgMax(label)}");
     }
 }

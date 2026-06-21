@@ -236,11 +236,11 @@ public class DQNTrainer(Model agent, Environments.Environment environment, Optim
             // Calculate diagnostic data
             var elapsed = stopwatch.Elapsed;
             avgElapsed += (elapsed - avgElapsed) / (e + 1);
-            var eta = avgElapsed * (episodes - e - 1);
 
             // Log episode diagnostics in the console
             if ((e + 1) % testEvery == 0 || (e + 1) == episodes)
             {
+                var eta = avgElapsed * (episodes - e - 1);
                 Console.WriteLine($"\n\nEpisodes completed: {e + 1}/{episodes}");
                 Console.WriteLine($"Total reward for last episode: {totalReward:F2},");
                 Console.WriteLine($"Average loss for last episode: {(totalLoss / trainSteps):F3}");

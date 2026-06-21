@@ -127,6 +127,124 @@ public partial class Tensor
         return result;
     }
 
+    public static Tensor SoftmaxCrossEntropy(Tensor t, Tensor target)
+    {
+        int classes = t.Dimensions[^1];
+        int batchSize = t.ElementCount / classes;
+
+        var result = GetResultTensor(t, [batchSize, 1], t.RequiresGrad);
+
+        var probs = new double[t.ElementCount];
+
+        for (int b = 0; b < batchSize; b++)
+        {
+            int offset = b * classes;
+
+            var tSlice = t.Data.AsSpan(offset, classes);
+            var tVecs = MemoryMarshal.Cast<double, Vector<double>>(tSlice);
+
+            var vmax = new Vector<double>(double.MinValue);
+            for (int i = 0; i < tVecs.Length; i++)
+            {
+                vmax = Vector.Max(vmax, tVecs[i]);
+            }
+
+            double max = double.MinValue;
+            for (int lane = 0; lane < VectorSize; lane++)
+            {
+                max = Math.Max(max, vmax[lane]);
+            }
+
+            for (int i = tVecs.Length * VectorSize; i < classes; i++)
+            {
+                max = Math.Max(max, tSlice[i]);
+            }
+
+            var pSlice = probs.AsSpan(offset, classes);
+            var pVecs = MemoryMarshal.Cast<double, Vector<double>>(pSlice);
+
+            var vmaxSplat = new Vector<double>(max);
+            var acc = Vector<double>.Zero;
+            for (int i = 0; i < tVecs.Length; i++)
+            {
+                pVecs[i] = Vector.Exp(tVecs[i] - vmaxSplat);
+                acc += pVecs[i];
+            }
+            double sumExp = Vector.Sum(acc);
+
+            for (int i = tVecs.Length * VectorSize; i < classes; i++)
+            {
+                pSlice[i] = Math.Exp(tSlice[i] - max);
+                sumExp += pSlice[i];
+            }
+
+            double logSumExp = Math.Log(sumExp) + max;
+
+            var vsumSplat = new Vector<double>(sumExp);
+            for (int i = 0; i < pVecs.Length; i++)
+            {
+                pVecs[i] /= vsumSplat;
+            }
+
+            for (int i = pVecs.Length * VectorSize; i < classes; i++)
+            {
+                pSlice[i] /= sumExp;
+            }
+
+            var gSlice = target.Data.AsSpan(offset, classes);
+            var gVecs = MemoryMarshal.Cast<double, Vector<double>>(gSlice);
+            var vdot = Vector<double>.Zero;
+            for (int i = 0; i < tVecs.Length; i++)
+            {
+                vdot += gVecs[i] * tVecs[i];
+            }
+            double dot = Vector.Sum(vdot);
+
+            for (int i = tVecs.Length * VectorSize; i < classes; i++)
+            {
+                dot += gSlice[i] * tSlice[i];
+            }
+
+            result[b] = logSumExp - dot;
+        }
+
+        if (!Inference)
+        {
+            result._parents.AddRange(t);
+
+            result._backward = () =>
+            {
+                if (!t.RequiresGrad) return;
+
+                for (int b = 0; b < batchSize; b++)
+                {
+                    int offset = b * classes;
+                    double rg = result.Grad[b];
+                    var vrg = new Vector<double>(rg);
+
+                    var pSlice = probs.AsSpan(offset, classes);
+                    var pVecs = MemoryMarshal.Cast<double, Vector<double>>(pSlice);
+                    var gSlice = target.Data.AsSpan(offset, classes);
+                    var gVecs = MemoryMarshal.Cast<double, Vector<double>>(gSlice);
+                    var tgSlice = t.Grad.AsSpan(offset, classes);
+                    var tgVecs = MemoryMarshal.Cast<double, Vector<double>>(tgSlice);
+
+                    for (int i = 0; i < pVecs.Length; i++)
+                    {
+                        tgVecs[i] += (pVecs[i] - gVecs[i]) * vrg;
+                    }
+
+                    for (int i = pVecs.Length * VectorSize; i < classes; i++)
+                    {
+                        tgSlice[i] += (pSlice[i] - gSlice[i]) * rg;
+                    }
+                }
+            };
+        }
+
+        return result;
+    }
+
     /// <summary>
     /// Masks predicted Q-Values based on action selected per experience.
     /// </summary>

@@ -1,4 +1,5 @@
 ﻿using NNN.Components.Activations;
+using NNN.Components.Autodiff;
 using NNN.Components.Buffers;
 using NNN.Components.Costs;
 using NNN.Components.Environments;
@@ -8,6 +9,7 @@ using NNN.Components.Models.Layers;
 using NNN.Components.Optimizers;
 using NNN.Components.Trainers;
 using NNN.Components.Utilities;
+using NNN.Components.Utilities.DataLoaders;
 using NNN.Components.Utilities.SaveSystem;
 using static NNN.Components.Utilities.UIUtils;
 
@@ -35,8 +37,40 @@ int testEpisodes = 5000;
 DQNTrainer dqnTrainer;
 FIFOBuffer<Episode> episodeBuffer = new(episodeMemorySize);
 
+Model mnistModel = new([
+    new Conv(8, [5, 5], new LeakyReLU()),
+    new Conv(16, [5, 5], new LeakyReLU()),
+    new Dense(128, new LeakyReLU()),
+    new Dense(10, new Linear())
+    ], new([1, 28, 28, 1]));
+Optimizer mnistOptimizer = new Adam(0.01);
+Cost mnistCost = new SoftmaxCrossEntropy();
+Trainer mnistTrainer = new(mnistModel, mnistOptimizer, mnistCost);
+
+Console.WriteLine("Loading MNIST dataset...");
+var (trainImages, trainLabels) = MNISTLoader.GetTrainingData();
+var (testImages, testLabels) = MNISTLoader.GetTestData();
+Console.WriteLine("MNIST dataset loaded");
+
+Func<Model, bool> testFunc = (model) =>
+{
+    int testIndex = Random.Shared.Next(testImages.Length);
+    var predicts = model.Predict(Tensor.WrapBatch(testImages[testIndex]));
+    return Tensor.ArgMax(predicts) == Tensor.ArgMax(testLabels[testIndex]);
+};
+
+BatchBuffer batchBuffer = new(trainImages, trainLabels);
+
+Console.WriteLine("Starting model training...");
+mnistTrainer.Train(batchBuffer, 32, 1000, testFunc, testEvery: 10, testLength: 100);
+
+Console.WriteLine("Press any key to close...");
+Console.ReadKey();
+
+/*
 if (demoMode) DemoHandler.RunDemo();
 else InteractionLoop();
+*/
 
 #pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
 #pragma warning disable CS8602 // Dereference of a possibly null reference.
