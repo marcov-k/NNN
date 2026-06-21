@@ -14,7 +14,7 @@ namespace NNN.Components.Trainers;
 /// <param name="model">Model to be trained.</param>
 /// <param name="optimizer">Optimizer to use for parameter updates.</param>
 /// <param name="cost">Cost function to use for loss calculation.</param>
-public class Trainer(Model model, Optimizer optimizer, Cost cost)
+public class Trainer(Model model, Optimizer optimizer, Cost cost, double maxGradNorm = 1.0)
 {
     /// <summary>
     /// Model being trained.
@@ -28,6 +28,10 @@ public class Trainer(Model model, Optimizer optimizer, Cost cost)
     /// Cost function being used for loss calculation.
     /// </summary>
     readonly Cost Cost = cost;
+    /// <summary>
+    /// Maximum magnitude of gradients without normalization.
+    /// </summary>
+    readonly double MaxGradNorm = maxGradNorm;
 
     /// <summary>
     /// Trains the model for the given number of epochs using the given dataset.
@@ -65,6 +69,7 @@ public class Trainer(Model model, Optimizer optimizer, Cost cost)
         }
 
         // Train for the given number of epochs
+        int optimizerStep = 0;
         for (int e = 0; e < epochs; e++)
         {
             totalLoss = 0.0;
@@ -84,10 +89,18 @@ public class Trainer(Model model, Optimizer optimizer, Cost cost)
                 loss = Cost.CalculateCost(predictions, targets[i]);
                 totalLoss += loss[0];
                 loss.Backward();
+                Model.ClipGradients(MaxGradNorm);
 
                 foreach (var param in Model.Parameters)
                 {
-                    Optimizer.Step(param, epochs);
+                    Console.WriteLine($"Parameter before test: value = {param.Data[0]}, {param.Data[1]}, {param.Data[2]}, grad = {param.Grad[0]}, {param.Grad[1]}, {param.Grad[2]}");
+                }
+                Console.WriteLine();
+
+                foreach (var param in Model.Parameters)
+                {
+                    Optimizer.Step(param, optimizerStep);
+                    optimizerStep++;
                 }
             }
 
@@ -114,6 +127,10 @@ public class Trainer(Model model, Optimizer optimizer, Cost cost)
                     }
                     double successPercent = ((double)successes / testLength) * 100.0;
                     Console.WriteLine($"Model success percentage: {successPercent:F2}%");
+                }
+                foreach (var param in Model.Parameters)
+                {
+                    Console.WriteLine($"Parameter after test: value = {param.Data[0]}, grad = {param.Grad[0]}");
                 }
             }
         }

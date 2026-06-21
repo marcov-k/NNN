@@ -416,7 +416,7 @@ public partial class Tensor
             // Copy input tensor data into result tensor
             for (int i = 0; i < result.ElementCount; i++)
             {
-                result.GetFullIndices(i);
+                result.GetFullIndices(i, indices);
                 indices[^t.Rank..].CopyTo(srcIndices);
                 result[i] = t[t.LinearIndex(srcIndices)];
             }

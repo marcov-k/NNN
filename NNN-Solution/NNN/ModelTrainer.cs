@@ -125,9 +125,10 @@ void StandardTraining()
         ], new([1, 28, 28, 1]));
     }
 
-    Optimizer optimizer = new Adam(0.01);
+    Optimizer optimizer = new Adam(0.001);
+    double maxGradNorm = 0.5;
     Cost cost = new SoftmaxCrossEntropy();
-    Trainer trainer = new(model, optimizer, cost);
+    Trainer trainer = new(model, optimizer, cost, maxGradNorm);
 
     var wrappedImages = new Tensor[testImages.Length];
     for (int i = 0; i < testImages.Length; i++)
