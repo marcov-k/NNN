@@ -11,7 +11,7 @@ A neural network framework created from scratch in C# implementing automatic dif
 - Dynamic computation graph reused across forward passes
 - Dense and convolutional layers
 - Standard activation functions (Sigmoid, Tanh, ReLU, etc.)
-- Standard loss functions (MSE, pseudo-Huber Loss)
+- Standard loss functions (MSE, pseudo-Huber Loss, Softmax Cross-Entropy)
 - Standard optimizers (SGD, Adam)
 - Performance optimizations via SIMD vectorization and parallelization
 
@@ -320,7 +320,8 @@ NNN\
 &emsp;&emsp;├── Costs\
 &emsp;&emsp;│&emsp;&ensp;├── Cost (Base class)\
 &emsp;&emsp;│&emsp;&ensp;├── Huber\
-&emsp;&emsp;│&emsp;&ensp;└── MSE\
+&emsp;&emsp;│&emsp;&ensp;├── MSE\
+&emsp;&emsp;│&emsp;&ensp;└── Softmax Cross-Entropy\
 &emsp;&emsp;│\
 &emsp;&emsp;├── Environments (DQN)\
 &emsp;&emsp;│&emsp;&ensp;├── Environment (Base class)\
