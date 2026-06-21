@@ -191,6 +191,10 @@ public class DQNTrainer(Model agent, Environments.Environment environment, Optim
         Stopwatch stopwatch = new();
         totalStopwatch.Start();
         stopwatch.Start();
+
+        // Test initial agent performance
+        Environment.TestTrainingProgress(Agent, testEpisodes);
+
         for (int e = 0; e < episodes; e++)
         {
             // Freeze new opponent agent for self-play every OpponentCopyRate episodes

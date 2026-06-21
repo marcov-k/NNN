@@ -49,9 +49,22 @@ public class Trainer(Model model, Optimizer optimizer, Cost cost)
 
         double totalLoss;
 
-        // Train for the given number of epochs
         totalTimer.Start();
         epochTimer.Start();
+
+        if (testFunc is not null)
+        {
+            Console.WriteLine($"\nEvaluating initial model performance...");
+            int successes = 0;
+            for (int i = 0; i < testLength; i++)
+            {
+                if (testFunc(Model, i)) successes++;
+            }
+            double successPercent = ((double)successes / testLength) * 100.0;
+            Console.WriteLine($"Model success percentage: {successPercent:F2}%");
+        }
+
+        // Train for the given number of epochs
         for (int e = 0; e < epochs; e++)
         {
             totalLoss = 0.0;
