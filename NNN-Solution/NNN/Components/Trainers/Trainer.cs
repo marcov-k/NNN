@@ -93,12 +93,6 @@ public class Trainer(Model model, Optimizer optimizer, Cost cost, double maxGrad
 
                 foreach (var param in Model.Parameters)
                 {
-                    Console.WriteLine($"Parameter before test: value = {param.Data[0]}, {param.Data[1]}, {param.Data[2]}, grad = {param.Grad[0]}, {param.Grad[1]}, {param.Grad[2]}");
-                }
-                Console.WriteLine();
-
-                foreach (var param in Model.Parameters)
-                {
                     Optimizer.Step(param, optimizerStep);
                     optimizerStep++;
                 }
@@ -127,10 +121,6 @@ public class Trainer(Model model, Optimizer optimizer, Cost cost, double maxGrad
                     }
                     double successPercent = ((double)successes / testLength) * 100.0;
                     Console.WriteLine($"Model success percentage: {successPercent:F2}%");
-                }
-                foreach (var param in Model.Parameters)
-                {
-                    Console.WriteLine($"Parameter after test: value = {param.Data[0]}, grad = {param.Grad[0]}");
                 }
             }
         }

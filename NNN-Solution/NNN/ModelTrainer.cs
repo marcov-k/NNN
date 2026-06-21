@@ -108,6 +108,7 @@ void StandardTraining()
     var (testImages, testLabels) = MNISTLoader.GetTestData();
     Console.WriteLine("MNIST dataset loaded");
 
+    double tau = 0.05;
     Model model;
     if (GetInput("Load model from file? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
     {
@@ -118,9 +119,9 @@ void StandardTraining()
     else
     {
         model = new([
-            new Conv(8, [5, 5], new LeakyReLU()),
-            new Conv(16, [5, 5], new LeakyReLU()),
-            new Dense(128, new LeakyReLU()),
+            new Conv(8, [5, 5], new LeakyReLU(tau)),
+            new Conv(16, [5, 5], new LeakyReLU(tau)),
+            new Dense(128, new LeakyReLU(tau)),
             new Dense(10, new Linear())
         ], new([1, 28, 28, 1]));
     }
