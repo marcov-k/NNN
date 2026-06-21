@@ -312,6 +312,7 @@ NNN\
 &emsp;&emsp;│&emsp;&ensp;└── TensorUtilities (Various utility functions for tensors)\
 &emsp;&emsp;│\
 &emsp;&emsp;├── Buffers\
+&emsp;&emsp;│&emsp;&ensp;├── BatchBuffer (Standard supervised training buffer)\
 &emsp;&emsp;│&emsp;&ensp;├── FIFOBuffer (Standard First-In First-Out buffer)\
 &emsp;&emsp;│&emsp;&ensp;├── ReplayBuffer (PER buffer for DQN experience replay)\
 &emsp;&emsp;│&emsp;&ensp;└── SumTree (Standard sum tree data structure)\
@@ -349,6 +350,8 @@ NNN\
 &emsp;&emsp;│&emsp;&ensp;└── Trainer (Standard supervised training)\
 &emsp;&emsp;│\
 &emsp;&emsp;└── Utilities\
+&emsp;&emsp;&emsp;&emsp;├── DataLoaders\
+&emsp;&emsp;&emsp;&emsp;│&emsp;&ensp;└── MNISTLoader\
 &emsp;&emsp;&emsp;&emsp;├── SaveSystem\
 &emsp;&emsp;&emsp;&emsp;│&emsp;&ensp;├── LayerData (JSON serializable class storing data for a single layer)\
 &emsp;&emsp;&emsp;&emsp;│&emsp;&ensp;├── ModelData (JSON serializable class storing data for a single neural network)\
