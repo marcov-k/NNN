@@ -156,6 +156,6 @@ public static class MNISTLoader
     static int Extract1ByteInt32(byte[] bytes, ref int offset)
     {
         offset++;
-        return bytes[offset - 1]; // implicitly conver byte to int32
+        return bytes[offset - 1]; // implicitly convert byte to int32
     }
 }
