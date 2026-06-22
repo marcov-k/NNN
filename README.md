@@ -86,6 +86,7 @@ Architecture: 4 -> 1 (Sigmoid -> Linear)\
 Optimizer: Adam\
 Learning Rate: 0.01\
 Target MSE: < 0.01
+#### Training Results:
 | Test # | Epochs Required |
 |--------|--------------|
 | 1 | 788 |
@@ -131,6 +132,81 @@ Console.WriteLine("Press any key to close...");
 Console.ReadKey();
 ```
 
+### MNIST Dataset
+#### Specifications:
+Architecture: Conv(8 filters, 5x5 kernel) -> Conv(16 filters, 5x5 kernel, 0.2 dropout) -> 128 (0.5 dropout) -> 10 (Leaky ReLU, Leaky ReLU, Leaky ReLU, Linear)\
+Loss Function: Softmax Cross-Entropy\
+Optimizer: Adam (0.01 weight decay)\
+Initial Learning Rate: 0.001 (with decay)\
+Final Learning Rate: 0.0001\
+Total Time Required for Training and Evaluation: 2:01:01.393\
+Training Inputs: Standard 60,000 training image dataset\
+Testing Inputs: Standard 10,000 testing image dataset
+#### Training Results:
+| Epochs | Accuracy |
+|--------|----------|
+| 0* | 9.82% |
+| 5 | 95.30% |
+| 10 | 96.00% |
+| 15 | 96.36% |
+| 20 | 95.98% |
+| 25 | 96.80% |
+| 30 | 96.85% |
+| 35 | 97.16% |
+| 40 | 96.94% |
+| 45 | 97.26% |
+| 50 | 97.42% |
+
+*Accuracy prior to any training being done
+#### Code Used for Testing:
+```
+Console.WriteLine("Loading MNIST dataset...");
+var (trainImages, trainLabels) = MNISTLoader.GetTrainingData();
+var (testImages, testLabels) = MNISTLoader.GetTestData();
+Console.WriteLine("MNIST dataset loaded");
+
+double tau = 0.05;
+double convDropout = 0.15;
+double denseDropout = 0.5;
+Model model;
+if (GetInput("Load model from file? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
+{
+    // Load model from file
+    string fileName = GetFileName();
+    model = Saver.LoadModel(fileName);
+}
+else
+{
+    model = new([
+        new Conv(8, [5, 5], new LeakyReLU(tau)),
+        new Conv(16, [5, 5], new LeakyReLU(tau), convDropout),
+        new Dense(128, new LeakyReLU(tau), denseDropout),
+        new Dense(10, new Linear())
+    ], new([1, 28, 28, 1]));
+}
+
+Optimizer optimizer = new Adam(0.001, weightDecay: 0.01);
+double maxGradNorm = 0.5;
+Cost cost = new SoftmaxCrossEntropy();
+Trainer trainer = new(model, optimizer, cost, maxGradNorm);
+
+var wrappedImages = new Tensor[testImages.Length];
+for (int i = 0; i < testImages.Length; i++)
+{
+    wrappedImages[i] = Tensor.WrapBatch(testImages[i]);
+}
+
+Func<Model, int, bool> testFunc = (model, i) =>
+{
+    var predicts = model.Predict(wrappedImages[i]);
+    return Tensor.ArgMax(predicts) == Tensor.ArgMax(testLabels[i]);
+};
+
+BatchBuffer batchBuffer = new(trainImages, trainLabels);
+int batchSize = 128;
+int testLength = testLabels.Length;
+```
+
 ### Tic-Tac-Toe (DQN + Self-Play)
 #### Specifications:
 Architecture: 256 -> 256 -> 128 -> 9 (Leaky ReLU -> Leaky ReLU -> Leaky ReLU -> Linear)\
@@ -140,6 +216,7 @@ Learning Rate: 0.001\
 Games per Performance Test: 5000\
 Opponent for Performance Tests: Randomly-Acting\
 Total Time Required for Training and Evaluation: 3:15.919
+#### Training Results:
 | Training Episodes | Win Rate | Tie Rate | Win + Tie Rate |
 |-------------------|----------|----------|----------------|
 | 200* | 42.06% | 30.32% | 72.38% |
