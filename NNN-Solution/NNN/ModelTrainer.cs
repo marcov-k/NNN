@@ -207,7 +207,7 @@ void StandardTrainingLoop(Trainer trainer, BatchBuffer batchBuffer, int batchSiz
             int epochs = GetInteger("Enter number of epochs to train");
             int testEvery = GetInteger("Enter epochs per training progress test");
             Console.WriteLine($"\n\nTraining for {epochs} epochs...");
-            trainer.Train(batchBuffer, batchSize, epochs, batchAllInputs: true, testFunc, testEvery, testLength);
+            trainer.Train(batchBuffer, batchSize, epochs, batchAllInputs: true, testFunc, testEvery: testEvery, testLength: testLength);
         }
         else break;
     }
