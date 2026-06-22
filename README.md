@@ -86,6 +86,7 @@ Architecture: 4 -> 1 (Sigmoid -> Linear)\
 Optimizer: Adam\
 Learning Rate: 0.01\
 Target MSE: < 0.01
+#### Training Results:
 | Test # | Epochs Required |
 |--------|--------------|
 | 1 | 788 |
@@ -141,6 +142,7 @@ Final Learning Rate: 0.0001\
 Total Time Required for Training and Evaluation: 2:01:01.393\
 Training Inputs: Standard 60,000 training image dataset\
 Testing Inputs: Standard 10,000 testing image dataset
+#### Training Results
 | Epochs | Accuracy |
 |--------|----------|
 | 0* | 9.82% |
@@ -214,6 +216,7 @@ Learning Rate: 0.001\
 Games per Performance Test: 5000\
 Opponent for Performance Tests: Randomly-Acting\
 Total Time Required for Training and Evaluation: 3:15.919
+#### Training Results:
 | Training Episodes | Win Rate | Tie Rate | Win + Tie Rate |
 |-------------------|----------|----------|----------------|
 | 200* | 42.06% | 30.32% | 72.38% |
