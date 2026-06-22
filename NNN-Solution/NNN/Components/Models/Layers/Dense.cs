@@ -20,10 +20,12 @@ public class Dense : Layer
     /// </summary>
     /// <param name="neuronCount">Number of neurons in the new layer.</param>
     /// <param name="activation">Activation function of the new layer.</param>
-    public Dense(int neuronCount, Activation activation)
+    /// <param name="dropout">Dropout rate of the new layer.</param>
+    public Dense(int neuronCount, Activation activation, double dropout = 0.0)
     {
         NeuronCount = neuronCount;
         Activation = activation;
+        Dropout = dropout;
     }
 
     /// <summary>
@@ -33,12 +35,14 @@ public class Dense : Layer
     /// <param name="weights">Weights tensor of the new layer.</param>
     /// <param name="biases">Bias tensor of the new layer.</param>
     /// <param name="activation">Activation function of the new layer.</param>
-    public Dense(int neuronCount, Tensor weights, Tensor biases, Activation activation)
+    /// <param name="dropout">Dropout rate of the new layer.</param>
+    public Dense(int neuronCount, Tensor weights, Tensor biases, Activation activation, double dropout)
     {
         NeuronCount = neuronCount;
         Weights = weights;
         Biases = biases;
         Activation = activation;
+        Dropout = dropout;
     }
 
     /// <summary>
@@ -61,6 +65,12 @@ public class Dense : Layer
         var output = flatInput ^ Weights;
         output += Tensor.Broadcast(Biases, output.Dimensions);
         output = Activation.Forward(output);
+
+        if (Dropout > 0.0)
+        {
+            output *= Tensor.GetDenseDropoutMask(output, Dropout);
+        }
+
         return output;
     }
 
@@ -72,7 +82,7 @@ public class Dense : Layer
 
     public override Layer Copy()
     {
-        return new Dense(NeuronCount, Weights.Copy(), Biases.Copy(), Activation.Copy());
+        return new Dense(NeuronCount, Weights.Copy(), Biases.Copy(), Activation.Copy(), Dropout);
     }
 
     public override void BuildFromData(LayerData data)
@@ -90,5 +100,7 @@ public class Dense : Layer
         {
             Activation = Activator.CreateInstance(activType) as Activation ?? new Linear();
         }
+
+        Dropout = data.Dropout;
     }
 }

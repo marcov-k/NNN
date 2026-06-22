@@ -21,6 +21,10 @@ public abstract class Layer
     /// Format of the output of the layer.
     /// </summary>
     public Tensor OutputFormat { get; protected set; } = new();
+    /// <summary>
+    /// Dropout rate of the layer.
+    /// </summary>
+    public double Dropout { get; protected set; } = 0.0;
 
     /// <summary>
     /// Parameterless constructor for model reconstruction from save data.

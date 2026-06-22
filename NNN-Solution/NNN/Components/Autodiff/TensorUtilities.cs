@@ -657,6 +657,55 @@ public partial class Tensor
         return result;
     }
 
+    public static Tensor GetDenseDropoutMask(Tensor result, double dropout)
+    {
+        if (Inference) return Scalar(1.0, result.Dimensions, requiresGrad: false);
+
+        Tensor mask = new(result.Dimensions, requiresGrad: false);
+        double scale = 1.0 / (1.0 - dropout);
+        for (int i = 0; i < mask.ElementCount; i++)
+        {
+            double rand = Random.Shared.NextDouble();
+            mask[i] = rand < dropout ? 0.0 : scale;
+        }
+        return mask;
+    }
+
+    public static Tensor GetSpatialDropoutMask(Tensor result, double dropout)
+    {
+        if (Inference) return Scalar(1.0, result.Dimensions, requiresGrad: false);
+
+        Tensor mask = new(result.Dimensions, requiresGrad: false);
+        double scale = 1.0 / (1.0 - dropout);
+
+        int batches = result.Dimensions[0];
+        int batchSize = result.ElementCount / batches;
+        int channels = result.Dimensions[^1];
+        int spatialSize = batchSize / channels;
+
+        var channelVals = new double[channels];
+        for (int b = 0; b < batches; b++)
+        {
+            int batchOffset = b * batchSize;
+
+            for (int c = 0; c < channels; c++)
+            {
+                channelVals[c] = Random.Shared.NextDouble() < dropout ? 0.0 : scale;
+            }
+
+            for (int s = 0; s < spatialSize; s++)
+            {
+                int spatialOffset = batchOffset + (s * channels);
+                for (int c = 0; c < channels; c++)
+                {
+                    mask[spatialOffset + c] = channelVals[c];
+                }
+            }
+        }
+
+        return mask;
+    }
+
     /// <summary>
     /// Gets the tensor instance to write the result of the current function/operation to.
     /// </summary>

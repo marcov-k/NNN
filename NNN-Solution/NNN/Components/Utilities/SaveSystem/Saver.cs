@@ -44,14 +44,16 @@ public static class Saver
             {
                 case Dense dense:
                     layers[i] = new(layerName: dense.GetType().AssemblyQualifiedName,
-                        activation: dense.Activation.GetType().AssemblyQualifiedName, biases: dense.Biases,
-                        neuronCount: dense.NeuronCount, weights: dense.Weights);
+                        activation: dense.Activation.GetType().AssemblyQualifiedName,
+                        dropout: dense.Dropout, biases: dense.Biases, neuronCount: dense.NeuronCount,
+                        weights: dense.Weights);
 
                     break;
                 case Conv conv:
                     layers[i] = new(layerName: conv.GetType().AssemblyQualifiedName,
-                        activation: conv.Activation.GetType().AssemblyQualifiedName, biases: conv.Biases,
-                        filterCount: conv.FilterCount, kernelDims: conv.KernelDims, kernels: conv.Kernels);
+                        activation: conv.Activation.GetType().AssemblyQualifiedName,
+                        dropout: conv.Dropout, biases: conv.Biases, filterCount: conv.FilterCount,
+                        kernelDims: conv.KernelDims, kernels: conv.Kernels);
 
                     break;
             }

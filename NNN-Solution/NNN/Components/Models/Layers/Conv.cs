@@ -28,11 +28,13 @@ public class Conv : Layer
     /// <param name="filterCount">Number of filters in the layer.</param>
     /// <param name="kernelDims">Dimensions of the kernels used by the layer.</param>
     /// <param name="activation">Activation function of the new layer.</param>
-    public Conv(int filterCount, int[] kernelDims, Activation activation)
+    /// <param name="dropout">Dropout rate of the new layer.</param>
+    public Conv(int filterCount, int[] kernelDims, Activation activation, double dropout = 0.0)
     {
         FilterCount = filterCount;
         KernelDims = kernelDims;
         Activation = activation;
+        Dropout = dropout;
     }
 
     /// <summary>
@@ -43,13 +45,15 @@ public class Conv : Layer
     /// <param name="kernels">Kernels tensor of the new layer.</param>
     /// <param name="biases">Bias tensor of the new layer.</param>
     /// <param name="activation">Activation function of the new layer.</param>
-    public Conv(int filterCount, int[] kernelDims, Tensor kernels, Tensor biases, Activation activation)
+    /// <param name="dropout">Dropout rate of the new layer.</param>
+    public Conv(int filterCount, int[] kernelDims, Tensor kernels, Tensor biases, Activation activation, double dropout)
     {
         FilterCount = filterCount;
         KernelDims = kernelDims;
         Kernels = kernels;
         Biases = biases;
         Activation = activation;
+        Dropout = dropout;
     }
 
     /// <summary>
@@ -80,7 +84,11 @@ public class Conv : Layer
     {
         // Apply convolution to the input
         var output = Tensor.Convolve(input, Kernels, Biases);
-        return Activation.Forward(output);
+        output = Activation.Forward(output);
+
+        if (Dropout > 0.0) output *= Tensor.GetSpatialDropoutMask(output, Dropout);
+
+        return output;
     }
 
     public override IEnumerable<Tensor> GetParameters()
@@ -91,7 +99,7 @@ public class Conv : Layer
 
     public override Layer Copy()
     {
-        return new Conv(FilterCount, [.. KernelDims], Kernels.Copy(), Biases.Copy(), Activation.Copy());
+        return new Conv(FilterCount, [.. KernelDims], Kernels.Copy(), Biases.Copy(), Activation.Copy(), Dropout);
     }
 
     public override void BuildFromData(LayerData data)
@@ -110,5 +118,7 @@ public class Conv : Layer
         {
             Activation = Activator.CreateInstance(activType) as Activation ?? new Linear();
         }
+
+        Dropout = data.Dropout;
     }
 }

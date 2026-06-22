@@ -109,6 +109,8 @@ void StandardTraining()
     Console.WriteLine("MNIST dataset loaded");
 
     double tau = 0.05;
+    double convDropout = 0.15;
+    double denseDropout = 0.5;
     Model model;
     if (GetInput("Load model from file? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
     {
@@ -120,13 +122,13 @@ void StandardTraining()
     {
         model = new([
             new Conv(8, [5, 5], new LeakyReLU(tau)),
-            new Conv(16, [5, 5], new LeakyReLU(tau)),
-            new Dense(128, new LeakyReLU(tau)),
+            new Conv(16, [5, 5], new LeakyReLU(tau), convDropout),
+            new Dense(128, new LeakyReLU(tau), denseDropout),
             new Dense(10, new Linear())
         ], new([1, 28, 28, 1]));
     }
 
-    Optimizer optimizer = new Adam(0.001);
+    Optimizer optimizer = new Adam(0.001, weightDecay: 0.01);
     double maxGradNorm = 0.5;
     Cost cost = new SoftmaxCrossEntropy();
     Trainer trainer = new(model, optimizer, cost, maxGradNorm);
