@@ -20,9 +20,6 @@ if (demoMode) DemoHandler.RunDemo();
 else if (dqnMode) DQNTraining();
 else StandardTraining();
 
-
-#pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
-#pragma warning disable CS8602 // Dereference of a possibly null reference.
 // Primary loop for DQN model training UI - entry point
 void DQNTraining()
 {
@@ -165,6 +162,7 @@ void StandardTraining()
 
     Console.WriteLine("\nPress any key to close...");
     Console.ReadKey();
+    System.Environment.Exit(0);
 }
 
 // UI loop for training DQN models for a specified number of episodes
@@ -270,9 +268,6 @@ void TestMNIST(Tensor[] testImages, Tensor[] wrappedImages, Tensor[] testLabels,
     DrawMNISTImage(image, label, 0.5);
     Console.WriteLine($"Model prediction: {predictLabel}");
 }
-
-#pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.
-#pragma warning restore CS8602 // Dereference of a possibly null reference.
 
 /// <summary>
 /// Key mappings for user navigation during training episode review.

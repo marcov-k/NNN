@@ -1,5 +1,6 @@
 ﻿using NNN.Components.Activations;
 using NNN.Components.Autodiff;
+using NNN.Components.Utilities;
 using NNN.Components.Utilities.SaveSystem;
 
 namespace NNN.Components.Models.Layers;
@@ -102,23 +103,16 @@ public class Conv : Layer
         return new Conv(FilterCount, [.. KernelDims], Kernels.Copy(), Biases.Copy(), Activation.Copy(), Dropout);
     }
 
-    public override void BuildFromData(LayerData data)
+    public override void WriteUniqueData(FileStream stream)
     {
-        if (data.FilterCount is not null) FilterCount = data.FilterCount.Value;
-        if (data.KernelDims is not null) KernelDims = data.KernelDims;
+        FileUtils.WriteInt32(stream, FilterCount);
+        FileUtils.WriteTensor(stream, Kernels);
+    }
 
-        if (data.Kernels is not null) Kernels = data.Kernels;
-        Kernels.RestoreGrad();
-
-        if (data.Biases is not null) Biases = data.Biases;
-        Biases.RestoreGrad();
-
-        var activType = Type.GetType(data.Activation);
-        if (activType is not null)
-        {
-            Activation = Activator.CreateInstance(activType) as Activation ?? new Linear();
-        }
-
-        Dropout = data.Dropout;
+    protected override void ReadUniqueData(FileStream stream)
+    {
+        FilterCount = FileUtils.ReadInt32(stream);
+        Kernels = FileUtils.ReadTensor(stream);
+        KernelDims = Kernels.Dimensions[1..^1];
     }
 }

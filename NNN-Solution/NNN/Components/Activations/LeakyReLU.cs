@@ -1,4 +1,5 @@
 ﻿using NNN.Components.Autodiff;
+using NNN.Components.Utilities.SaveSystem;
 
 namespace NNN.Components.Activations;
 
@@ -10,7 +11,7 @@ public class LeakyReLU : Activation
     /// <summary>
     /// Coefficient for negative inputs.
     /// </summary>
-    readonly double Tau;
+    double Tau;
 
     /// <summary>
     /// Creates a new Leaky ReLU activation function instance.
@@ -38,4 +39,14 @@ public class LeakyReLU : Activation
     /// </summary>
     /// <returns>New Leaky ReLU activation function instance with the same Tau value.</returns>
     public override Activation Copy() => new LeakyReLU(Tau);
+
+    public override void WriteUniqueData(FileStream stream)
+    {
+        FileUtils.WriteDouble(stream, Tau);
+    }
+
+    public override void BuildFromData(FileStream stream)
+    {
+        Tau = FileUtils.ReadDouble(stream);
+    }
 }

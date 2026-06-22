@@ -1,6 +1,4 @@
 ﻿using NNN.Components.Models;
-using NNN.Components.Models.Layers;
-using System.Text.Json;
 
 namespace NNN.Components.Utilities.SaveSystem;
 
@@ -21,8 +19,11 @@ public static class Saver
     /// File extension for neural network save files.
     /// </summary>
     const string Extension = ".nnn";
+    /// <summary>
+    /// Magic number for .nnn files.
+    /// </summary>
+    const int MagicNumber = 776883790; // spells ".NNN"
 
-#pragma warning disable CS8604 // Possible null reference argument.
     /// <summary>
     /// Saves the given model to a file with the given name.
     /// </summary>
@@ -34,36 +35,12 @@ public static class Saver
 
         string filePath = Path.Combine(DirectoryPath, fileName + Extension); // generate full file path
 
-        // Generate save data for the model
-        var layers = new LayerData[model.Layers.Length];
-        for (int i = 0; i < layers.Length; i++)
+        using FileStream stream = new(filePath, FileMode.Create, FileAccess.Write);
         {
-            var layer = model.Layers[i];
-
-            switch (layer)
-            {
-                case Dense dense:
-                    layers[i] = new(layerName: dense.GetType().AssemblyQualifiedName,
-                        activation: dense.Activation.GetType().AssemblyQualifiedName,
-                        dropout: dense.Dropout, biases: dense.Biases, neuronCount: dense.NeuronCount,
-                        weights: dense.Weights);
-
-                    break;
-                case Conv conv:
-                    layers[i] = new(layerName: conv.GetType().AssemblyQualifiedName,
-                        activation: conv.Activation.GetType().AssemblyQualifiedName,
-                        dropout: conv.Dropout, biases: conv.Biases, filterCount: conv.FilterCount,
-                        kernelDims: conv.KernelDims, kernels: conv.Kernels);
-
-                    break;
-            }
+            FileUtils.WriteInt32(stream, MagicNumber);
+            FileUtils.WriteModel(stream, model);
+            stream.Flush();
         }
-        ModelData modelData = new(layers);
-
-        // Serialize the model as Json and save to file
-        string json = JsonSerializer.Serialize(modelData);
-
-        File.WriteAllText(filePath, json);
     }
 
     /// <summary>
@@ -77,15 +54,17 @@ public static class Saver
 
         string filePath = Path.Combine(DirectoryPath, fileName + Extension); // generate full file path
 
-        string json = File.ReadAllText(filePath); // load model Json
+        Model model;
+        using FileStream stream = new(filePath, FileMode.Open, FileAccess.Read);
+        {
+            int magic = FileUtils.ReadInt32(stream);
+            if (magic != MagicNumber) throw new Exception($"Invalid magic number: found {magic} instead of {MagicNumber}");
 
-        // Reconstruct model from save data Json
-        var modelData = JsonSerializer.Deserialize<ModelData>(json);
-        Model model = new(modelData);
+            model = FileUtils.ReadModel(stream);
+        }
 
         return model;
     }
-#pragma warning restore CS8604 // Possible null reference argument.
 
     /// <summary>
     /// Checks whether a neural network file with the given name exists.
@@ -109,7 +88,7 @@ public static class Saver
     {
         if (string.IsNullOrEmpty(DirectoryPath))
         {
-            string? exePath = System.Environment.ProcessPath;
+            string? exePath = Environment.ProcessPath;
             string? exeDirPath = Path.GetDirectoryName(exePath);
             if (!string.IsNullOrEmpty(exeDirPath))
             {

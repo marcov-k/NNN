@@ -5,14 +5,13 @@ namespace NNN.Components.Autodiff;
 /// <summary>
 /// Class representing n-dimensional data and autograd graph nodes.
 /// </summary>
-[Serializable]
 public partial class Tensor
 {
     // Linear value storage
     /// <summary>
     /// Linear array storing all of the tensor's values.
     /// </summary>
-    public double[] Data { get; init; } = [];
+    public double[] Data { get; private set; } = [];
     /// <summary>
     /// Linear array storing the gradient of each corresponding value.
     /// </summary>
@@ -34,13 +33,13 @@ public partial class Tensor
     /// <summary>
     /// Array containing the length of each of the tensor's dimensions.
     /// </summary>
-    public int[] Dimensions { get; init; } = [];
+    public int[] Dimensions { get; private set; } = [];
 
     // Index mapping
     /// <summary>
     /// Array containing the strides over the linear array represented by increments in the coordinate indices along each dimension.
     /// </summary>
-    public int[] Strides { get; init; } = [];
+    public int[] Strides { get; private set; } = [];
 
     // AutoGrad graph
     /// <summary>

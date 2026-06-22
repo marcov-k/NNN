@@ -62,43 +62,6 @@ public class Model
     }
 
     /// <summary>
-    /// Constructs a new model instance from the given save data.
-    /// </summary>
-    /// <param name="data">Save data representing the model architecture and training.</param>
-    public Model(ModelData data)
-    {
-        Layers = new Layer[data.Layers.Length];
-
-        BuildFromData(data);
-    }
-
-    /// <summary>
-    /// Reconstructs the model to match the architecture and training of the model stored in the save data.
-    /// </summary>
-    /// <param name="data"></param>
-    void BuildFromData(ModelData data)
-    {
-        InvalidateParameters(); // ensure any previous parameters are cleared
-
-        // Reconstruct each layer from the save data
-        LayerData layerData;
-        Type? layerType;
-        for (int i = 0; i < data.Layers.Length; i++)
-        {
-            layerData = data.Layers[i];
-
-            // Create new instance of saved layer type
-            layerType = Type.GetType(layerData.LayerName);
-            if (layerType is not null)
-            {
-                var layer = Activator.CreateInstance(layerType) as Layer;
-                layer?.BuildFromData(layerData);
-                if (layer is not null) Layers[i] = layer;
-            }
-        }
-    }
-
-    /// <summary>
     /// Initializes layer parameters to support the given input format.
     /// </summary>
     /// <param name="inputFormat">Tensor representing the expected input format.</param>
@@ -223,9 +186,4 @@ public class Model
 
         return new(layers);
     }
-
-    /// <summary>
-    /// Clears the model's current stored parameter references.
-    /// </summary>
-    void InvalidateParameters() => _parameters = null;
 }

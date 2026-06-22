@@ -29,7 +29,7 @@ public partial class Tensor
     }
 
     /// <summary>
-    /// Parameterless constructor for Json serializer.
+    /// Creates a new empty tensor instance.
     /// </summary>
     public Tensor() { }
 

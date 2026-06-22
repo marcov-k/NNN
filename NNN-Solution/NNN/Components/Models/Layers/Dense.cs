@@ -9,6 +9,9 @@ namespace NNN.Components.Models.Layers;
 /// </summary>
 public class Dense : Layer
 {
+    /// <summary>
+    /// Number of neurons in the layer.
+    /// </summary>
     public int NeuronCount { get; private set; }
     /// <summary>
     /// Tensor containing the weights parameters of the layer.
@@ -85,22 +88,15 @@ public class Dense : Layer
         return new Dense(NeuronCount, Weights.Copy(), Biases.Copy(), Activation.Copy(), Dropout);
     }
 
-    public override void BuildFromData(LayerData data)
+    public override void WriteUniqueData(FileStream stream)
     {
-        if (data.NeuronCount is not null) NeuronCount = data.NeuronCount.Value;
+        FileUtils.WriteInt32(stream, NeuronCount);
+        FileUtils.WriteTensor(stream, Weights);
+    }
 
-        if (data.Weights is not null) Weights = data.Weights;
-        Weights.RestoreGrad();
-
-        Biases = data.Biases;
-        Biases.RestoreGrad();
-
-        var activType = Type.GetType(data.Activation);
-        if (activType is not null)
-        {
-            Activation = Activator.CreateInstance(activType) as Activation ?? new Linear();
-        }
-
-        Dropout = data.Dropout;
+    protected override void ReadUniqueData(FileStream stream)
+    {
+        NeuronCount = FileUtils.ReadInt32(stream);
+        Weights = FileUtils.ReadTensor(stream);
     }
 }

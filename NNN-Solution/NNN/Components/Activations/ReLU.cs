@@ -7,8 +7,6 @@ namespace NNN.Components.Activations;
 /// </summary>
 public class ReLU : Activation
 {
-    // Base Activation API overrides
-
     /// <summary>
     /// Applies the ReLU activation function to each element in the input tensor.
     /// </summary>
@@ -21,4 +19,8 @@ public class ReLU : Activation
     /// </summary>
     /// <returns>New ReLU activation function instance.</returns>
     public override Activation Copy() => new ReLU();
+
+    public override void WriteUniqueData(FileStream stream) { }
+
+    public override void BuildFromData(FileStream stream) { }
 }

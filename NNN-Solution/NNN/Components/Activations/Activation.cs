@@ -19,4 +19,16 @@ public abstract class Activation
     /// </summary>
     /// <returns>New instance of the same activation function.</returns>
     public abstract Activation Copy(); // used to ensure function-specific parameters are persisted during copies
+
+    /// <summary>
+    /// Writes any activation type-specific data to the file stream.
+    /// </summary>
+    /// <param name="stream">File stream to write to.</param>
+    public abstract void WriteUniqueData(FileStream stream);
+
+    /// <summary>
+    /// Fills the activation instance with data at the current position in the file stream.
+    /// </summary>
+    /// <param name="stream">File stream to read from.</param>
+    public abstract void BuildFromData(FileStream stream);
 }

@@ -19,4 +19,8 @@ public class Linear : Activation
     /// </summary>
     /// <returns>New linear activation function instance.</returns>
     public override Activation Copy() => new Linear();
+
+    public override void WriteUniqueData(FileStream stream) { }
+
+    public override void BuildFromData(FileStream stream) { }
 }

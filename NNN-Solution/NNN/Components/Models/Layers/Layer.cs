@@ -1,5 +1,6 @@
 ﻿using NNN.Components.Activations;
 using NNN.Components.Autodiff;
+using NNN.Components.Utilities;
 using NNN.Components.Utilities.SaveSystem;
 
 namespace NNN.Components.Models.Layers;
@@ -57,8 +58,30 @@ public abstract class Layer
     public abstract Layer Copy();
 
     /// <summary>
-    /// Reconstructs the layer from the save data.
+    /// Writes any layer type-specific data to the file stream.
     /// </summary>
-    /// <param name="data">Save data containing the layer's saved parameters.</param>
-    public abstract void BuildFromData(LayerData data);
+    /// <param name="stream">File stream to write to.</param>
+    public abstract void WriteUniqueData(FileStream stream);
+
+    /// <summary>
+    /// Fills the layer instance with data at the current position in the file stream.
+    /// </summary>
+    /// <param name="stream">File stream to read from.</param>
+    public void BuildFromData(FileStream stream)
+    {
+        var activType = IDManager.GetActivationByID((byte)stream.ReadByte());
+        Activation = (Activator.CreateInstance(activType) as Activation)!;
+        Activation.BuildFromData(stream);
+
+        Dropout = FileUtils.ReadDouble(stream);
+        Biases = FileUtils.ReadTensor(stream);
+
+        ReadUniqueData(stream);
+    }
+
+    /// <summary>
+    /// Reads any layer type-specific data from the file stream.
+    /// </summary>
+    /// <param name="stream">File stream to read from.</param>
+    protected abstract void ReadUniqueData(FileStream stream);
 }
