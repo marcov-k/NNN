@@ -11,7 +11,9 @@ namespace NNN.Components.Optimizers;
 /// <param name="beta1">Exponential decay rate of first moment estimates.</param>
 /// <param name="beta2">Exponential decay rate of second moment estimates.</param>
 /// <param name="epsilon">Epsilon value to use.</param>
-public class Adam(double learningRate = 0.001, double beta1 = 0.9, double beta2 = 0.999, double epsilon = 1e-8) : Optimizer(learningRate)
+/// <param name="weightDecay">Weight decay value to use.</param>
+public class Adam(double learningRate = 0.001, double beta1 = 0.9, double beta2 = 0.999,
+    double epsilon = 1e-8, double weightDecay = 0.0) : Optimizer(learningRate)
 {
     /// <summary>
     /// Exponential decay rate of first moment estimates.
@@ -53,6 +55,14 @@ public class Adam(double learningRate = 0.001, double beta1 = 0.9, double beta2 
     /// Preallocated vectorization of epsilon value.
     /// </summary>
     readonly Vector<double> EpsilonVec = new(epsilon);
+    /// <summary>
+    /// Weight decay to apply during each parameter update.
+    /// </summary>
+    readonly double WeightDecay = weightDecay;
+    /// <summary>
+    /// Preallocated vectorization of weight decay value.
+    /// </summary>
+    readonly Vector<double> WeightDecayVec = new(weightDecay);
 
     /// <summary>
     /// Dictionary of per-parameter persistent buffers for first and second moments.
@@ -81,6 +91,7 @@ public class Adam(double learningRate = 0.001, double beta1 = 0.9, double beta2 
         var gradVecs = MemoryMarshal.Cast<double, Vector<double>>(parameter.Grad.AsSpan());
         var paramVecs = MemoryMarshal.Cast<double, Vector<double>>(parameter.Data.AsSpan());
 
+        // Update vectorized parameters based on moments
         for (int i = 0; i < paramVecs.Length; i++)
         {
             mVecs[i] = (Beta1Vec * mVecs[i]) + (OneMinusBeta1Vec * gradVecs[i]);
@@ -90,21 +101,22 @@ public class Adam(double learningRate = 0.001, double beta1 = 0.9, double beta2 
             var vHatVec = vVecs[i] / biasCorr2Vec;
 
             paramVecs[i] -= (LRVec * mHatVec) / (Vector.SquareRoot(vHatVec) + EpsilonVec);
+            if (WeightDecay > 0.0) paramVecs[i] -= LRVec * WeightDecayVec * paramVecs[i];
         }
 
+        // Clean up unvectorized tail
         for (int i = paramVecs.Length * VectorSize; i < parameter.ElementCount; i++)
         {
             double grad = parameter.Grad[i];
 
-            // Update parameter moments
             m[i] = Beta1 * m[i] + (OneMinusBeta1 * grad);
             v[i] = Beta2 * v[i] + (OneMinusBeta2 * (grad * grad));
 
-            // Correct moment estimate bias due to 0 initialization
             double mHat = m[i] / biasCorrection1;
             double vHat = v[i] / biasCorrection2;
 
-            parameter.Data[i] -= (LR * mHat) / (Math.Sqrt(vHat) + Epsilon); // update parameter based on moments
+            parameter.Data[i] -= (LR * mHat) / (Math.Sqrt(vHat) + Epsilon);
+            if (WeightDecay > 0.0) parameter.Data[i] -= LR * WeightDecay * parameter.Data[i];
         }
     }
 }

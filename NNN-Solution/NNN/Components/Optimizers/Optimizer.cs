@@ -12,11 +12,23 @@ public abstract class Optimizer(double learningRate)
     /// <summary>
     /// Gradient scaling factor for parameter updates.
     /// </summary>
-    protected readonly double LR = learningRate;
+    public double LR
+    {
+        get => _lr;
+        set
+        {
+            _lr = value;
+            LRVec = new(value);
+        }
+    }
+    /// <summary>
+    /// Internal learning rate property.
+    /// </summary>
+    protected double _lr = learningRate;
     /// <summary>
     /// Preallocated vectorization of learning rate.
     /// </summary>
-    protected readonly Vector<double> LRVec = new(learningRate);
+    protected Vector<double> LRVec = new(learningRate);
     /// <summary>
     /// Size of vectors in the current CPU architecture.
     /// </summary>

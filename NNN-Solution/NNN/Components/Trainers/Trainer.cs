@@ -19,7 +19,7 @@ public class Trainer(Model model, Optimizer optimizer, Cost cost, double maxGrad
     /// <summary>
     /// Model being trained.
     /// </summary>
-    readonly Model Model = model;
+    Model Model = model;
     /// <summary>
     /// Optimizer being used for parameter updates.
     /// </summary>
@@ -36,15 +36,27 @@ public class Trainer(Model model, Optimizer optimizer, Cost cost, double maxGrad
     /// <summary>
     /// Trains the model for the given number of epochs using the given dataset.
     /// </summary>
-    /// <param name="inputs">Tensor representing the input values of the dataset.</param>
-    /// <param name="targets">Tensor representing the target outputs of the dataset.</param>
+    /// <param name="batchBuffer">Buffer containing the training data.</param>
+    /// <param name="batchSize">Number of training inputs to include in each batch.</param>
     /// <param name="epochs">Number of epochs to train for.</param>
+    /// <param name="batchAllInputs">Whether to train on all training inputs during each epoch.</param>
+    /// <param name="testFunc">Function to use to evaluate model success rate.</param>
+    /// <param name="decayLR">Whether to decay the learning rate over time.</param>
+    /// <param name="minLRFraction">Minimum allowed fraction of the original learning rate.</param>
+    /// <param name="testEvery">How many epochs to run between performance tests.</param>
+    /// <param name="testLength">How many iterations to run per performance test.</param>
     public void Train(BatchBuffer batchBuffer, int batchSize, int epochs, bool batchAllInputs = true,
-        Func<Model, int, bool>? testFunc = null, int testEvery = 100, int testLength = 1000)
+        Func<Model, int, bool>? testFunc = null, bool decayLR = true, double minLRFraction = 0.1, int testEvery = 100,
+        int testLength = 1000)
     {
         Stopwatch totalTimer = new();
         Stopwatch epochTimer = new();
         TimeSpan avgElapsed = new(0);
+
+        Model bestModel = Model.Copy();
+        double bestAccuracy = double.MinValue;
+
+        double baseLR = Optimizer.LR;
 
         Tensor[] inputs = new Tensor[1];
         Tensor[] targets = new Tensor[1];
@@ -73,6 +85,14 @@ public class Trainer(Model model, Optimizer optimizer, Cost cost, double maxGrad
         for (int e = 0; e < epochs; e++)
         {
             totalLoss = 0.0;
+
+            if (decayLR)
+            {
+                double progress = epochs > 1 ? (double)e / (epochs - 1) : 0.0;
+                double cosFactor = 0.5 * (1.0 + Math.Cos(Math.PI * progress));
+                double decayRange = 1.0 - minLRFraction;
+                Optimizer.LR = baseLR * (minLRFraction + decayRange * cosFactor);
+            }
 
             if (batchAllInputs)
             {
@@ -120,11 +140,19 @@ public class Trainer(Model model, Optimizer optimizer, Cost cost, double maxGrad
                         if (testFunc(Model, i)) successes++;
                     }
                     double successPercent = ((double)successes / testLength) * 100.0;
+                    if (successPercent > bestAccuracy)
+                    {
+                        bestModel = Model.Copy();
+                        bestAccuracy = successPercent;
+                    }
                     Console.WriteLine($"Model success percentage: {successPercent:F2}%");
                 }
             }
         }
 
+        if (decayLR) Optimizer.LR = baseLR;
+
+        Model = bestModel;
         totalTimer.Stop();
         Console.WriteLine($"Total training time: {MathUtils.RoundToMS(totalTimer.Elapsed)}");
     }
