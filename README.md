@@ -142,7 +142,7 @@ Final Learning Rate: 0.0001\
 Total Time Required for Training and Evaluation: 2:01:01.393\
 Training Inputs: Standard 60,000 training image dataset\
 Testing Inputs: Standard 10,000 testing image dataset
-#### Training Results
+#### Training Results:
 | Epochs | Accuracy |
 |--------|----------|
 | 0* | 9.82% |
