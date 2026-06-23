@@ -1,6 +1,7 @@
 ﻿using NNN.Components.Autodiff;
 using NNN.Components.Models;
 using NNN.Components.Models.Layers;
+using System.Buffers.Binary;
 using System.Text;
 
 namespace NNN.Components.Utilities.SaveSystem;
@@ -11,12 +12,14 @@ public static class FileUtils
 
     public static void WriteBool(FileStream stream, bool data)
     {
-        stream.Write(BitConverter.GetBytes(data));
+        stream.WriteByte((byte)(data ? 1 : 0));
     }
 
     public static void WriteDouble(FileStream stream, double data)
     {
-        stream.Write(BitConverter.GetBytes(data));
+        Span<byte> buffer = stackalloc byte[sizeof(double)];
+        BinaryPrimitives.WriteDoubleLittleEndian(buffer, data);
+        stream.Write(buffer);
     }
 
     public static void WriteDoubleArray(FileStream stream, double[] data)
@@ -30,7 +33,9 @@ public static class FileUtils
 
     public static void WriteInt32(FileStream stream, int data)
     {
-        stream.Write(BitConverter.GetBytes(data));
+        Span<byte> buffer = stackalloc byte[sizeof(int)];
+        BinaryPrimitives.WriteInt32LittleEndian(buffer, data);
+        stream.Write(buffer);
     }
 
     public static void WriteInt32Array(FileStream stream, int[] data)
@@ -55,7 +60,7 @@ public static class FileUtils
 
     public static void WriteModel(FileStream stream, Model model)
     {
-        stream.WriteByte((byte)model.Layers.Length);
+        WriteInt32(stream, model.Layers.Length);
         foreach (var layer in model.Layers)
         {
             WriteLayer(stream, layer);
@@ -80,16 +85,14 @@ public static class FileUtils
 
     public static bool ReadBool(FileStream stream)
     {
-        var bytes = new byte[sizeof(bool)];
-        stream.ReadExactly(bytes);
-        return BitConverter.ToBoolean(bytes);
+        return stream.ReadByte() == 1;
     }
 
     public static double ReadDouble(FileStream stream)
     {
-        var bytes = new byte[sizeof(double)];
-        stream.ReadExactly(bytes);
-        return BitConverter.ToDouble(bytes);
+        Span<byte> buffer = stackalloc byte[sizeof(double)];
+        stream.ReadExactly(buffer);
+        return BinaryPrimitives.ReadDoubleLittleEndian(buffer);
     }
 
     public static double[] ReadDoubleArray(FileStream stream)
@@ -105,9 +108,9 @@ public static class FileUtils
 
     public static int ReadInt32(FileStream stream)
     {
-        var bytes = new byte[sizeof(int)];
-        stream.ReadExactly(bytes);
-        return BitConverter.ToInt32(bytes);
+        Span<byte> buffer = stackalloc byte[sizeof(int)];
+        stream.ReadExactly(buffer);
+        return BinaryPrimitives.ReadInt32LittleEndian(buffer);
     }
 
     public static int[] ReadInt32Array(FileStream stream)
