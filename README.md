@@ -449,6 +449,7 @@ NNN\
 ### File Header Format:
 - Magic Number -> int32 (4 bytes) -> 776883790 (spells ".NNN" in ASCII)
 - Description -> string ([see formatting](#string-format-utf8)) -> short description of the model in the file
+- Parameter Count -> uint64 (8 bytes) -> total number of parameter values across all parameter tensors in the model
 
 ### Model Header Format:
 - Layer Count -> int32 (4 bytes) -> number of layers in the model
