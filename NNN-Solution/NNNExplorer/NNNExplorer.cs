@@ -1,5 +1,4 @@
-﻿using CsvHelper.Configuration.Attributes;
-using NNN.Components.Utilities.SaveSystem;
+﻿using NNN.Components.Utilities.SaveSystem;
 using static NNN.Components.Utilities.UIUtils;
 
 namespace NNNExplorer;
