@@ -480,7 +480,7 @@ NNN\
 - Data -> double array ([see formatting](#double-array-format)) -> linear array of the tensor's data values (row-major ordering)
 
 ### String Format (UTF8):
-- Length -> int32 (4 bytes) -> number of bytes in the string
+- Length -> int32 (4 bytes) -> number of characters in the string
 - Characters -> byte[Length] -> UTF8 character bytes
 
 ### Int32 Array Format:
