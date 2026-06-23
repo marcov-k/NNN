@@ -441,9 +441,9 @@ NNN\
 
 ## File Format (.nnn)
 ### General Formatting Notes:
-- All multi-byte numbers use big-endian encoding
-- Each layer type's encoding includes different parameters - identified by Layer ID
-- Certain [activation functions](#activation-data-format-for-activation-functions-with-parameters) encode additional parameters (eg. LeakyReLU's Tau) - identified by Activation ID
+- All multi-byte numbers use little-endian encoding
+- Each layer type's encoding includes different parameters - identified by [Layer ID](#layer-ids)
+- Certain [activation functions](#activation-data-format---found-immediately-after-activation-id-for-activation-functions-with-parameters) encode additional parameters (eg. LeakyReLU's Tau) immediately after their ID - identified by [Activation ID](#activation-ids)
 - Data appears in the file in the exact order as listed below
 
 ### File Header Format:
@@ -454,11 +454,11 @@ NNN\
 - Layer Count -> int32 (4 bytes) -> number of layers in the model
 
 ### Layer Header Format:
-- Layer ID -> unsigned byte -> ID of the specific layer type
+- Layer ID -> unsigned byte -> ID of the specific layer type ([see ID list](#layer-ids))
 
 ### Layer Data Format:
 - #### Shared - always comes before type-specific data:
-  - Activation ID -> unsigned byte -> ID of the layer's activation function
+  - Activation ID -> unsigned byte -> ID of the layer's activation function ([see ID list](#activation-ids))
   - Dropout -> double (8 bytes) -> dropout parameter of the layer
   - Bias -> tensor ([see formatting](#tensor-format)) -> bias parameter of the layer
 
@@ -470,13 +470,13 @@ NNN\
   - Filter Count -> int32 (4 bytes) -> number of filters in the layer
   - Kernels -> tensor ([see formatting](#tensor-format)) -> kernels parameter of the layer
 
-- ### Activation Data Format (for activation functions with parameters):
+### Activation Data Format - found immediately after Activation ID (for activation functions with parameters):
 - #### Leaky ReLU:
   - Tau -> double (8 bytes) -> tau parameter of the function
 
 ### Tensor Format:
 - Dimensions -> int32 array ([see formatting](#int32-array-format)) -> dimensions of the tensor
-- RequiresGrad -> bool (1 byte) -> whether the tensor requires gradients to be calculated
+- RequiresGrad -> boolean ([see formatting](#boolean-format)) -> whether the tensor requires gradients to be calculated
 - Data -> double array ([see formatting](#double-array-format)) -> linear array of the tensor's data values
 
 ### String Format (UTF8):
@@ -490,6 +490,21 @@ NNN\
 ### Double Array Format:
 - Length -> int32 (4 bytes) -> number of elements in the array
 - Elements -> double[Length] (8 bytes each) -> elements in the array
+
+### Boolean Format:
+- 1 byte -> 1 = true, 0 = false
+
+### Layer IDs:
+- 0 -> Dense
+- 1 -> Conv
+
+### Activation IDs:
+- 0 -> Linear
+- 1 -> Sigmoid
+- 2 -> Tanh
+- 3 -> ReLU
+- 4 -> Leaky ReLU
+- 5 -> Softmax
 
 ## Implementation Details
 ### Reverse-mode Autograd
