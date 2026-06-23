@@ -347,8 +347,8 @@ trainer.Train(x, y, epochs: 1000);
 - Basic supervised trainer
 - Deep Q-Network (DQN) trainer
 ### Saver
-- Serializes trained models using custom .nnn file format
-- Deserializes and reconstructs models from custom .nnn file format
+- Serializes and saves trained models to custom .nnn format files
+- Deserializes and reconstructs models from custom .nnn format files
 
 ## Automatic Differentiation (via partial derivatives)
 ### Example
@@ -435,8 +435,61 @@ NNN\
 &emsp;&emsp;&emsp;&emsp;│&emsp;&ensp;└── Saver (Static class for handling model saving/loading)\
 &emsp;&emsp;&emsp;&emsp;│\
 &emsp;&emsp;&emsp;&emsp;├── DemoHandler (Static class for handling demonstrations)\
+&emsp;&emsp;&emsp;&emsp;├── IDManager (Static class for looking up IDs for saving/loading - layer type, activation function, etc.)\
 &emsp;&emsp;&emsp;&emsp;├── MathUtils\
 &emsp;&emsp;&emsp;&emsp;└── UIUtils
+
+## File Format (.nnn)
+### General Formatting Notes:
+- All multi-byte numbers use big-endian encoding
+- Each layer type's encoding includes different parameters - identified by Layer ID
+- Certain [activation functions](#activation-data-format-for-activation-functions-with-parameters) encode additional parameters (eg. LeakyReLU's Tau) - identified by Activation ID
+- Data appears in the file in the exact order as listed below
+
+### File Header Format:
+- Magic Number -> int32 (4 bytes) -> 776883790 (spells ".NNN" in ASCII)
+- Description -> string ([see formatting](#string-format-utf8)) -> short description of the model in the file
+
+### Model Header Format:
+- Layer Count -> int32 (4 bytes) -> number of layers in the model
+
+### Layer Header Format:
+- Layer ID -> unsigned byte -> ID of the specific layer type
+
+### Layer Data Format:
+- #### Shared - always comes before type-specific data:
+  - Activation ID -> unsigned byte -> ID of the layer's activation function
+  - Dropout -> double (8 bytes) -> dropout parameter of the layer
+  - Bias -> tensor ([see formatting](#tensor-format)) -> bias parameter of the layer
+
+- #### Dense:
+  - Neuron Count -> int32 (4 bytes) -> number of neurons in the layer
+  - Weights -> tensor ([see formatting](#tensor-format)) -> weights parameter of the layer
+
+- #### Conv:
+  - Filter Count -> int32 (4 bytes) -> number of filters in the layer
+  - Kernels -> tensor ([see formatting](#tensor-format)) -> kernels parameter of the layer
+
+- ### Activation Data Format (for activation functions with parameters):
+- #### Leaky ReLU:
+  - Tau -> double (8 bytes) -> tau parameter of the function
+
+### Tensor Format:
+- Dimensions -> int32 array ([see formatting](#int32-array-format)) -> dimensions of the tensor
+- RequiresGrad -> bool (1 byte) -> whether the tensor requires gradients to be calculated
+- Data -> double array ([see formatting](#double-array-format)) -> linear array of the tensor's data values
+
+### String Format (UTF8):
+- Length -> int32 (4 bytes) -> number of bytes in the string
+- Characters -> byte[Length] -> UTF8 character bytes
+
+### Int32 Array Format:
+- Length -> int32 (4 bytes) -> number of elements in the array
+- Elements -> int32[Length] (4 bytes each) -> elements in the array
+
+### Double Array Format:
+- Length -> int32 (4 bytes) -> number of elements in the array
+- Elements -> double[Length] (8 bytes each) -> elements in the array
 
 ## Implementation Details
 ### Reverse-mode Autograd
