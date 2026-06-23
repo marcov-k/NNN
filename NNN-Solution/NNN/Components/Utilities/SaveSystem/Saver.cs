@@ -8,13 +8,9 @@ namespace NNN.Components.Utilities.SaveSystem;
 public static class Saver
 {
     /// <summary>
-    /// Directory to save to and load from.
-    /// </summary>
-    const string DirectoryName = "Models";
-    /// <summary>
     /// Full directory path to save to and load from.
     /// </summary>
-    static string DirectoryPath = string.Empty;
+    static string DirectoryPath = "../../../../Models";
     /// <summary>
     /// File extension for neural network save files.
     /// </summary>
@@ -100,15 +96,6 @@ public static class Saver
     /// </summary>
     static void InitDirectory()
     {
-        if (string.IsNullOrEmpty(DirectoryPath))
-        {
-            string? exePath = Environment.ProcessPath;
-            string? exeDirPath = Path.GetDirectoryName(exePath);
-            if (!string.IsNullOrEmpty(exeDirPath))
-            {
-                DirectoryPath = Path.Combine(exeDirPath, DirectoryName);
-                if (!Directory.Exists(DirectoryPath)) Directory.CreateDirectory(DirectoryPath);
-            }
-        }
+        if (!Directory.Exists(DirectoryPath)) Directory.CreateDirectory(DirectoryPath);
     }
 }

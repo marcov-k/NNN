@@ -120,7 +120,7 @@ public class Conv : Layer
     {
         int filterCount = FileUtils.ReadInt32(stream);
         var kernels = FileUtils.ReadTensor(stream);
-        var kernelDims = Kernels.Dimensions[1..^1];
+        var kernelDims = kernels.Dimensions[1..^1];
 
         string kernelDimsString = "Kernel Dimensions: [";
         for (int i = 0; i < kernelDims.Length; i++)

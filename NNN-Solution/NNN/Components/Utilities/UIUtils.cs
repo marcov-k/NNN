@@ -123,7 +123,7 @@ public static class UIUtils
         }
 
         Saver.SaveModel(model, fileName, desc);
-        Console.WriteLine("\n Model saved");
+        Console.WriteLine("\nModel saved");
     }
 
     /// <summary>

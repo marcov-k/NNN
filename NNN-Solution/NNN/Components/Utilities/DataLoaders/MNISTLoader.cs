@@ -10,7 +10,7 @@ public static class MNISTLoader
     /// <summary>
     /// Path to the directory containing MNIST dataset files.
     /// </summary>
-    const string DirectoryPath = @"TrainingData/MNIST";
+    const string DirectoryPath = @"../../../../TrainingData/MNIST";
     /// <summary>
     /// Name of the file containing training image data.
     /// </summary>

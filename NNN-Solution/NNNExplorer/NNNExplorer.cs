@@ -28,8 +28,9 @@ public class NNNExplorer
     {
         while (true)
         {
-            string fileName = GetInput("\nEnter name of .nnn file to view - must be in the Models directory corresponding to this executable (without extension)");
+            string fileName = GetInput("Enter name of .nnn file to view (without extension)");
             string filePath = Saver.GetFullPath(fileName);
+            Console.WriteLine("\n");
             DisplayFile(filePath);
 
             if (GetInput("View another file? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.No]) break;
@@ -45,6 +46,9 @@ public class NNNExplorer
     static void DisplayFile(string filePath)
     {
         Console.WriteLine();
+
+        Console.WriteLine($"Reading model stored in {Path.GetFileName(filePath)}\n");
+
         if (!File.Exists(filePath))
         {
             Console.WriteLine("File not found.\n");
@@ -72,9 +76,9 @@ public class NNNExplorer
             Console.WriteLine($"Description: {desc}");
             Console.WriteLine($"Total Parameter Count: {paramCount}");
             Console.WriteLine($"Layers: {layerCount}");
-            foreach (var layer in layerData)
+            for (int i = 0; i < layerCount; i++)
             {
-                Console.WriteLine($"\n{layer}\n");
+                Console.WriteLine($"\nLayer {i + 1}\n{layerData[i]}\n");
             }
             Console.WriteLine();
         }

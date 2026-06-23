@@ -182,7 +182,7 @@ public static class FileUtils
     {
         var layerType = IDManager.GetLayerByID((byte)stream.ReadByte());
         var layer = Activator.CreateInstance(layerType) as Layer;
-        return layer!.PrintLayer(stream);
+        return $"Layer Type: {layerType.Name}\n{layer!.PrintLayer(stream)}";
     }
 
     public static string PrintTensor(FileStream stream)
