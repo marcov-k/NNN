@@ -69,9 +69,9 @@ public static class FileUtils
 
     public static void WriteString(FileStream stream, string data)
     {
-        var bytes = Encoding.UTF8.GetBytes(data);
-        WriteInt32(stream, bytes.Length);
-        stream.Write(bytes);
+        Span<byte> buffer = Encoding.UTF8.GetBytes(data);
+        WriteInt32(stream, buffer.Length);
+        stream.Write(buffer);
     }
 
     public static void WriteTensor(FileStream stream, Tensor data)
@@ -79,6 +79,13 @@ public static class FileUtils
         WriteInt32Array(stream, data.Dimensions);
         WriteBool(stream, data.RequiresGrad);
         WriteDoubleArray(stream, data.Data);
+    }
+
+    public static void WriteUInt64(FileStream stream, ulong data)
+    {
+        Span<byte> buffer = stackalloc byte[sizeof(ulong)];
+        BinaryPrimitives.WriteUInt64LittleEndian(buffer, data);
+        stream.Write(buffer);
     }
 
     // Decoding functions
@@ -146,9 +153,9 @@ public static class FileUtils
     public static string ReadString(FileStream stream)
     {
         int length = ReadInt32(stream);
-        var bytes = new byte[length];
-        stream.ReadExactly(bytes);
-        return Encoding.UTF8.GetString(bytes);
+        Span<byte> buffer = stackalloc byte[length];
+        stream.ReadExactly(buffer);
+        return Encoding.UTF8.GetString(buffer);
     }
 
     public static Tensor ReadTensor(FileStream stream)
@@ -160,5 +167,12 @@ public static class FileUtils
         Tensor tensor = new(dims, requiresGrad);
         Array.Copy(data, tensor.Data, data.Length);
         return tensor;
+    }
+
+    public static ulong ReadUInt64(FileStream stream)
+    {
+        Span<byte> buffer = stackalloc byte[sizeof(ulong)];
+        stream.ReadExactly(buffer);
+        return BinaryPrimitives.ReadUInt64LittleEndian(buffer);
     }
 }

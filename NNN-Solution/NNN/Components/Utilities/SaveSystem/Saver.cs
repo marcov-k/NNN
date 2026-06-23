@@ -40,6 +40,7 @@ public static class Saver
         {
             FileUtils.WriteInt32(stream, MagicNumber);
             FileUtils.WriteString(stream, desc);
+            FileUtils.WriteUInt64(stream, model.GetTotalParameterSize());
             FileUtils.WriteModel(stream, model);
             stream.Flush();
         }
@@ -65,7 +66,7 @@ public static class Saver
 
             // Skip the file's description
             int descLength = FileUtils.ReadInt32(stream);
-            stream.Position += descLength;
+            stream.Position += descLength + sizeof(ulong); // skip description + total parameter count (ulong)
 
             model = FileUtils.ReadModel(stream);
         }

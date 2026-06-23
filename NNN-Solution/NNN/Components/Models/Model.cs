@@ -17,7 +17,7 @@ public class Model
     /// </summary>
     public Layer[] Layers { get; private set; }
     /// <summary>
-    /// List of all layer parameters.
+    /// List of all layer parameter tensors.
     /// </summary>
     public List<Tensor> Parameters
     {
@@ -28,7 +28,7 @@ public class Model
         }
     }
     /// <summary>
-    /// Number of parameters across all layers.
+    /// Number of parameter tensors across all layers.
     /// </summary>
     public int ParameterCount => Parameters.Count;
 
@@ -169,6 +169,20 @@ public class Model
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Gets the total number of parameter values across all layers.
+    /// </summary>
+    /// <returns>Total number of parameter values.</returns>
+    public ulong GetTotalParameterSize()
+    {
+        ulong paramSize = 0;
+        foreach (var param in Parameters)
+        {
+            paramSize += (ulong)param.ElementCount;
+        }
+        return paramSize;
     }
 
     /// <summary>
