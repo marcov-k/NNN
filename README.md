@@ -477,7 +477,7 @@ NNN\
 ### Tensor Format:
 - Dimensions -> int32 array ([see formatting](#int32-array-format)) -> dimensions of the tensor
 - RequiresGrad -> boolean ([see formatting](#boolean-format)) -> whether the tensor requires gradients to be calculated
-- Data -> double array ([see formatting](#double-array-format)) -> linear array of the tensor's data values
+- Data -> double array ([see formatting](#double-array-format)) -> linear array of the tensor's data values (row-major ordering)
 
 ### String Format (UTF8):
 - Length -> int32 (4 bytes) -> number of bytes in the string
