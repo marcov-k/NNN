@@ -468,7 +468,7 @@ NNN\
 
 - #### Conv:
   - Filter Count -> int32 (4 bytes) -> number of filters in the layer
-  - Kernels -> tensor ([see formatting](#tensor-format)) -> kernels parameter of the layer
+  - Kernels -> tensor ([see formatting](#tensor-format)) -> kernels parameter of the layer ([f, h, w..., c] ordering)
 
 ### Activation Data Format - found immediately after Activation ID (for activation functions with parameters):
 - #### Leaky ReLU:
