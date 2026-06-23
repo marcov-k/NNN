@@ -49,4 +49,10 @@ public class LeakyReLU : Activation
     {
         Tau = FileUtils.ReadDouble(stream);
     }
+
+    public override string PrintActivation(FileStream stream)
+    {
+        double tau = FileUtils.ReadDouble(stream);
+        return $", Tau: {tau}";
+    }
 }

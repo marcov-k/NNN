@@ -22,7 +22,7 @@ public static class Saver
     /// <summary>
     /// Magic number for .nnn files.
     /// </summary>
-    const int MagicNumber = 776883790; // spells ".NNN"
+    public const int MagicNumber = 776883790; // spells ".NNN"
 
     /// <summary>
     /// Saves the given model to a file with the given name.
@@ -32,9 +32,7 @@ public static class Saver
     /// <param name="desc">Short description to include in the file.</param>
     public static void SaveModel(Model model, string fileName, string desc = "")
     {
-        InitDirectory(); // ensure directory exists
-
-        string filePath = Path.Combine(DirectoryPath, fileName + Extension); // generate full file path
+        string filePath = GetFullPath(fileName);
 
         using FileStream stream = new(filePath, FileMode.Create, FileAccess.Write);
         {
@@ -53,9 +51,7 @@ public static class Saver
     /// <returns>Model loaded from the given file.</returns>
     public static Model LoadModel(string fileName)
     {
-        InitDirectory(); // ensure directory exists
-
-        string filePath = Path.Combine(DirectoryPath, fileName + Extension); // generate full file path
+        string filePath = GetFullPath(fileName);
         if (!File.Exists(filePath)) throw new ArgumentException($"File with name {fileName} not found.");
 
         Model model;
@@ -81,12 +77,22 @@ public static class Saver
     /// <returns>Whether a neural network file with the given name exists.</returns>
     public static bool FileExists(string fileName)
     {
-        InitDirectory(); // ensure directory exists
-
-        string filePath = Path.Combine(DirectoryPath, fileName + Extension); // generate full file path
+        string filePath = GetFullPath(fileName);
 
         if (File.Exists(filePath)) return true;
         else return false;
+    }
+
+    /// <summary>
+    /// Gets the full file path to a .nnn file with the given name in the Models directory.
+    /// </summary>
+    /// <param name="fileName">Name of the file to get path to.</param>
+    /// <returns>Full path to the given file.</returns>
+    public static string GetFullPath(string fileName)
+    {
+        InitDirectory();
+
+        return Path.Combine(DirectoryPath, fileName + Extension);
     }
 
     /// <summary>

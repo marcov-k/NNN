@@ -31,4 +31,11 @@ public abstract class Activation
     /// </summary>
     /// <param name="stream">File stream to read from.</param>
     public abstract void BuildFromData(FileStream stream);
+
+    /// <summary>
+    /// Converts any activation type-specific data from the file stream into a readable string.
+    /// </summary>
+    /// <param name="stream">File stream to read from.</param>
+    /// <returns>Readable string of the activation type-specific data.</returns>
+    public abstract string PrintActivation(FileStream stream);
 }

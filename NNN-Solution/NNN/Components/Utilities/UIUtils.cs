@@ -23,6 +23,65 @@ public static class UIUtils
     public enum UserInput { Yes, No, Quit }
 
     /// <summary>
+    /// Key mappings for user navigation during training episode review.
+    /// </summary>
+    enum EpisodeNavigation
+    {
+        Previous = ConsoleKey.LeftArrow,
+        Next = ConsoleKey.RightArrow,
+        Exit = ConsoleKey.Escape,
+        Quit = ConsoleKey.Q
+    }
+
+    /// <summary>
+    /// Allows the user to view past DQN training episodes.
+    /// </summary>
+    /// <param name="env">DQN environment episodes took place in.</param>
+    /// <param name="episodeBuffer">Buffer of stored episodes for viewing.</param>
+    public static void ViewEpisodes(Environments.Environment env, ref FIFOBuffer<Episode> episodeBuffer)
+    {
+        if (GetInput("Replay past episodes? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
+        {
+            // Allow user to view past episodes until user indicates to stop
+            while (true)
+            {
+                Console.WriteLine();
+                int episode = GetEpisodeSelection(episodeBuffer!);
+
+                int step = 0;
+                bool viewingEpisode = true;
+                while (viewingEpisode)
+                {
+                    // Render current selected step of the episode
+                    Console.Clear();
+                    env.Render(episodeBuffer[episode], step);
+
+                    // Navigate through episode based on user input
+                    var input = Console.ReadKey(true).Key;
+                    switch (input)
+                    {
+                        case (ConsoleKey)EpisodeNavigation.Next:
+                            step = Math.Min(step + 1, episodeBuffer[episode].Experiences.Count);
+                            break;
+                        case (ConsoleKey)EpisodeNavigation.Previous:
+                            step = Math.Max(step - 1, 0);
+                            break;
+                        case (ConsoleKey)EpisodeNavigation.Exit:
+                            Console.Clear();
+                            viewingEpisode = false;
+                            break;
+                        case (ConsoleKey)EpisodeNavigation.Quit:
+                            System.Environment.Exit(0);
+                            break;
+                    }
+                }
+
+                if (GetInput("View another episode? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.No]) break;
+            }
+        }
+    }
+
+    /// <summary>
     /// Saves the given model to the file entered by the user.
     /// </summary>
     /// <param name="model">Model to be saved.</param>
@@ -50,6 +109,11 @@ public static class UIUtils
         }
     }
 
+    /// <summary>
+    /// Finalizes model save information.
+    /// </summary>
+    /// <param name="model">Model to save.</param>
+    /// <param name="fileName">File to save to.</param>
     static void Save(Model model, string fileName)
     {
         string desc = string.Empty;
@@ -74,6 +138,22 @@ public static class UIUtils
             input = GetInput("Enter file name");
             if (Saver.FileExists(input)) return input;
             else Console.WriteLine("\nFile not found");
+        }
+    }
+
+    /// <summary>
+    /// Prompts the user to enter an integer input in the given range.
+    /// </summary>
+    /// <param name="prompt">Prompt to display to the user.</param>
+    /// <param name="min">Minimum value of the integer (inclusive).</param>
+    /// <param name="max">Maximum value of the integer (inclusive).</param>
+    /// <returns>Integer within the given range entered by the user.</returns>
+    public static int GetIntegerInRange(string prompt, int min, int max)
+    {
+        while (true)
+        {
+            if (int.TryParse(GetInput(prompt), out int integer) && integer >= min && integer <= max) return integer;
+            else Console.WriteLine("\nNot a valid number");
         }
     }
 

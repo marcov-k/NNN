@@ -115,4 +115,29 @@ public class Conv : Layer
         Kernels = FileUtils.ReadTensor(stream);
         KernelDims = Kernels.Dimensions[1..^1];
     }
+
+    protected override string PrintUniqueLayer(FileStream stream)
+    {
+        int filterCount = FileUtils.ReadInt32(stream);
+        var kernels = FileUtils.ReadTensor(stream);
+        var kernelDims = Kernels.Dimensions[1..^1];
+
+        string kernelDimsString = "Kernel Dimensions: [";
+        for (int i = 0; i < kernelDims.Length; i++)
+        {
+            kernelDimsString += kernelDims[i];
+            if (i < kernelDims.Length - 1) kernelDimsString += ", ";
+        }
+        kernelDimsString += "]";
+
+        string kernelsString = "Kernels Tensor: Dimensions: [";
+        for (int i = 0; i < kernels.Dimensions.Length; i++)
+        {
+            kernelsString += kernels.Dimensions[i];
+            if (i < kernels.Dimensions.Length - 1) kernelsString += ", ";
+        }
+        kernelsString += $"], # of parameter values: {kernels.ElementCount}";
+
+        return $"Filters: {filterCount}\n{kernelDimsString}\n{kernelsString}";
+    }
 }

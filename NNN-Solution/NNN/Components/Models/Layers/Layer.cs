@@ -84,4 +84,28 @@ public abstract class Layer
     /// </summary>
     /// <param name="stream">File stream to read from.</param>
     protected abstract void ReadUniqueData(FileStream stream);
+
+    /// <summary>
+    /// Converts the layer data from the file stream into a readable string.
+    /// </summary>
+    /// <param name="stream">File stream to read from.</param>
+    /// <returns>Readable string of the layer data.</returns>
+    public string PrintLayer(FileStream stream)
+    {
+        var activType = IDManager.GetActivationByID((byte)stream.ReadByte());
+        var activation = Activator.CreateInstance(activType) as Activation;
+        string activData = activation!.PrintActivation(stream);
+        double dropout = FileUtils.ReadDouble(stream);
+        string biases = $"Bias Tensor: {FileUtils.PrintTensor(stream)}";
+        string additionalData = PrintUniqueLayer(stream);
+
+        return $"{additionalData}\n{biases}\nDropout: {dropout}\nActivation: {activType.Name}{activData}";
+    }
+
+    /// <summary>
+    /// Converts layer type-specific data from the file stream into a readable string.
+    /// </summary>
+    /// <param name="stream">File stream to read from.</param>
+    /// <returns>Readable string of the layer type-specific data.</returns>
+    protected abstract string PrintUniqueLayer(FileStream stream);
 }

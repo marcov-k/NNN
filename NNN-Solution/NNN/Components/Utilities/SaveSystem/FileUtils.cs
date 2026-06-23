@@ -175,4 +175,31 @@ public static class FileUtils
         stream.ReadExactly(buffer);
         return BinaryPrimitives.ReadUInt64LittleEndian(buffer);
     }
+
+    // File viewing functions
+
+    public static string PrintLayer(FileStream stream)
+    {
+        var layerType = IDManager.GetLayerByID((byte)stream.ReadByte());
+        var layer = Activator.CreateInstance(layerType) as Layer;
+        return layer!.PrintLayer(stream);
+    }
+
+    public static string PrintTensor(FileStream stream)
+    {
+        var dims = ReadInt32Array(stream);
+        stream.Position++; // skip RequiresGrad
+        int dataLength = ReadInt32(stream);
+        stream.Position += dataLength * sizeof(double); // skip tensor data
+
+        string data = "Dimensions:[";
+        for (int i = 0; i < dims.Length; i++)
+        {
+            data += dims[i];
+            if (i != dims.Length - 1) data += ", ";
+        }
+        data += $"], # of parameter values: {dataLength}";
+
+        return data;
+    }
 }

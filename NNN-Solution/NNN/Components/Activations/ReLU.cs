@@ -23,4 +23,6 @@ public class ReLU : Activation
     public override void WriteUniqueData(FileStream stream) { }
 
     public override void BuildFromData(FileStream stream) { }
+
+    public override string PrintActivation(FileStream stream) => string.Empty;
 }

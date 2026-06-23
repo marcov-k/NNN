@@ -99,4 +99,11 @@ public class Dense : Layer
         NeuronCount = FileUtils.ReadInt32(stream);
         Weights = FileUtils.ReadTensor(stream);
     }
+
+    protected override string PrintUniqueLayer(FileStream stream)
+    {
+        int neuronCount = FileUtils.ReadInt32(stream);
+        string weights = $"Weights Tensor: {FileUtils.PrintTensor(stream)}";
+        return $"Neurons: {neuronCount}\n{weights}";
+    }
 }
