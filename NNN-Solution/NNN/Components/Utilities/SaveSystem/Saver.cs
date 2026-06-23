@@ -29,7 +29,8 @@ public static class Saver
     /// </summary>
     /// <param name="model">Model to save.</param>
     /// <param name="fileName">Name of file to save to.</param>
-    public static void SaveModel(Model model, string fileName)
+    /// <param name="desc">Short description to include in the file.</param>
+    public static void SaveModel(Model model, string fileName, string desc = "")
     {
         InitDirectory(); // ensure directory exists
 
@@ -38,6 +39,7 @@ public static class Saver
         using FileStream stream = new(filePath, FileMode.Create, FileAccess.Write);
         {
             FileUtils.WriteInt32(stream, MagicNumber);
+            FileUtils.WriteString(stream, desc);
             FileUtils.WriteModel(stream, model);
             stream.Flush();
         }
@@ -53,12 +55,17 @@ public static class Saver
         InitDirectory(); // ensure directory exists
 
         string filePath = Path.Combine(DirectoryPath, fileName + Extension); // generate full file path
+        if (!File.Exists(filePath)) throw new ArgumentException($"File with name {fileName} not found.");
 
         Model model;
         using FileStream stream = new(filePath, FileMode.Open, FileAccess.Read);
         {
             int magic = FileUtils.ReadInt32(stream);
             if (magic != MagicNumber) throw new Exception($"Invalid magic number: found {magic} instead of {MagicNumber}");
+
+            // Skip the file's description
+            int descLength = FileUtils.ReadInt32(stream);
+            stream.Position += descLength;
 
             model = FileUtils.ReadModel(stream);
         }

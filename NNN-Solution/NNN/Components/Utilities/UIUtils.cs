@@ -38,18 +38,28 @@ public static class UIUtils
                 if (GetInput($"File with name \"{fileName}\" already exists. Overwrite existing file? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]])
                     == userInputs[UserInput.Yes])
                 {
-                    Saver.SaveModel(model, fileName);
-                    Console.WriteLine("\nModel saved");
+                    Save(model, fileName);
                     break;
                 }
             }
             else
             {
-                Saver.SaveModel(model, fileName);
-                Console.WriteLine("\nModel saved");
+                Save(model, fileName);
                 break;
             }
         }
+    }
+
+    static void Save(Model model, string fileName)
+    {
+        string desc = string.Empty;
+        if (GetInput("Include a short description of the model? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
+        {
+            desc = GetInput("Enter description:");
+        }
+
+        Saver.SaveModel(model, fileName, desc);
+        Console.WriteLine("\n Model saved");
     }
 
     /// <summary>

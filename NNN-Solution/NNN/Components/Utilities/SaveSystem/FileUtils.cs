@@ -1,6 +1,7 @@
 ﻿using NNN.Components.Autodiff;
 using NNN.Components.Models;
 using NNN.Components.Models.Layers;
+using System.Text;
 
 namespace NNN.Components.Utilities.SaveSystem;
 
@@ -59,6 +60,13 @@ public static class FileUtils
         {
             WriteLayer(stream, layer);
         }
+    }
+
+    public static void WriteString(FileStream stream, string data)
+    {
+        var bytes = Encoding.UTF8.GetBytes(data);
+        WriteInt32(stream, bytes.Length);
+        stream.Write(bytes);
     }
 
     public static void WriteTensor(FileStream stream, Tensor data)
@@ -130,6 +138,14 @@ public static class FileUtils
             layers[i] = ReadLayer(stream);
         }
         return new(layers);
+    }
+
+    public static string ReadString(FileStream stream)
+    {
+        int length = ReadInt32(stream);
+        var bytes = new byte[length];
+        stream.ReadExactly(bytes);
+        return Encoding.UTF8.GetString(bytes);
     }
 
     public static Tensor ReadTensor(FileStream stream)
