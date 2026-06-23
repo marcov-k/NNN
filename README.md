@@ -13,7 +13,7 @@ A neural network framework created from scratch in C# implementing automatic dif
 - Standard loss functions (MSE, pseudo-Huber Loss, Softmax Cross-Entropy)
 - Standard optimizers (SGD, Adam)
 - Performance optimizations via SIMD vectorization and parallelization
-- Custom file type for saving trained models
+- Custom file type for saving trained models (.nnn)
 
 ## Results
 ### Gradient Correctness Tests (Autograd Verification)
