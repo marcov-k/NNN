@@ -13,6 +13,7 @@ A neural network framework created from scratch in C# implementing automatic dif
 - Standard loss functions (MSE, pseudo-Huber Loss, Softmax Cross-Entropy)
 - Standard optimizers (SGD, Adam)
 - Performance optimizations via SIMD vectorization and parallelization
+- Custom file type for saving trained models
 
 ## Results
 ### Gradient Correctness Tests (Autograd Verification)
@@ -346,8 +347,8 @@ trainer.Train(x, y, epochs: 1000);
 - Basic supervised trainer
 - Deep Q-Network (DQN) trainer
 ### Saver
-- Serializes trained models using JSON
-- Deserializes and reconstructs models from JSON
+- Serializes trained models using custom .nnn file format
+- Deserializes and reconstructs models from custom .nnn file format
 
 ## Automatic Differentiation (via partial derivatives)
 ### Example
@@ -430,8 +431,7 @@ NNN\
 &emsp;&emsp;&emsp;&emsp;├── DataLoaders\
 &emsp;&emsp;&emsp;&emsp;│&emsp;&ensp;└── MNISTLoader\
 &emsp;&emsp;&emsp;&emsp;├── SaveSystem\
-&emsp;&emsp;&emsp;&emsp;│&emsp;&ensp;├── LayerData (JSON serializable class storing data for a single layer)\
-&emsp;&emsp;&emsp;&emsp;│&emsp;&ensp;├── ModelData (JSON serializable class storing data for a single neural network)\
+&emsp;&emsp;&emsp;&emsp;│&emsp;&ensp;├── FileUtils (Static class for reading and writing .nnn files)\
 &emsp;&emsp;&emsp;&emsp;│&emsp;&ensp;└── Saver (Static class for handling model saving/loading)\
 &emsp;&emsp;&emsp;&emsp;│\
 &emsp;&emsp;&emsp;&emsp;├── DemoHandler (Static class for handling demonstrations)\
