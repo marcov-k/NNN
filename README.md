@@ -367,77 +367,84 @@ The framework's equivalent of an autograd engine relies on functionality built d
  of the computation graph before propagating gradients in reverse-order.
 
 ## Organization
-NNN\
-├── ModelTrainer (Script for training neural networks using the NNN framework)\
+NNN-Solution - Directory (Full project solution)\
+├── NNN - Directory (Core class library for the NNN framework)\
+│&emsp;&ensp;└── Components - Directory\
+│&emsp;&emsp;&emsp;&ensp;├── Activations - Directory (Activation function classes)\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── Activation - C# Script (Base class)\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── LeakyReLU - C# Script\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── Linear - C# Script\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── ReLU - C# Script\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── Sigmoid - C# Script\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;└── Tanh - C# Script\
+│&emsp;&emsp;&emsp;&ensp;│\
+│&emsp;&emsp;&emsp;&ensp;├── Autodiff - Directory (Automatic differentation and tensor logic - implemented via a partial Tensor class)\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── TensorActivations - C# Script (Tensor implementations of activation functions)\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── TensorGraph - C# Script (Functions for handling computation graph)\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── TensorIndexing - C# Script (Functions for indexing tensors)\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── TensorInitializations - C# Script (Functions for initializing tensors)\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── TensorOperations - C# Script (Tensor implementations of mathematical operations)\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── TensorProperties - C# Script (All tensor class properties)\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;└── TensorUtilities - C# Script (Various utility functions for tensors)\
+│&emsp;&emsp;&emsp;&ensp;│\
+│&emsp;&emsp;&emsp;&ensp;├── Buffers - Directory\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── BatchBuffer - C# Script (Standard supervised training buffer)\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── FIFOBuffer - C# Script (Standard First-In First-Out buffer)\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── ReplayBuffer - C# Script (PER buffer for DQN experience replay)\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;└── SumTree - C# Script (Standard sum tree data structure)\
+│&emsp;&emsp;&emsp;&ensp;│\
+│&emsp;&emsp;&emsp;&ensp;├── Costs - Directory\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── Cost - C# Script (Base class)\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── Huber - C# Script\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── MSE - C# Script\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;└── SoftmaxCrossEntropy - C# Script\
+│&emsp;&emsp;&emsp;&ensp;│\
+│&emsp;&emsp;&emsp;&ensp;├── Environments - Directory (DQN)\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── Environment - C# Script (Base class)\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── MovementGrid2D - C# Script\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── Snake - C# Script\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;└── TicTacToe - C# Script\
+│&emsp;&emsp;&emsp;&ensp;│\
+│&emsp;&emsp;&emsp;&ensp;├── Episodes - Directory (Data structures for DQN experience storage)\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── Episode - C# Script (Data structure for a full DQN training episode)\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;└── Experience - C# Script (Data structure for a single DQN training experience)\
+│&emsp;&emsp;&emsp;&ensp;│\
+│&emsp;&emsp;&emsp;&ensp;├── Models - Directory (Neural network functionality)\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── Layers - Directory\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;│&emsp;&ensp;├── Conv - C# Script (Convolutional)\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;│&emsp;&ensp;├── Dense - C# Script (Fully connected)\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;│&emsp;&ensp;└── Layer - C# Script (Base class)\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;│\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;└── Model - C# Script (Full neural network container class)\
+│&emsp;&emsp;&emsp;&ensp;│\
+│&emsp;&emsp;&emsp;&ensp;├── Optimizers - Directory\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── Adam - C# Script\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── Optimizer - C# Script (Base class)\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;└── SGD - C# Script\
+│&emsp;&emsp;&emsp;&ensp;│\
+│&emsp;&emsp;&emsp;&ensp;├── Trainers - Directory\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── DQNTrainer - C# Script\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;└── Trainer - C# Script (Standard supervised training)\
+│&emsp;&emsp;&emsp;&ensp;│\
+│&emsp;&emsp;&emsp;&ensp;└── Utilities - Directory\
+│&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;├── DataLoaders - Directory\
+│&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;└── MNISTLoader - C# Script\
+│&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;├── SaveSystem - Directory\
+│&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── FileUtils - C# Script (Static class for reading and writing .nnn files)\
+│&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;└── Saver - C# Script (Static class for handling model saving/loading)\
+│&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;│\
+│&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;├── IDManager - C# Script (Static class for looking up IDs for saving/loading - layer type, activation function, etc.)\
+│&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;├── MathUtils - C# Script\
+│&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;└── UIUtils - C# Script\
 │\
-└── Components\
-&emsp;&emsp;├── Activations (Activation function classes)\
-&emsp;&emsp;│&emsp;&ensp;├── Activation (Base class)\
-&emsp;&emsp;│&emsp;&ensp;├── LeakyReLU\
-&emsp;&emsp;│&emsp;&ensp;├── Linear\
-&emsp;&emsp;│&emsp;&ensp;├── ReLU\
-&emsp;&emsp;│&emsp;&ensp;├── Sigmoid\
-&emsp;&emsp;│&emsp;&ensp;└── Tanh\
-&emsp;&emsp;│\
-&emsp;&emsp;├── Autodiff (Automatic differentation and tensor logic - implemented via a partial Tensor class)\
-&emsp;&emsp;│&emsp;&ensp;├── TensorActivations (Tensor implementations of activation functions)\
-&emsp;&emsp;│&emsp;&ensp;├── TensorGraph (Functions for handling computation graph)\
-&emsp;&emsp;│&emsp;&ensp;├── TensorIndexing (Functions for indexing tensors)\
-&emsp;&emsp;│&emsp;&ensp;├── TensorInitializations (Functions for initializing tensors)\
-&emsp;&emsp;│&emsp;&ensp;├── TensorOperations (Tensor implementations of mathematical operations)\
-&emsp;&emsp;│&emsp;&ensp;├── TensorProperties (All tensor class properties)\
-&emsp;&emsp;│&emsp;&ensp;└── TensorUtilities (Various utility functions for tensors)\
-&emsp;&emsp;│\
-&emsp;&emsp;├── Buffers\
-&emsp;&emsp;│&emsp;&ensp;├── BatchBuffer (Standard supervised training buffer)\
-&emsp;&emsp;│&emsp;&ensp;├── FIFOBuffer (Standard First-In First-Out buffer)\
-&emsp;&emsp;│&emsp;&ensp;├── ReplayBuffer (PER buffer for DQN experience replay)\
-&emsp;&emsp;│&emsp;&ensp;└── SumTree (Standard sum tree data structure)\
-&emsp;&emsp;│\
-&emsp;&emsp;├── Costs\
-&emsp;&emsp;│&emsp;&ensp;├── Cost (Base class)\
-&emsp;&emsp;│&emsp;&ensp;├── Huber\
-&emsp;&emsp;│&emsp;&ensp;├── MSE\
-&emsp;&emsp;│&emsp;&ensp;└── Softmax Cross-Entropy\
-&emsp;&emsp;│\
-&emsp;&emsp;├── Environments (DQN)\
-&emsp;&emsp;│&emsp;&ensp;├── Environment (Base class)\
-&emsp;&emsp;│&emsp;&ensp;├── MovementGrid2D\
-&emsp;&emsp;│&emsp;&ensp;├── Snake\
-&emsp;&emsp;│&emsp;&ensp;└── TicTacToe\
-&emsp;&emsp;│\
-&emsp;&emsp;├── Episodes (Data structures for DQN experience storage)\
-&emsp;&emsp;│&emsp;&ensp;├── Episode (Data structure for a full DQN training episode)\
-&emsp;&emsp;│&emsp;&ensp;└── Experience (Data structure for a single DQN training experience)\
-&emsp;&emsp;│\
-&emsp;&emsp;├── Models (Neural network functionality)\
-&emsp;&emsp;│&emsp;&ensp;├── Layers\
-&emsp;&emsp;│&emsp;&ensp;│&emsp;&ensp;├── Conv (Convolutional)\
-&emsp;&emsp;│&emsp;&ensp;│&emsp;&ensp;├── Dense\
-&emsp;&emsp;│&emsp;&ensp;│&emsp;&ensp;└── Layer (Base class)\
-&emsp;&emsp;│&emsp;&ensp;│\
-&emsp;&emsp;│&emsp;&ensp;└── Model (Full neural network container class)\
-&emsp;&emsp;│\
-&emsp;&emsp;├── Optimizers\
-&emsp;&emsp;│&emsp;&ensp;├── Adam\
-&emsp;&emsp;│&emsp;&ensp;├── Optimizer (Base class)\
-&emsp;&emsp;│&emsp;&ensp;└── SGD\
-&emsp;&emsp;│\
-&emsp;&emsp;├── Trainers\
-&emsp;&emsp;│&emsp;&ensp;├── DQNTrainer\
-&emsp;&emsp;│&emsp;&ensp;└── Trainer (Standard supervised training)\
-&emsp;&emsp;│\
-&emsp;&emsp;└── Utilities\
-&emsp;&emsp;&emsp;&emsp;├── DataLoaders\
-&emsp;&emsp;&emsp;&emsp;│&emsp;&ensp;└── MNISTLoader\
-&emsp;&emsp;&emsp;&emsp;├── SaveSystem\
-&emsp;&emsp;&emsp;&emsp;│&emsp;&ensp;├── FileUtils (Static class for reading and writing .nnn files)\
-&emsp;&emsp;&emsp;&emsp;│&emsp;&ensp;└── Saver (Static class for handling model saving/loading)\
-&emsp;&emsp;&emsp;&emsp;│\
-&emsp;&emsp;&emsp;&emsp;├── DemoHandler (Static class for handling demonstrations)\
-&emsp;&emsp;&emsp;&emsp;├── IDManager (Static class for looking up IDs for saving/loading - layer type, activation function, etc.)\
-&emsp;&emsp;&emsp;&emsp;├── MathUtils\
-&emsp;&emsp;&emsp;&emsp;└── UIUtils
+├── NNNDemo - Directory (Program for running NNN demonstrations)\
+│&emsp;&ensp;└── NNNDemo - C# Script (NNN demonstration program script)\
+│\
+├── NNNExplorer - Directory (NNN file viewer - for viewing .nnn files)\
+│&emsp;&ensp;└── NNNExplorer - C# Script (NNN file viewer program script)\
+│\
+└── NNNTrainer - Directory (Program for training neural networks using the NNN framework)\
+&emsp;&emsp;└── NNNTrainer - C# Script (NNN trainer program script)
 
 ## File Format (.nnn)
 ### General Formatting Notes:
