@@ -433,7 +433,7 @@ NNN-Solution - Directory (Full project solution)\
 │&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── FileUtils - C# Script (Static class for reading and writing .nnn files)\
 │&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;└── Saver - C# Script (Static class for handling model saving/loading)\
 │&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;│\
-│&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;├── IDManager - C# Script (Static class for looking up IDs for saving/loading - layer type, activation function, etc.)\
+│&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;├── IDManager - C# Script (Static class for looking up IDs for file format)\
 │&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;├── MathUtils - C# Script\
 │&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;└── UIUtils - C# Script\
 │\
