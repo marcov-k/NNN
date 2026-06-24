@@ -127,6 +127,12 @@ public partial class Tensor
         return result;
     }
 
+    /// <summary>
+    /// Performs the Softmax Cross-Entropy function between the given tensor and a target tensor.
+    /// </summary>
+    /// <param name="t">Tensor to perform the Softmax Cross-Entropy function on.</param>
+    /// <param name="target">Target tensor to use.</param>
+    /// <returns>Result tensor of performing the Softmax Cross-Entropy function between the given and target tensors.</returns>
     public static Tensor SoftmaxCrossEntropy(Tensor t, Tensor target)
     {
         int classes = t.Dimensions[^1];
@@ -136,6 +142,7 @@ public partial class Tensor
 
         var probs = new double[t.ElementCount];
 
+        // Apply Softmax Cross-Entropy per batch
         for (int b = 0; b < batchSize; b++)
         {
             int offset = b * classes;
@@ -143,6 +150,7 @@ public partial class Tensor
             var tSlice = t.Data.AsSpan(offset, classes);
             var tVecs = MemoryMarshal.Cast<double, Vector<double>>(tSlice);
 
+            // Calculate max
             var vmax = new Vector<double>(double.MinValue);
             for (int i = 0; i < tVecs.Length; i++)
             {
@@ -163,7 +171,8 @@ public partial class Tensor
             var pSlice = probs.AsSpan(offset, classes);
             var pVecs = MemoryMarshal.Cast<double, Vector<double>>(pSlice);
 
-            var vmaxSplat = new Vector<double>(max);
+            // Calculate exponent sum
+            var vmaxSplat = new Vector<double>(max); // splat scalar into vector
             var acc = Vector<double>.Zero;
             for (int i = 0; i < tVecs.Length; i++)
             {
@@ -180,7 +189,8 @@ public partial class Tensor
 
             double logSumExp = Math.Log(sumExp) + max;
 
-            var vsumSplat = new Vector<double>(sumExp);
+            // Normalize values by exponent sum
+            var vsumSplat = new Vector<double>(sumExp); // splat scalar into vector
             for (int i = 0; i < pVecs.Length; i++)
             {
                 pVecs[i] /= vsumSplat;
@@ -191,6 +201,7 @@ public partial class Tensor
                 pSlice[i] /= sumExp;
             }
 
+            // Calculate dot product of class values
             var gSlice = target.Data.AsSpan(offset, classes);
             var gVecs = MemoryMarshal.Cast<double, Vector<double>>(gSlice);
             var vdot = Vector<double>.Zero;
@@ -208,6 +219,7 @@ public partial class Tensor
             result[b] = logSumExp - dot;
         }
 
+        // Connect result tensor to autograd graph if needed
         if (!Inference)
         {
             result._parents.AddRange(t);
@@ -216,12 +228,15 @@ public partial class Tensor
             {
                 if (!t.RequiresGrad) return;
 
+                // Calculate gradient per batch
                 for (int b = 0; b < batchSize; b++)
                 {
                     int offset = b * classes;
-                    double rg = result.Grad[b];
-                    var vrg = new Vector<double>(rg);
 
+                    double rg = result.Grad[b];
+
+                    // Vectorize values
+                    var vrg = new Vector<double>(rg); // splat scalar into vector
                     var pSlice = probs.AsSpan(offset, classes);
                     var pVecs = MemoryMarshal.Cast<double, Vector<double>>(pSlice);
                     var gSlice = target.Data.AsSpan(offset, classes);
@@ -229,11 +244,13 @@ public partial class Tensor
                     var tgSlice = t.Grad.AsSpan(offset, classes);
                     var tgVecs = MemoryMarshal.Cast<double, Vector<double>>(tgSlice);
 
+                    // Calculate vectorized gradients
                     for (int i = 0; i < pVecs.Length; i++)
                     {
                         tgVecs[i] += (pVecs[i] - gVecs[i]) * vrg;
                     }
 
+                    // Clean up unvectorized tail
                     for (int i = pVecs.Length * VectorSize; i < classes; i++)
                     {
                         tgSlice[i] += (pSlice[i] - gSlice[i]) * rg;
@@ -657,12 +674,21 @@ public partial class Tensor
         return result;
     }
 
+    /// <summary>
+    /// Creates a dropout mask for a dense layer with the given dropout rate.
+    /// </summary>
+    /// <param name="result">Result tensor to apply dropout to.</param>
+    /// <param name="dropout">Dropout rate to apply.</param>
+    /// <returns>Dropout mask for the given result tensor.</returns>
     public static Tensor GetDenseDropoutMask(Tensor result, double dropout)
     {
+        // Do not apply dropout if in inference mode
         if (Inference) return Scalar(1.0, result.Dimensions, requiresGrad: false);
 
         Tensor mask = new(result.Dimensions, requiresGrad: false);
         double scale = 1.0 / (1.0 - dropout);
+
+        // Randomly select each element to be dropped or not based on dropout rate
         for (int i = 0; i < mask.ElementCount; i++)
         {
             double rand = Random.Shared.NextDouble();
@@ -671,31 +697,44 @@ public partial class Tensor
         return mask;
     }
 
+    /// <summary>
+    /// Creates a spatial dropout mask for a convolutional layer with the given dropout rate.
+    /// </summary>
+    /// <param name="result">Result tensor to apply dropout to.</param>
+    /// <param name="dropout">Dropout rate to apply.</param>
+    /// <returns>Dropout mask for the given result tensor.</returns>
     public static Tensor GetSpatialDropoutMask(Tensor result, double dropout)
     {
+        // Do not apply dropout if in inference mode
         if (Inference) return Scalar(1.0, result.Dimensions, requiresGrad: false);
 
         Tensor mask = new(result.Dimensions, requiresGrad: false);
         double scale = 1.0 / (1.0 - dropout);
 
+        // Compute strides and sizes
         int batches = result.Dimensions[0];
         int batchSize = result.ElementCount / batches;
         int channels = result.Dimensions[^1];
         int spatialSize = batchSize / channels;
 
         var channelVals = new double[channels];
+        // Apply dropout independently to each batch
         for (int b = 0; b < batches; b++)
         {
             int batchOffset = b * batchSize;
 
+            // Select which channels to drop for the given batch
             for (int c = 0; c < channels; c++)
             {
                 channelVals[c] = Random.Shared.NextDouble() < dropout ? 0.0 : scale;
             }
 
+            // Apply dropout to each spatial position
             for (int s = 0; s < spatialSize; s++)
             {
                 int spatialOffset = batchOffset + (s * channels);
+
+                // Apply dropout to each channel in the current spatial position
                 for (int c = 0; c < channels; c++)
                 {
                     mask[spatialOffset + c] = channelVals[c];

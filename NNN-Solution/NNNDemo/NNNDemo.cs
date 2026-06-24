@@ -6,6 +6,9 @@ using static NNN.Components.Utilities.UIUtils;
 
 namespace NNNDemo;
 
+/// <summary>
+/// Neural Network Notions demonstration program.
+/// </summary>
 public class NNNDemo
 {
     /// <summary>
@@ -62,6 +65,9 @@ public class NNNDemo
         System.Environment.Exit(0);
     }
 
+    /// <summary>
+    /// Runs the DQN training demonstration user interaction loop.
+    /// </summary>
     static void RunDQNDemo()
     {
         bool done = false;
@@ -84,6 +90,9 @@ public class NNNDemo
         }
     }
 
+    /// <summary>
+    /// Runs the standard supervised training demonstration user interaction loop.
+    /// </summary>
     static void RunStandardDemo()
     {
         bool done = false;
@@ -106,6 +115,10 @@ public class NNNDemo
         }
     }
 
+    /// <summary>
+    /// Loads and runs the MNIST training demonstration.
+    /// </summary>
+    /// <param name="fileName">Name of the file to load the MNIST demo model from.</param>
     static void RunMNISTDemo(string fileName)
     {
         Console.WriteLine("\nLoading MNIST test dataset...");

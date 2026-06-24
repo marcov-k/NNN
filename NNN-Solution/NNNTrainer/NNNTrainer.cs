@@ -14,6 +14,9 @@ using static NNN.Components.Utilities.UIUtils;
 
 namespace NNNTrainer;
 
+/// <summary>
+/// Neural Network Notions model training program.
+/// </summary>
 public class NNNTrainer
 {
     public static void Main(string[] args)
@@ -32,7 +35,9 @@ public class NNNTrainer
         System.Environment.Exit(0);
     }
 
-    // Primary loop for DQN model training UI - entry point
+    /// <summary>
+    /// Sets up training hyperparameters and prompts the user through DQN training.
+    /// </summary>
     static void DQNTraining()
     {
         Model model;
@@ -106,7 +111,9 @@ public class NNNTrainer
         }
     }
 
-    // Primary loop for standard supervised model training UI - entry point
+    /// <summary>
+    /// Sets up training hyperparameters and prompts the user through standard supervised training.
+    /// </summary>
     static void StandardTraining()
     {
         Console.Clear();
@@ -166,7 +173,14 @@ public class NNNTrainer
         }
     }
 
-    // UI loop for training DQN models for a specified number of episodes
+    /// <summary>
+    /// Repeatedly prompts the user to train a model for a given number of DQN episodes.
+    /// </summary>
+    /// <param name="dqnTrainer">DQN trainer to use.</param>
+    /// <param name="env">DQN environment to train in.</param>
+    /// <param name="model">Model to train.</param>
+    /// <param name="episodeBuffer">Buffer to store past training episodes in.</param>
+    /// <param name="testEpisodes">Number of episodes to run per performance test.</param>
     static void DQNTrainingLoop(DQNTrainer dqnTrainer, NNN.Components.Environments.Environment env, Model model,
         ref FIFOBuffer<Episode> episodeBuffer, int testEpisodes)
     {
@@ -197,7 +211,14 @@ public class NNNTrainer
         }
     }
 
-    // UI loop for training standard supervised models for a specified number of epochs
+    /// <summary>
+    /// Repeatedly prompts the user to train a model for a given number of supervised epochs.
+    /// </summary>
+    /// <param name="trainer">Supervised trainer to use.</param>
+    /// <param name="batchBuffer">Batch buffer storing training data.</param>
+    /// <param name="batchSize">Number of training inputs to include per batch.</param>
+    /// <param name="testFunc">Function to use to evaluate model performance.</param>
+    /// <param name="testLength">Number of times to run the test function per performance test.</param>
     static void StandardTrainingLoop(Trainer trainer, BatchBuffer batchBuffer, int batchSize,
         Func<Model, int, bool> testFunc, int testLength)
     {

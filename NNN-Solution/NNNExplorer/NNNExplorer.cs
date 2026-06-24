@@ -3,6 +3,9 @@ using static NNN.Components.Utilities.UIUtils;
 
 namespace NNNExplorer;
 
+/// <summary>
+/// Neural Network Notions .nnn format file viewing program.
+/// </summary>
 public class NNNExplorer
 {
     public static void Main(string[] args)

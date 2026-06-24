@@ -71,7 +71,7 @@ public static class UIUtils
                             viewingEpisode = false;
                             break;
                         case (ConsoleKey)EpisodeNavigation.Quit:
-                            System.Environment.Exit(0);
+                            Environment.Exit(0);
                             break;
                     }
                 }

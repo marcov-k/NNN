@@ -78,7 +78,7 @@ public class Adam(double learningRate = 0.001, double beta1 = 0.9, double beta2 
             _state[parameter] = moments;
         }
 
-        // Update moments and parameter values
+        // Precalculate and vectorize data
         double biasCorrection1 = 1.0 - Math.Pow(Beta1, iteration + 1);
         var biasCorr1Vec = new Vector<double>(biasCorrection1);
 
