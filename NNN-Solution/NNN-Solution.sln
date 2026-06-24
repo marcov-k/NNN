@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
 VisualStudioVersion = 18.8.11912.234
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NNN.Core", "NNN\NNN.Core.csproj", "{820A4656-E673-4A87-ACAC-0E46B0E91DFB}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NNNCSharp.Core", "NNNCSharp\NNNCSharp.Core.csproj", "{820A4656-E673-4A87-ACAC-0E46B0E91DFB}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NNNTrainer", "NNNTrainer\NNNTrainer.csproj", "{7789B17E-74D7-47CD-ADD9-927C53035D21}"
 EndProject

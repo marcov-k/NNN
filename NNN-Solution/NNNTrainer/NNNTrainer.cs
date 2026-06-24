@@ -1,16 +1,16 @@
-﻿using NNN.Components.Activations;
-using NNN.Components.Autodiff;
-using NNN.Components.Buffers;
-using NNN.Components.Costs;
-using NNN.Components.Environments;
-using NNN.Components.Episodes;
-using NNN.Components.Models;
-using NNN.Components.Models.Layers;
-using NNN.Components.Optimizers;
-using NNN.Components.Trainers;
-using NNN.Components.Utilities.DataLoaders;
-using NNN.Components.Utilities.SaveSystem;
-using static NNN.Components.Utilities.UIUtils;
+﻿using NNNCSharp.Components.Activations;
+using NNNCSharp.Components.Autodiff;
+using NNNCSharp.Components.Buffers;
+using NNNCSharp.Components.Costs;
+using NNNCSharp.Components.Environments;
+using NNNCSharp.Components.Episodes;
+using NNNCSharp.Components.Models;
+using NNNCSharp.Components.Models.Layers;
+using NNNCSharp.Components.Optimizers;
+using NNNCSharp.Components.Trainers;
+using NNNCSharp.Components.Utilities.DataLoaders;
+using NNNCSharp.Components.Utilities.SaveSystem;
+using static NNNCSharp.Components.Utilities.UIUtils;
 
 namespace NNNTrainer;
 
@@ -41,7 +41,7 @@ public class NNNTrainer
     static void DQNTraining()
     {
         Model model;
-        NNN.Components.Environments.Environment env = new TicTacToe();
+        NNNCSharp.Components.Environments.Environment env = new TicTacToe();
         double exploration = 1.0;
         double explorationDecay = 0.9995;
         double minExploration = 0.01;
@@ -181,7 +181,7 @@ public class NNNTrainer
     /// <param name="model">Model to train.</param>
     /// <param name="episodeBuffer">Buffer to store past training episodes in.</param>
     /// <param name="testEpisodes">Number of episodes to run per performance test.</param>
-    static void DQNTrainingLoop(DQNTrainer dqnTrainer, NNN.Components.Environments.Environment env, Model model,
+    static void DQNTrainingLoop(DQNTrainer dqnTrainer, NNNCSharp.Components.Environments.Environment env, Model model,
         ref FIFOBuffer<Episode> episodeBuffer, int testEpisodes)
     {
         // Train agent until user indicates to stop

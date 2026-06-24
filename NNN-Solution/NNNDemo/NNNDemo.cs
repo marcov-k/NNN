@@ -1,8 +1,8 @@
-﻿using NNN.Components.Autodiff;
-using NNN.Components.Environments;
-using NNN.Components.Utilities.DataLoaders;
-using NNN.Components.Utilities.SaveSystem;
-using static NNN.Components.Utilities.UIUtils;
+﻿using NNNCSharp.Components.Autodiff;
+using NNNCSharp.Components.Environments;
+using NNNCSharp.Components.Utilities.DataLoaders;
+using NNNCSharp.Components.Utilities.SaveSystem;
+using static NNNCSharp.Components.Utilities.UIUtils;
 
 namespace NNNDemo;
 
@@ -14,7 +14,7 @@ public class NNNDemo
     /// <summary>
     /// Array of all environments with trained and implemented demonstrations.
     /// </summary>
-    static readonly NNN.Components.Environments.Environment[] DQNDemoEnvs = [new TicTacToe(), new Snake()];
+    static readonly NNNCSharp.Components.Environments.Environment[] DQNDemoEnvs = [new TicTacToe(), new Snake()];
     /// <summary>
     /// Array of all standard supervised training demo functions.
     /// </summary>
