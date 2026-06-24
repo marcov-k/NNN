@@ -141,7 +141,7 @@ public static class FileUtils
 
     public static Model ReadModel(FileStream stream)
     {
-        int layerCount = stream.ReadByte();
+        int layerCount = ReadInt32(stream);
         var layers = new Layer[layerCount];
         for (int i = 0; i < layerCount; i++)
         {
@@ -192,7 +192,7 @@ public static class FileUtils
         int dataLength = ReadInt32(stream);
         stream.Position += dataLength * sizeof(double); // skip tensor data
 
-        string data = "Dimensions:[";
+        string data = "Dimensions: [";
         for (int i = 0; i < dims.Length; i++)
         {
             data += dims[i];

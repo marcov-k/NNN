@@ -99,7 +99,7 @@ public class NNNDemo
             int demoIndex = GetIntegerInRange(prompt, 1, StandardDemos.Length);
 
             Console.WriteLine("\n");
-            StandardDemos[demoIndex].DemoFunction(StandardDemos[demoIndex].FileName);
+            StandardDemos[demoIndex - 1].DemoFunction(StandardDemos[demoIndex - 1].FileName);
 
             Console.Clear();
             if (GetInput("Continue viewing standard demos? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.No]) done = true;
@@ -130,13 +130,11 @@ public class NNNDemo
             var label = labels[index];
 
             int predictLabel = Tensor.ArgMax(model.Predict(wrappedImage));
-            Console.WriteLine($"Image index in dataset: {index}\n");
+            Console.WriteLine($"\n\nImage index in dataset: {index}\n");
             DrawMNISTImage(image, label, 0.5);
             Console.WriteLine($"Model prediction: {predictLabel}");
 
             if (GetInput("View another image? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.No]) done = true;
-
-            Console.Clear();
         }
     }
 }

@@ -26,6 +26,10 @@ public class NNNTrainer
         {
             DQNTraining();
         }
+
+        Console.WriteLine("\nPress any key to quit...");
+        Console.ReadKey();
+        System.Environment.Exit(0);
     }
 
     // Primary loop for DQN model training UI - entry point
@@ -53,6 +57,7 @@ public class NNNTrainer
         DQNTrainer dqnTrainer;
         FIFOBuffer<Episode> episodeBuffer = new(episodeMemorySize);
 
+        Console.Clear();
         Console.WriteLine("Welcome to the DQN Training Terminal (Enter Q to quit)");
 
         if (GetInput("Load model from file? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
@@ -99,16 +104,15 @@ public class NNNTrainer
         {
             SaveLoop(model);
         }
-
-        Console.WriteLine("\nPress any key to quit...");
-        Console.ReadKey();
-        System.Environment.Exit(0);
     }
 
     // Primary loop for standard supervised model training UI - entry point
     static void StandardTraining()
     {
-        Console.WriteLine("Loading MNIST dataset...");
+        Console.Clear();
+        Console.WriteLine("Welcome to the Supervised Training Terminal (Enter Q to quit)");
+
+        Console.WriteLine("\nLoading MNIST dataset...");
         var (trainImages, trainLabels) = MNISTLoader.GetTrainingData();
         var (testImages, testLabels) = MNISTLoader.GetTestData();
         Console.WriteLine("MNIST dataset loaded");
@@ -160,10 +164,6 @@ public class NNNTrainer
         {
             SaveLoop(model);
         }
-
-        Console.WriteLine("\nPress any key to close...");
-        Console.ReadKey();
-        System.Environment.Exit(0);
     }
 
     // UI loop for training DQN models for a specified number of episodes

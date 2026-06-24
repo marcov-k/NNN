@@ -16,7 +16,7 @@ public class NNNExplorer
             DisplayFile(args[0]);
         }
 
-        Console.WriteLine("Press any key to close...");
+        Console.WriteLine("\nPress any key to close...");
         Console.ReadKey();
         Environment.Exit(0);
     }
@@ -78,7 +78,7 @@ public class NNNExplorer
             Console.WriteLine($"Layers: {layerCount}");
             for (int i = 0; i < layerCount; i++)
             {
-                Console.WriteLine($"\nLayer {i + 1}\n{layerData[i]}\n");
+                Console.WriteLine($"\nLayer {i + 1}:\n{layerData[i]}\n");
             }
             Console.WriteLine();
         }
