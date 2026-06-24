@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
-VisualStudioVersion = 18.8.11912.234 insiders
+VisualStudioVersion = 18.8.11912.234
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NNN.Core", "NNN\NNN.Core.csproj", "{820A4656-E673-4A87-ACAC-0E46B0E91DFB}"
 EndProject
@@ -10,6 +10,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NNNExplorer", "NNNExplorer\NNNExplorer.csproj", "{4557D4B2-C710-499A-B527-BFAE8ED88DB9}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NNNDemo", "NNNDemo\NNNDemo.csproj", "{5A3B6842-B72E-4F51-BC0E-C0AD9CDD1BE1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NNNTester", "NNNTester\NNNTester.csproj", "{279FEC86-7673-4BA6-8A17-B6680B5E91FF}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -51,6 +53,14 @@ Global
 		{5A3B6842-B72E-4F51-BC0E-C0AD9CDD1BE1}.Release|Any CPU.Build.0 = Release|Any CPU
 		{5A3B6842-B72E-4F51-BC0E-C0AD9CDD1BE1}.Release|x64.ActiveCfg = Release|Any CPU
 		{5A3B6842-B72E-4F51-BC0E-C0AD9CDD1BE1}.Release|x64.Build.0 = Release|Any CPU
+		{279FEC86-7673-4BA6-8A17-B6680B5E91FF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{279FEC86-7673-4BA6-8A17-B6680B5E91FF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{279FEC86-7673-4BA6-8A17-B6680B5E91FF}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{279FEC86-7673-4BA6-8A17-B6680B5E91FF}.Debug|x64.Build.0 = Debug|Any CPU
+		{279FEC86-7673-4BA6-8A17-B6680B5E91FF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{279FEC86-7673-4BA6-8A17-B6680B5E91FF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{279FEC86-7673-4BA6-8A17-B6680B5E91FF}.Release|x64.ActiveCfg = Release|Any CPU
+		{279FEC86-7673-4BA6-8A17-B6680B5E91FF}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
