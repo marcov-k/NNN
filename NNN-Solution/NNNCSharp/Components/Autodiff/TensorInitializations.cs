@@ -59,6 +59,13 @@ public partial class Tensor
     /// <returns>Bias tensor with non-zero values.</returns>
     public static Tensor InitBiases(int neuronCount) => Scalar(0.01, [neuronCount], true);
 
+    /// <summary>
+    /// Initializes a new kernels tensor.
+    /// </summary>
+    /// <param name="filterCount">Number of filters to use.</param>
+    /// <param name="kernelDims">Dimensions of each individual kernel.</param>
+    /// <param name="inputChannels">Number of input channels.</param>
+    /// <returns>Kernels tensor with the required dimensions.</returns>
     public static Tensor InitKernels(int filterCount, int[] kernelDims, int inputChannels)
     {
         var dims = new int[kernelDims.Length + 2];
