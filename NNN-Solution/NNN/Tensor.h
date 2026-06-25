@@ -7,7 +7,26 @@
 #include <unordered_set>
 #include <vector>
 
-class Tensor
+class Tensor; // forward declaration
+
+struct TensorPtrHash
+{
+	size_t operator()(const std::shared_ptr<Tensor>& ptr) const
+	{
+		return std::hash<Tensor*>()(ptr.get());
+	}
+};
+
+struct TensorPtrEqual
+{
+	bool operator()(const std::shared_ptr<Tensor>& a,
+		const std::shared_ptr<Tensor>& b) const
+	{
+		return a.get() == b.get();
+	}
+};
+
+class Tensor : public std::enable_shared_from_this<Tensor>
 {
 public:
 	const std::vector<double>& data() const
@@ -59,6 +78,14 @@ public:
 
 	const std::vector<int> get_full_indices(int index) const;
 
+	void restore_grad();
+
+	void clear_graph();
+
+	static void begin_forward();
+
+	void backward();
+
 private:
 	std::vector<double> _data;
 	std::vector<double> _grad;
@@ -72,10 +99,17 @@ private:
 	std::function<void()> _backward = [] {};
 	static int _forward_gen;
 	int _last_gen = -1;
-	std::optional<std::vector<std::shared_ptr<Tensor>>> _topo;
-	std::optional<std::unordered_set<std::shared_ptr<Tensor>>> _visited;
+	std::optional<std::vector<std::shared_ptr<Tensor>>> _topo = {};
+	std::optional<std::unordered_set<std::shared_ptr<Tensor>, TensorPtrHash, TensorPtrEqual>> _visited = {};
 
 	static std::vector<int> compute_strides(const std::vector<int>& dims);
 
 	void get_full_indices(int index, std::span<int> indices) const;
+
+	void prepare_forward();
+
+	void finalize_forward();
+
+	static void build_topo(std::shared_ptr<Tensor> t, std::vector<std::shared_ptr<Tensor>>& topo,
+		std::unordered_set<std::shared_ptr<Tensor>, TensorPtrHash, TensorPtrEqual>& visited);
 };
