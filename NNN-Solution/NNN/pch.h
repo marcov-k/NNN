@@ -10,9 +10,12 @@
 // add headers that you want to pre-compile here
 #include "framework.h"
 
+#include <cmath>
 #include <functional>
+#include <immintrin.h>
 #include <memory>
 #include <optional>
+#include <random>
 #include <span>
 #include <stdexcept>
 #include <unordered_set>

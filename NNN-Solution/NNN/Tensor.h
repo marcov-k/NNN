@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <immintrin.h>
 #include <memory>
 #include <optional>
 #include <span>
@@ -86,6 +87,8 @@ public:
 
 	void backward();
 
+	static std::shared_ptr<Tensor> sum(std::shared_ptr<Tensor> t);
+
 private:
 	std::vector<double> _data;
 	std::vector<double> _grad;
@@ -94,7 +97,7 @@ private:
 	static constexpr int VECTOR_SIZE = 256 / 64; // AVX2 register width / bits per double
 	static constexpr int PARALLEL_THRESHOLD = 500000;
 	std::vector<std::shared_ptr<Tensor>> _parents;
-	std::vector<std::weak_ptr<Tensor>> _results;
+	std::vector<std::shared_ptr<Tensor>> _results;
 	int _op_index = 0;
 	std::function<void()> _backward = [] {};
 	static int _forward_gen;
@@ -112,4 +115,6 @@ private:
 
 	static void build_topo(std::shared_ptr<Tensor> t, std::vector<std::shared_ptr<Tensor>>& topo,
 		std::unordered_set<std::shared_ptr<Tensor>, TensorPtrHash, TensorPtrEqual>& visited);
+
+	static std::shared_ptr<Tensor> get_result_tensor(std::shared_ptr<Tensor> owner, const std::vector<int>& dims, bool requires_grad);
 };

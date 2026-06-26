@@ -26,13 +26,9 @@ void Tensor::prepare_forward()
 
 	_op_index = 0;
 
-	for (std::weak_ptr<Tensor> r : _results)
+	for (std::shared_ptr<Tensor>& t : _results)
 	{
-		std::shared_ptr<Tensor> result = r.lock();
-		if (result)
-		{
-			result->clear_graph();
-		}
+		t->clear_graph();
 	}
 
 	_last_gen = _forward_gen;
@@ -63,12 +59,11 @@ void Tensor::build_topo(std::shared_ptr<Tensor> t, std::vector<std::shared_ptr<T
 void Tensor::backward()
 {
 	if (!_topo.has_value()) _topo.emplace();
-	_topo->clear();
 
 	if (!_visited.has_value()) _visited.emplace();
-	_visited->clear();
 
 	build_topo(shared_from_this(), *_topo, *_visited);
+	_visited->clear();
 
 	for (std::shared_ptr<Tensor>& t : *_topo)
 	{
@@ -86,4 +81,6 @@ void Tensor::backward()
 	{
 		t->finalize_forward();
 	}
+
+	_topo->clear();
 }
