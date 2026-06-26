@@ -66,6 +66,8 @@ public:
 
 	Tensor(const std::vector<int> dims, bool req_grad = false);
 
+	Tensor(double value, const std::vector<int> dims, bool req_grad = false);
+
 	double& operator[](int index);
 
 	const double& operator[](int index) const;

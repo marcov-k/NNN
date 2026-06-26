@@ -34,3 +34,21 @@ Tensor::Tensor(const std::vector<int> dims, bool req_grad) : _dimensions(dims), 
 		_grad.assign(size, 0.0);
 	}
 }
+
+Tensor::Tensor(double value, const std::vector<int> dims, bool req_grad) : _dimensions(dims), requires_grad(req_grad)
+{
+	_strides = compute_strides(dims);
+
+	int size = 1;
+	for (int dim : dims)
+	{
+		size *= dim;
+	}
+
+	_data.assign(size, value);
+
+	if (requires_grad)
+	{
+		_grad.assign(size, 0.0);
+	}
+}

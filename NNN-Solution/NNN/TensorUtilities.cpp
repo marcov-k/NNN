@@ -153,11 +153,11 @@ std::shared_ptr<Tensor> Tensor::clip(std::shared_ptr<Tensor> t, double min, doub
 					__m256d reg_rg0 = _mm256_loadu_pd(&p_rg[i]);
 					__m256d reg_rg1 = _mm256_loadu_pd(&p_rg[i + 4]);
 
-					__m256d clamp_mask0 = _mm256_or_pd(_mm256_cmp_pd(reg_tv0, reg_min, _CMP_LT_OS), _mm256_cmp_pd(reg_tv0, reg_max, _CMP_GT_OS));
-					__m256d clamp_mask1 = _mm256_or_pd(_mm256_cmp_pd(reg_tv1, reg_min, _CMP_LT_OS), _mm256_cmp_pd(reg_tv1, reg_max, _CMP_GT_OS));
+					__m256d clamp_mask0 = _mm256_and_pd(_mm256_cmp_pd(reg_tv0, reg_max, _CMP_LE_OS), _mm256_cmp_pd(reg_tv0, reg_min, _CMP_GE_OS));
+					__m256d clamp_mask1 = _mm256_and_pd(_mm256_cmp_pd(reg_tv1, reg_max, _CMP_LE_OS), _mm256_cmp_pd(reg_tv1, reg_min, _CMP_GE_OS));
 
-					__m256d grad_add0 = _mm256_blendv_pd(reg_rg0, reg_0, clamp_mask0);
-					__m256d grad_add1 = _mm256_blendv_pd(reg_rg1, reg_0, clamp_mask1);
+					__m256d grad_add0 = _mm256_blendv_pd(reg_0, reg_rg0, clamp_mask0);
+					__m256d grad_add1 = _mm256_blendv_pd(reg_0, reg_rg1, clamp_mask1);
 
 					__m256d grad0 = _mm256_add_pd(reg_tg0, grad_add0);
 					__m256d grad1 = _mm256_add_pd(reg_tg1, grad_add1);
@@ -172,9 +172,9 @@ std::shared_ptr<Tensor> Tensor::clip(std::shared_ptr<Tensor> t, double min, doub
 					__m256d reg_tg = _mm256_loadu_pd(&p_tg[i]);
 					__m256d reg_rg = _mm256_loadu_pd(&p_rg[i]);
 
-					__m256d clamp_mask = _mm256_and_pd(_mm256_cmp_pd(reg_tv, reg_min, _CMP_LT_OS), _mm256_cmp_pd(reg_tv, reg_max, _CMP_GT_OS));
+					__m256d clamp_mask = _mm256_and_pd(_mm256_cmp_pd(reg_tv, reg_max, _CMP_LE_OS), _mm256_cmp_pd(reg_tv, reg_min, _CMP_GE_OS));
 					
-					__m256d grad_add = _mm256_blendv_pd(reg_rg, reg_0, clamp_mask);
+					__m256d grad_add = _mm256_blendv_pd(reg_0, reg_rg, clamp_mask);
 					__m256d grad = _mm256_add_pd(reg_tg, grad_add);
 
 					_mm256_storeu_pd(&p_tg[i], grad);
