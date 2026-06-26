@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <functional>
 #include <immintrin.h>
 #include <memory>
@@ -63,7 +64,7 @@ public:
 
 	Tensor();
 
-	Tensor(const std::vector<int>& dims, bool req_grad = false);
+	Tensor(const std::vector<int> dims, bool req_grad = false);
 
 	double& operator[](int index);
 
@@ -88,6 +89,10 @@ public:
 	void backward();
 
 	static std::shared_ptr<Tensor> sum(std::shared_ptr<Tensor> t);
+
+	static std::shared_ptr<Tensor> mean(std::shared_ptr<Tensor> t);
+
+	static std::shared_ptr<Tensor> clip(std::shared_ptr<Tensor> t, double min, double max);
 
 private:
 	std::vector<double> _data;

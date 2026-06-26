@@ -170,8 +170,11 @@ void MathUtils::vector_add(std::vector<double>& a, double b)
 	}
 }
 
-double MathUtils::vector_sum(const double* __restrict a, int n)
+double MathUtils::vector_sum(const std::vector<double>& a)
 {
+	int n = static_cast<int>(a.size());
+	const double* __restrict p_a = a.data();
+
 	__m256d acc0 = _mm256_setzero_pd();
 	__m256d acc1 = _mm256_setzero_pd();
 
@@ -179,8 +182,8 @@ double MathUtils::vector_sum(const double* __restrict a, int n)
 
 	for (; i <= n - 8; i += 8)
 	{
-		__m256d reg0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg1 = _mm256_loadu_pd(&a[i + 4]);
+		__m256d reg0 = _mm256_loadu_pd(&p_a[i]);
+		__m256d reg1 = _mm256_loadu_pd(&p_a[i + 4]);
 
 		acc0 = _mm256_add_pd(acc0, reg0);
 		acc1 = _mm256_add_pd(acc1, reg1);
@@ -190,7 +193,7 @@ double MathUtils::vector_sum(const double* __restrict a, int n)
 
 	for (; i <= n - 4; i += 4)
 	{
-		__m256d reg = _mm256_loadu_pd(&a[i]);
+		__m256d reg = _mm256_loadu_pd(&p_a[i]);
 		total_acc = _mm256_add_pd(total_acc, reg);
 	}
 
@@ -198,7 +201,7 @@ double MathUtils::vector_sum(const double* __restrict a, int n)
 
 	for (; i < n; i++)
 	{
-		sum += a[i];
+		sum += p_a[i];
 	}
 
 	return sum;

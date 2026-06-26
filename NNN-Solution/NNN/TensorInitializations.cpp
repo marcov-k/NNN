@@ -17,7 +17,7 @@ std::vector<int> Tensor::compute_strides(const std::vector<int>& dims)
 
 Tensor::Tensor() {}
 
-Tensor::Tensor(const std::vector<int>& dims, bool req_grad) : _dimensions(dims), requires_grad(req_grad)
+Tensor::Tensor(const std::vector<int> dims, bool req_grad) : _dimensions(dims), requires_grad(req_grad)
 {
 	_strides = compute_strides(dims);
 

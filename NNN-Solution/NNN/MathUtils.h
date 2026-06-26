@@ -18,5 +18,5 @@ public:
 
 	static void vector_add(std::vector<double>& a, double b);
 
-	static double vector_sum(const double* __restrict a, int n);
+	static double vector_sum(const std::vector<double>& a);
 };
