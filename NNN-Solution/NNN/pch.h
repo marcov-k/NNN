@@ -14,6 +14,7 @@
 #include <cmath>
 #include <functional>
 #include <immintrin.h>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <random>

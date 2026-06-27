@@ -55,18 +55,6 @@ int Tensor::linear_index(const std::vector<int>& indices) const
 	return offset;
 }
 
-int Tensor::linear_index(std::span<int> indices) const
-{
-	int offset = 0;
-
-	for (int i = 0; i < (int)indices.size(); i++)
-	{
-		offset += indices[i] * _strides[i];
-	}
-
-	return offset;
-}
-
 const std::vector<int> Tensor::get_full_indices(int index) const
 {
 	int dimCount = rank();
@@ -81,7 +69,7 @@ const std::vector<int> Tensor::get_full_indices(int index) const
 	return indices;
 }
 
-void Tensor::get_full_indices(int index, std::span<int> indices) const
+void Tensor::get_full_indices(int index, int* __restrict indices) const
 {
 	int dimCount = rank();
 

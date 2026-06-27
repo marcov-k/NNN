@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <functional>
 #include <immintrin.h>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <span>
@@ -78,8 +79,6 @@ public:
 
 	int linear_index(const std::vector<int>& indices) const;
 
-	int linear_index(std::span<int> indices) const;
-
 	const std::vector<int> get_full_indices(int index) const;
 
 	void restore_grad();
@@ -90,11 +89,33 @@ public:
 
 	void backward();
 
+	static std::shared_ptr<Tensor> mask_actions(std::shared_ptr<Tensor> q_values, const std::vector<int>& actions);
+
+	static int arg_max(std::shared_ptr<Tensor> t);
+
 	static std::shared_ptr<Tensor> sum(std::shared_ptr<Tensor> t);
 
 	static std::shared_ptr<Tensor> mean(std::shared_ptr<Tensor> t);
 
+	static std::shared_ptr<Tensor> softmax_cross_entropy(std::shared_ptr<Tensor> t, std::shared_ptr<Tensor> target);
+
+	static std::shared_ptr<Tensor> transpose(std::shared_ptr<Tensor> t, const std::vector<int>& axes);
+
+	static std::shared_ptr<Tensor> transpose(std::shared_ptr<Tensor> t);
+
+	static std::shared_ptr<Tensor> broadcast(std::shared_ptr<Tensor> t, const std::vector<int>& target_dims);
+
+	static std::shared_ptr<Tensor> reshape(std::shared_ptr<Tensor> t, const std::vector<int>& new_dims);
+
+	static std::shared_ptr<Tensor> flatten(std::shared_ptr<Tensor> t, int start_axis = 0);
+
+	static std::shared_ptr<Tensor> wrap_batch(std::shared_ptr<Tensor> t);
+
 	static std::shared_ptr<Tensor> clip(std::shared_ptr<Tensor> t, double min, double max);
+
+	static std::shared_ptr<Tensor> get_dense_dropout_mask(const std::vector<int> dims, double dropout);
+
+	static std::shared_ptr<Tensor> get_spatial_dropout_mask(const std::vector<int> dims, double dropout);
 
 private:
 	std::vector<double> _data;
@@ -114,7 +135,7 @@ private:
 
 	static std::vector<int> compute_strides(const std::vector<int>& dims);
 
-	void get_full_indices(int index, std::span<int> indices) const;
+	void get_full_indices(int index, int* __restrict indices) const;
 
 	void prepare_forward();
 
