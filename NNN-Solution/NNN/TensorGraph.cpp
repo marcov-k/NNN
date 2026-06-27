@@ -42,7 +42,7 @@ void Tensor::finalize_forward()
 	}
 }
 
-void Tensor::build_topo(std::shared_ptr<Tensor> t, std::vector<std::shared_ptr<Tensor>>& topo,
+void Tensor::build_topo(const std::shared_ptr<Tensor>& t, std::vector<std::shared_ptr<Tensor>>& topo,
 	std::unordered_set<std::shared_ptr<Tensor>, TensorPtrHash, TensorPtrEqual>& visited)
 {
 	if (visited.contains(t)) return;
@@ -62,22 +62,23 @@ void Tensor::backward()
 
 	if (!_visited.has_value()) _visited.emplace();
 
-	build_topo(shared_from_this(), *_topo, *_visited);
+	auto& topo = *_topo;
+	build_topo(shared_from_this(), topo, *_visited);
 	_visited->clear();
 
-	for (std::shared_ptr<Tensor>& t : *_topo)
+	for (std::shared_ptr<Tensor>& t : topo)
 	{
 		t->restore_grad();
 	}
 
 	_grad.assign(_grad.size(), 1.0);
 
-	for (int i = (int)_topo.value().size() - 1; i >= 0; i--)
+	for (int i = (int)topo.size() - 1; i >= 0; i--)
 	{
-		_topo.value()[i]->_backward();
+		topo[i]->_backward();
 	}
 
-	for (std::shared_ptr<Tensor>& t : *_topo)
+	for (std::shared_ptr<Tensor>& t : topo)
 	{
 		t->finalize_forward();
 	}

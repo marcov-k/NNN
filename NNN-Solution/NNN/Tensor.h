@@ -89,33 +89,72 @@ public:
 
 	void backward();
 
-	static std::shared_ptr<Tensor> mask_actions(std::shared_ptr<Tensor> q_values, const std::vector<int>& actions);
+	static std::shared_ptr<Tensor> add(const std::shared_ptr<Tensor>& a, const std::shared_ptr<Tensor>& b);
 
-	static int arg_max(std::shared_ptr<Tensor> t);
+	static std::shared_ptr<Tensor> add(const std::shared_ptr<Tensor>& a, double b);
 
-	static std::shared_ptr<Tensor> sum(std::shared_ptr<Tensor> t);
+	static std::shared_ptr<Tensor> sub(const std::shared_ptr<Tensor>& a, const std::shared_ptr<Tensor>& b);
 
-	static std::shared_ptr<Tensor> mean(std::shared_ptr<Tensor> t);
+	static std::shared_ptr<Tensor> sub(const std::shared_ptr<Tensor>& a, double b);
 
-	static std::shared_ptr<Tensor> softmax_cross_entropy(std::shared_ptr<Tensor> t, std::shared_ptr<Tensor> target);
+	static std::shared_ptr<Tensor> sub(double a, const std::shared_ptr<Tensor>& b);
 
-	static std::shared_ptr<Tensor> transpose(std::shared_ptr<Tensor> t, const std::vector<int>& axes);
+	static std::shared_ptr<Tensor> mul(const std::shared_ptr<Tensor>& a, const std::shared_ptr<Tensor>& b);
 
-	static std::shared_ptr<Tensor> transpose(std::shared_ptr<Tensor> t);
+	static std::shared_ptr<Tensor> mul(const std::shared_ptr<Tensor>& a, double b);
 
-	static std::shared_ptr<Tensor> broadcast(std::shared_ptr<Tensor> t, const std::vector<int>& target_dims);
+	static std::shared_ptr<Tensor> div(const std::shared_ptr<Tensor>& a, const std::shared_ptr<Tensor>& b);
 
-	static std::shared_ptr<Tensor> reshape(std::shared_ptr<Tensor> t, const std::vector<int>& new_dims);
+	static std::shared_ptr<Tensor> div(const std::shared_ptr<Tensor>& a, double b);
 
-	static std::shared_ptr<Tensor> flatten(std::shared_ptr<Tensor> t, int start_axis = 0);
+	static std::shared_ptr<Tensor> div(double a, const std::shared_ptr<Tensor>& b);
 
-	static std::shared_ptr<Tensor> wrap_batch(std::shared_ptr<Tensor> t);
+	static std::shared_ptr<Tensor> pow(const std::shared_ptr<Tensor>& a, const std::shared_ptr<Tensor>& exp);
 
-	static std::shared_ptr<Tensor> clip(std::shared_ptr<Tensor> t, double min, double max);
+	static std::shared_ptr<Tensor> pow(const std::shared_ptr<Tensor>& a, double exp);
 
-	static std::shared_ptr<Tensor> get_dense_dropout_mask(const std::vector<int> dims, double dropout);
+	static std::shared_ptr<Tensor> pow(double a, const std::shared_ptr<Tensor>& exp);
 
-	static std::shared_ptr<Tensor> get_spatial_dropout_mask(const std::vector<int> dims, double dropout);
+	static std::shared_ptr<Tensor> exp(const std::shared_ptr<Tensor>& t);
+
+	static std::shared_ptr<Tensor> log(const std::shared_ptr<Tensor>& arg, const std::shared_ptr<Tensor>& log_base);
+
+	static std::shared_ptr<Tensor> log(const std::shared_ptr<Tensor>& arg, double log_base);
+
+	static std::shared_ptr<Tensor> log(double arg, const std::shared_ptr<Tensor>& log_base);
+
+	static std::shared_ptr<Tensor> matmul(const std::shared_ptr<Tensor>& a, const std::shared_ptr<Tensor>& b);
+
+	static std::shared_ptr<Tensor> convolve(const std::shared_ptr<Tensor>& input, const std::shared_ptr<Tensor>& kernels,
+		const std::shared_ptr<Tensor>& biases);
+
+	static std::shared_ptr<Tensor> mask_actions(const std::shared_ptr<Tensor>& q_values, const std::vector<int>& actions);
+
+	static int arg_max(const std::shared_ptr<const Tensor>& t);
+
+	static std::shared_ptr<Tensor> sum(const std::shared_ptr<Tensor>& t);
+
+	static std::shared_ptr<Tensor> mean(const std::shared_ptr<Tensor>& t);
+
+	static std::shared_ptr<Tensor> softmax_cross_entropy(const std::shared_ptr<Tensor>& t, const std::shared_ptr<Tensor>& target);
+
+	static std::shared_ptr<Tensor> transpose(const std::shared_ptr<Tensor>& t, const std::vector<int>& axes);
+
+	static std::shared_ptr<Tensor> transpose(const std::shared_ptr<Tensor>& t);
+
+	static std::shared_ptr<Tensor> broadcast(const std::shared_ptr<Tensor>& t, const std::vector<int>& target_dims);
+
+	static std::shared_ptr<Tensor> reshape(const std::shared_ptr<Tensor>& t, const std::vector<int>& new_dims);
+
+	static std::shared_ptr<Tensor> flatten(const std::shared_ptr<Tensor>& t, int start_axis = 0);
+
+	static std::shared_ptr<Tensor> wrap_batch(const std::shared_ptr<Tensor>& t);
+
+	static std::shared_ptr<Tensor> clip(const std::shared_ptr<Tensor>& t, double min, double max);
+
+	static std::shared_ptr<Tensor> get_dense_dropout_mask(const std::vector<int>& dims, double dropout);
+
+	static std::shared_ptr<Tensor> get_spatial_dropout_mask(const std::vector<int>& dims, double dropout);
 
 private:
 	std::vector<double> _data;
@@ -141,8 +180,95 @@ private:
 
 	void finalize_forward();
 
-	static void build_topo(std::shared_ptr<Tensor> t, std::vector<std::shared_ptr<Tensor>>& topo,
+	static void build_topo(const std::shared_ptr<Tensor>& t, std::vector<std::shared_ptr<Tensor>>& topo,
 		std::unordered_set<std::shared_ptr<Tensor>, TensorPtrHash, TensorPtrEqual>& visited);
 
-	static std::shared_ptr<Tensor> get_result_tensor(std::shared_ptr<Tensor> owner, const std::vector<int>& dims, bool requires_grad);
+	static std::shared_ptr<Tensor> get_result_tensor(const std::shared_ptr<Tensor>& owner, const std::vector<int>& dims, bool requires_grad);
+
+	static void transpose_matrix(const double* __restrict src, double* __restrict dst, int src_off, int dst_off,
+		int rows, int cols);
+
+	static void compute_row(int i, int n, int p, const double* __restrict a, const double* __restrict b_t,
+		double* __restrict r, int a_off, int b_t_off, int r_off);
+
+	static void compute_output_position(int batch_out_pos, int spatial_rank, int out_spatial_size, int filter_count,
+		int kernel_spatial_size, int input_channels, const int* __restrict out_spatial_strides,
+		const int* __restrict kernel_spatial_strides, const int* __restrict input_strides,
+		const int* __restrict kernel_strides, const int* __restrict result_strides, const double* __restrict input_data,
+		const double* __restrict kernel_data, const double* __restrict bias_data, double* __restrict result_data);
+
+	static void compute_kernel_grad(int fkp, int spatial_rank, int batch, int out_spatial_size,
+		int filter_count, int kernel_spatial_size, int input_channels, const int* __restrict out_spatial_strides,
+		const int* __restrict kernel_spatial_strides, const int* __restrict input_strides,
+		const int* __restrict kernel_strides, const int* __restrict result_strides, const double* __restrict input_data,
+		double* __restrict kernel_grad, const double* __restrict result_grad);
+
+	static void compute_input_grad(int batch_in_pos, int spatial_rank, int in_spatial_size, int filter_count,
+		int kernel_spatial_size, int input_channels, const int* __restrict in_spatial_strides,
+		const int* __restrict kernel_spatial_strides, const int* __restrict out_spatial_dims,
+		const int* __restrict out_spatial_strides, const int* __restrict input_strides, const int* __restrict kernel_strides,
+		const int* __restrict result_strides, double* __restrict input_grad, const double* __restrict kernel_data,
+		const double* __restrict result_grad);
 };
+
+// Free function operators
+
+inline std::shared_ptr<Tensor> operator+(const std::shared_ptr<Tensor>& a, const std::shared_ptr<Tensor>& b)
+{
+	return Tensor::add(a, b);
+}
+
+inline std::shared_ptr<Tensor> operator+(const std::shared_ptr<Tensor>& a, double b)
+{
+	return Tensor::add(a, b);
+}
+
+inline std::shared_ptr<Tensor> operator+(double a, const std::shared_ptr<Tensor>& b)
+{
+	return Tensor::add(b, a);
+}
+
+inline std::shared_ptr<Tensor> operator-(const std::shared_ptr<Tensor>& a, const std::shared_ptr<Tensor>& b)
+{
+	return Tensor::sub(a, b);
+}
+
+inline std::shared_ptr<Tensor> operator-(const std::shared_ptr<Tensor>& a, double b)
+{
+	return Tensor::sub(a, b);
+}
+
+inline std::shared_ptr<Tensor> operator-(double a, const std::shared_ptr<Tensor>& b)
+{
+	return Tensor::sub(a, b);
+}
+
+inline std::shared_ptr<Tensor> operator*(const std::shared_ptr<Tensor>& a, const std::shared_ptr<Tensor>& b)
+{
+	return Tensor::mul(a, b);
+}
+
+inline std::shared_ptr<Tensor> operator*(const std::shared_ptr<Tensor>& a, double b)
+{
+	return Tensor::mul(a, b);
+}
+
+inline std::shared_ptr<Tensor> operator*(double a, const std::shared_ptr<Tensor>& b)
+{
+	return Tensor::mul(b, a);
+}
+
+inline std::shared_ptr<Tensor> operator/(const std::shared_ptr<Tensor>& a, const std::shared_ptr<Tensor>& b)
+{
+	return Tensor::div(a, b);
+}
+
+inline std::shared_ptr<Tensor> operator/(const std::shared_ptr<Tensor>& a, double b)
+{
+	return Tensor::div(a, b);
+}
+
+inline std::shared_ptr<Tensor> operator/(double a, const std::shared_ptr<Tensor>& b)
+{
+	return Tensor::div(a, b);
+}

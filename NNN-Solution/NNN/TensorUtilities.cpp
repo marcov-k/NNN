@@ -2,7 +2,7 @@
 #include "Tensor.h"
 #include "MathUtils.h"
 
-std::shared_ptr<Tensor> Tensor::get_result_tensor(std::shared_ptr<Tensor> owner, const std::vector<int>& dims, bool requires_grad)
+std::shared_ptr<Tensor> Tensor::get_result_tensor(const std::shared_ptr<Tensor>& owner, const std::vector<int>& dims, bool requires_grad)
 {
 	owner->prepare_forward();
 
@@ -48,7 +48,7 @@ std::shared_ptr<Tensor> Tensor::get_result_tensor(std::shared_ptr<Tensor> owner,
 	return result;
 }
 
-std::shared_ptr<Tensor> Tensor::mask_actions(std::shared_ptr<Tensor> q_values, const std::vector<int>& actions)
+std::shared_ptr<Tensor> Tensor::mask_actions(const std::shared_ptr<Tensor>& q_values, const std::vector<int>& actions)
 {
 	const int batch_size = (int)actions.size();
 	const int action_count = q_values->_dimensions.back();
@@ -78,7 +78,7 @@ std::shared_ptr<Tensor> Tensor::mask_actions(std::shared_ptr<Tensor> q_values, c
 	return result;
 }
 
-int Tensor::arg_max(std::shared_ptr<Tensor> t)
+int Tensor::arg_max(const std::shared_ptr<const Tensor>& t)
 {
 	int index = 0;
 	double max = t->_data[0];
@@ -96,7 +96,7 @@ int Tensor::arg_max(std::shared_ptr<Tensor> t)
 	return index;
 }
 
-std::shared_ptr<Tensor> Tensor::sum(std::shared_ptr<Tensor> t)
+std::shared_ptr<Tensor> Tensor::sum(const std::shared_ptr<Tensor>& t)
 {
 	std::shared_ptr<Tensor> result = get_result_tensor(t, std::vector<int>(1, 1), t->requires_grad); // dims: {1} — scalar result
 
@@ -117,7 +117,7 @@ std::shared_ptr<Tensor> Tensor::sum(std::shared_ptr<Tensor> t)
 	return result;
 }
 
-std::shared_ptr<Tensor> Tensor::mean(std::shared_ptr<Tensor> t)
+std::shared_ptr<Tensor> Tensor::mean(const std::shared_ptr<Tensor>& t)
 {
 	std::shared_ptr<Tensor> result = get_result_tensor(t, std::vector<int>(1, 1), t->requires_grad); // dims: {1} - scalar result
 
@@ -139,7 +139,7 @@ std::shared_ptr<Tensor> Tensor::mean(std::shared_ptr<Tensor> t)
 	return result;
 }
 
-std::shared_ptr<Tensor> Tensor::softmax_cross_entropy(std::shared_ptr<Tensor> t, std::shared_ptr<Tensor> target)
+std::shared_ptr<Tensor> Tensor::softmax_cross_entropy(const std::shared_ptr<Tensor>& t, const std::shared_ptr<Tensor>& target)
 {
 	const int classes = t->_dimensions.back();
 	const int element_count = t->element_count();
@@ -196,13 +196,13 @@ std::shared_ptr<Tensor> Tensor::softmax_cross_entropy(std::shared_ptr<Tensor> t,
 			sum_exp += exp;
 		}
 
-		double log_sum_exp = std::log(sum_exp) + max;
+		const double log_sum_exp = std::log(sum_exp) + max;
 
 		MathUtils::vector_div(p_slice, sum_exp);
 
 		std::span<const double> g_slice(target->_data.begin() + offset, classes);
 
-		double dot = MathUtils::vector_dot(g_slice, t_slice);
+		const double dot = MathUtils::vector_dot(g_slice, t_slice);
 
 		result->_data[b] = log_sum_exp - dot;
 	}
@@ -273,7 +273,7 @@ std::shared_ptr<Tensor> Tensor::softmax_cross_entropy(std::shared_ptr<Tensor> t,
 	return result;
 }
 
-std::shared_ptr<Tensor> Tensor::transpose(std::shared_ptr<Tensor> t, const std::vector<int>& axes)
+std::shared_ptr<Tensor> Tensor::transpose(const std::shared_ptr<Tensor>& t, const std::vector<int>& axes)
 {
 	std::vector<int> result_dims(t->rank());
 	const int axes_length = (int)axes.size();
@@ -333,7 +333,7 @@ std::shared_ptr<Tensor> Tensor::transpose(std::shared_ptr<Tensor> t, const std::
 	return result;
 }
 
-std::shared_ptr<Tensor> Tensor::transpose(std::shared_ptr<Tensor> t)
+std::shared_ptr<Tensor> Tensor::transpose(const std::shared_ptr<Tensor>& t)
 {
 	// Default permutation order: reverse all axes
 	std::vector<int> axes(t->rank());
@@ -346,7 +346,7 @@ std::shared_ptr<Tensor> Tensor::transpose(std::shared_ptr<Tensor> t)
 	return transpose(t, axes);
 }
 
-std::shared_ptr<Tensor> Tensor::broadcast(std::shared_ptr<Tensor> t, const std::vector<int>& target_dims)
+std::shared_ptr<Tensor> Tensor::broadcast(const std::shared_ptr<Tensor>& t, const std::vector<int>& target_dims)
 {
 	// t->_dimensions must be a suffix of target_dims (eg. t->_dimensions = [16], target_dims = [32, 16])
 
@@ -378,7 +378,7 @@ std::shared_ptr<Tensor> Tensor::broadcast(std::shared_ptr<Tensor> t, const std::
 	return result;
 }
 
-std::shared_ptr<Tensor> Tensor::reshape(std::shared_ptr<Tensor> t, const std::vector<int>& new_dims)
+std::shared_ptr<Tensor> Tensor::reshape(const std::shared_ptr<Tensor>& t, const std::vector<int>& new_dims)
 {
 	std::shared_ptr<Tensor> result = get_result_tensor(t, new_dims, t->requires_grad);
 
@@ -399,7 +399,7 @@ std::shared_ptr<Tensor> Tensor::reshape(std::shared_ptr<Tensor> t, const std::ve
 	return result;
 }
 
-std::shared_ptr<Tensor> Tensor::flatten(std::shared_ptr<Tensor> t, int start_axis)
+std::shared_ptr<Tensor> Tensor::flatten(const std::shared_ptr<Tensor>& t, int start_axis)
 {
 	int flat_size = 1;
 	for (int i = start_axis; i < t->rank(); ++i) flat_size *= t->_dimensions[i];
@@ -410,7 +410,7 @@ std::shared_ptr<Tensor> Tensor::flatten(std::shared_ptr<Tensor> t, int start_axi
 	return reshape(t, new_dims);
 }
 
-std::shared_ptr<Tensor> Tensor::wrap_batch(std::shared_ptr<Tensor> t)
+std::shared_ptr<Tensor> Tensor::wrap_batch(const std::shared_ptr<Tensor>& t)
 {
 	std::vector<int> batch_dims;
 	batch_dims.reserve(t->rank() + 1);
@@ -436,7 +436,7 @@ std::shared_ptr<Tensor> Tensor::wrap_batch(std::shared_ptr<Tensor> t)
 	return batch;
 }
 
-std::shared_ptr<Tensor> Tensor::clip(std::shared_ptr<Tensor> t, double min, double max)
+std::shared_ptr<Tensor> Tensor::clip(const std::shared_ptr<Tensor>& t, double min, double max)
 {
 	std::shared_ptr<Tensor> result = get_result_tensor(t, t->dimensions(), t->requires_grad);
 
@@ -538,7 +538,7 @@ std::shared_ptr<Tensor> Tensor::clip(std::shared_ptr<Tensor> t, double min, doub
 	return result;
 }
 
-std::shared_ptr<Tensor> Tensor::get_dense_dropout_mask(const std::vector<int> dims, double dropout)
+std::shared_ptr<Tensor> Tensor::get_dense_dropout_mask(const std::vector<int>& dims, double dropout)
 {
 	if (inference) return std::make_shared<Tensor>(1.0, dims, false);
 
@@ -555,7 +555,7 @@ std::shared_ptr<Tensor> Tensor::get_dense_dropout_mask(const std::vector<int> di
 	return mask;
 }
 
-std::shared_ptr<Tensor> Tensor::get_spatial_dropout_mask(const std::vector<int> dims, double dropout)
+std::shared_ptr<Tensor> Tensor::get_spatial_dropout_mask(const std::vector<int>& dims, double dropout)
 {
 	if (inference) return std::make_shared<Tensor>(1.0, dims, false);
 
