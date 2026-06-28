@@ -506,3 +506,258 @@ void Tensor::compute_row(int i, int n, int p, const double* __restrict a, const 
 		r[r_off + i * p + j] = MathUtils::vector_dot(a, b_t, a_off + i * n, b_t_off + j * n, n);
 	}
 }
+
+std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const std::shared_ptr<Tensor>& b)
+{
+	const int rank = a->rank();
+	const int m = a->_dimensions[rank - 2];
+	const int n = a->_dimensions[rank - 1];
+	const int p = b->_dimensions[b->_dimensions.size() - 1];
+
+	bool b_batched = b->rank() == rank;
+
+	int batch_size = 1;
+	for (int i = 0; i < rank - 2; ++i) batch_size *= a->_dimensions[i];
+	const int a_mat_size = m * n;
+	const int b_mat_size = n * p;
+	const int r_mat_size = m * p;
+
+	const int total_rows = batch_size * m;
+
+	std::vector<int> result_dims(a->_dimensions);
+	result_dims[rank - 1] = p;
+
+	const auto& owner = a->requires_grad ? a : b;
+	auto result = get_result_tensor(owner, result_dims, a->requires_grad || b->requires_grad);
+
+	const bool use_parallel = (long)total_rows * n * p > PARALLEL_THRESHOLD;
+	thread_local std::vector<double> b_t;
+	b_t.resize(b_mat_size * batch_size);
+	int b_src_off = 0;
+	for (int batch = 0; batch < batch_size; ++batch)
+	{
+		if (b_batched) b_src_off = batch * b_mat_size;
+		transpose_matrix(b->_data.data(), b_t.data(), b_src_off, batch * b_mat_size, n, p);
+	}
+
+	#pragma warning(suppress: 6993)
+	#pragma omp parallel for if(use_parallel)
+	for (int row = 0; row < total_rows; ++row)
+	{
+		const int batch = row / m;
+		const int i = row % m;
+		compute_row(i, n, p, a->_data.data(), b_t.data(), result->_data.data(), batch * a_mat_size, batch * b_mat_size, batch * r_mat_size);
+	}
+
+	if (!inference)
+	{
+		result->_parents.reserve(result->_parents.size() + 2);
+		result->_parents.push_back(a);
+		result->_parents.push_back(b);
+
+		result->_backward = [a, a_mat_size, b, b_mat_size, b_batched, batch_size, m, n, p, result, r_mat_size]()
+			{
+				if (!a->requires_grad && !b->requires_grad) return;
+
+				const bool par = (long)m * n * p > PARALLEL_THRESHOLD;
+
+				thread_local std::vector<double> a_t;
+				thread_local std::vector<double> d_out_t;
+
+				int b_off = 0;
+				for (int batch = 0; batch < batch_size; ++batch)
+				{
+					const int a_off = batch * a_mat_size;
+					if (b_batched) b_off = batch * b_mat_size;
+					const int r_off = batch * r_mat_size;
+
+					if (a->requires_grad && b->requires_grad)
+					{
+						a_t.resize(a_mat_size);
+						d_out_t.resize(r_mat_size);
+
+						transpose_matrix(a->_data.data(), a_t.data(), a_off, 0, m, n);
+						transpose_matrix(result->_grad.data(), d_out_t.data(), r_off, 0, m, p);
+
+						#pragma omp parallel for if(par)
+						for (int i = 0; i < m; ++i)
+						{
+							for (int k = 0; k < n; ++k)
+							{
+								a->_grad[a_off + i * n + k] += MathUtils::vector_dot(result->_grad.data(), b->_data.data(),
+									r_off + i * p, b_off + k * p, p);
+							}
+						}
+
+						#pragma omp parallel for if(par)
+						for (int k = 0; k < n; ++k)
+						{
+							for (int j = 0; j < p; ++j)
+							{
+								b->_grad[b_off + k * p + j] += MathUtils::vector_dot(a_t.data(), d_out_t.data(),
+									k * m, j * m, m);
+							}
+						}
+					}
+					else if (a->requires_grad)
+					{
+						#pragma omp parallel for if(par)
+						for (int i = 0; i < m; ++i)
+						{
+							for (int k = 0; k < n; ++k)
+							{
+								a->_grad[a_off + i * n + k] += MathUtils::vector_dot(result->_grad.data(), b->_data.data(),
+									r_off + i * p, b_off + k * p, p);
+							}
+						}
+					}
+					else if (b->requires_grad)
+					{
+						a_t.resize(a_mat_size);
+						d_out_t.resize(r_mat_size);
+
+						transpose_matrix(a->_data.data(), a_t.data(), a_off, 0, m, n);
+						transpose_matrix(result->_grad.data(), d_out_t.data(), r_off, 0, m, p);
+
+						#pragma omp parallel for if(par)
+						for (int k = 0; k < n; ++k)
+						{
+							for (int j = 0; j < p; ++j)
+							{
+								b->_grad[b_off + k * p + j] += MathUtils::vector_dot(a_t.data(), d_out_t.data(),
+									k * m, j * m, m);
+							}
+						}
+					}
+				}
+			};
+	}
+
+	return result;
+}
+
+void Tensor::compute_output_position(int batch_out_pos, int spatial_rank, int out_spatial_size, int filter_count,
+	int kernel_spatial_size, int input_channels, const int* __restrict out_spatial_strides,
+	const int* __restrict kernel_spatial_strides, const int* __restrict input_strides,
+	const int* __restrict kernel_strides, const int* __restrict result_strides, const double* __restrict input_data,
+	const double* __restrict kernel_data, const double* __restrict bias_data, double* __restrict result_data)
+{
+	const int b = batch_out_pos / out_spatial_size;
+
+	thread_local std::vector<int> out_coords;
+	thread_local std::vector<int> kernel_coords;
+	thread_local std::vector<double> sums;
+
+	out_coords.resize(spatial_rank);
+	int result_offset = b * result_strides[0];
+	int rem = batch_out_pos % out_spatial_size;
+	for (int i = 0; i < spatial_rank; ++i)
+	{
+		out_coords[i] = rem / out_spatial_strides[i];
+		result_offset += out_coords[i] * result_strides[i + 1];
+		rem %= out_spatial_strides[i];
+	}
+
+	const int input_offset_base = b * input_strides[0];
+	const int kernel_offset_base_coeff = kernel_spatial_size * input_channels;
+
+	kernel_coords.resize(spatial_rank);
+	sums.resize(filter_count);
+	std::copy_n(bias_data, filter_count, sums.data());
+
+	for (int kp = 0; kp < kernel_spatial_size; ++kp)
+	{
+		int kernel_offset_base = 0;
+		int input_offset = input_offset_base;
+		rem = kp;
+		for (int i = 0; i < spatial_rank; ++i)
+		{
+			kernel_coords[i] = rem / kernel_spatial_strides[i];
+			kernel_offset_base += kernel_coords[i] * kernel_strides[i + 1];
+			input_offset += (out_coords[i] + kernel_coords[i]) * input_strides[i + 1];
+			rem %= kernel_spatial_strides[i];
+		}
+
+		for (int f = 0; f < filter_count; ++f)
+		{
+			const int kernel_offset = kernel_offset_base_coeff * f + kernel_offset_base;
+			sums[f] += MathUtils::vector_dot(input_data, kernel_data, input_offset, kernel_offset, input_channels);
+		}
+	}
+
+	std::copy_n(sums.data(), filter_count, result_data + result_offset);
+}
+
+std::shared_ptr<Tensor> Tensor::convolve(const std::shared_ptr<Tensor>& input, const std::shared_ptr<Tensor>& kernels,
+	const std::shared_ptr<Tensor>& biases)
+{
+	const int batches = input->_dimensions[0];
+	const int spatial_rank = kernels->rank() - 2;
+	const int filter_count = kernels->_dimensions[0];
+	const int input_channels = kernels->_dimensions.back();
+
+	thread_local std::vector<int> out_spatial_dims;
+	thread_local std::vector<int> in_spatial_strides;
+	thread_local std::vector<int> out_spatial_strides;
+	thread_local std::vector<int> kernel_spatial_strides;
+	thread_local std::vector<int> result_dims;
+
+	out_spatial_dims.resize(spatial_rank);
+	result_dims.resize(input->rank());
+	result_dims[0] = batches;
+	result_dims.back() = filter_count;
+	int out_spatial_size = 1;
+	int in_spatial_size = 1;
+	int kernel_spatial_size = 1;
+	for (int i = 0; i < spatial_rank; ++i)
+	{
+		out_spatial_dims[i] = input->_dimensions[i + 1] - kernels->_dimensions[i + 1] + 1;
+		out_spatial_size *= out_spatial_dims[i];
+		in_spatial_size *= input->_dimensions[i + 1];
+		kernel_spatial_size *= kernels->_dimensions[i + 1];
+		result_dims[i + 1] = out_spatial_dims[i];
+	}
+
+	const int kernel_volume_size = kernel_spatial_size * input_channels;
+
+	in_spatial_strides.resize(spatial_rank);
+	out_spatial_strides.resize(spatial_rank);
+	kernel_spatial_strides.resize(spatial_rank);
+	in_spatial_strides.back() = 1;
+	out_spatial_strides.back() = 1;
+	kernel_spatial_strides.back() = 1;
+	for (int i = spatial_rank - 2; i >= 0; --i)
+	{
+		in_spatial_strides[i] = in_spatial_strides[i + 1] * input->_dimensions[i + 2];
+		out_spatial_strides[i] = out_spatial_strides[i + 1] * out_spatial_dims[i + 1];
+		kernel_spatial_strides[i] = kernel_spatial_strides[i + 1] * kernels->_dimensions[i + 2];
+	}
+
+	const auto& owner = input->requires_grad ? input : (kernels->requires_grad ? kernels : biases);
+	auto result = get_result_tensor(owner, result_dims, input->requires_grad || kernels->requires_grad || biases->requires_grad);
+
+	const bool use_parallel = (long)batches * out_spatial_size * filter_count * kernel_volume_size > PARALLEL_THRESHOLD;
+
+	#pragma omp parallel for if(use_parallel)
+	for (int i = 0; i < batches * out_spatial_size; ++i)
+	{
+		compute_output_position(i, spatial_rank, out_spatial_size, filter_count, kernel_spatial_size, input_channels,
+			out_spatial_strides.data(), kernel_spatial_strides.data(), input->_strides.data(), kernels->_strides.data(),
+			result->_strides.data(), input->_data.data(), kernels->_data.data(), biases->_data.data(), result->_data.data());
+	}
+
+	if (!inference)
+	{
+		result->_parents.reserve(result->_parents.size() + 3);
+		result->_parents.push_back(input);
+		result->_parents.push_back(kernels);
+		result->_parents.push_back(biases);
+
+		result->_backward = []()
+			{
+
+			};
+	}
+
+	return result;
+}

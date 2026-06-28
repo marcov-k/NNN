@@ -19,7 +19,6 @@
 #include <optional>
 #include <random>
 #include <span>
-#include <stdexcept>
 #include <unordered_set>
 #include <vector>
 

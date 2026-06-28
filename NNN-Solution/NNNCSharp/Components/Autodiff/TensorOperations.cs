@@ -1540,10 +1540,12 @@ public partial class Tensor
 
         // Compute spatial coordinates
         Span<int> outCoords = stackalloc int[spatialRank];
+        int resultOffset = b * resultStrides[0];
         int rem = batchOutPos % outSpatialSize;
         for (int i = 0; i < spatialRank; i++)
         {
             outCoords[i] = rem / outSpatialStrides[i];
+            resultOffset += outCoords[i] * resultStrides[i + 1];
             rem %= outSpatialStrides[i];
         }
 
@@ -1555,27 +1557,20 @@ public partial class Tensor
         // Precompute constant components of offsets
         int inputOffsetBase = b * inputStrides[0];
         int kernelOffsetBaseCoeff = kernelSpatialSize * inputChannels;
-        int kernelOffsetBase = 0;
-        for (int i = 0; i < spatialRank; i++)
-        {
-            kernelOffsetBase += kernelCoords[i] * kernelStrides[i + 1];
-        }
 
         // Calculate filter values for each kernel spatial position
         for (int kp = 0; kp < kernelSpatialSize; kp++)
         {
             // Compute spatial coordinates and linear offsets
+            int kernelOffsetBase = 0;
+            int inputOffset = inputOffsetBase;
             rem = kp;
             for (int i = 0; i < spatialRank; i++)
             {
                 kernelCoords[i] = rem / kernelSpatialStrides[i];
-                rem %= kernelSpatialStrides[i];
-            }
-
-            int inputOffset = inputOffsetBase;
-            for (int i = 0; i < spatialRank; i++)
-            {
+                kernelOffsetBase += kernelCoords[i] * kernelStrides[i + 1];
                 inputOffset += (outCoords[i] + kernelCoords[i]) * inputStrides[i + 1];
+                rem %= kernelSpatialStrides[i];
             }
 
             // Calculate value for each filter at the current position
@@ -1587,13 +1582,6 @@ public partial class Tensor
                 // Add dot product of current kernel position to the sums of the current filter
                 sums[f] += DotProduct(inputData, kernelData, inputOffset, kernelOffset, inputChannels);
             }
-        }
-
-        // Compute linear offset of the result
-        int resultOffset = b * resultStrides[0];
-        for (int i = 0; i < spatialRank; i++)
-        {
-            resultOffset += outCoords[i] * resultStrides[i + 1];
         }
 
         // Fill result data array with calculated sums
