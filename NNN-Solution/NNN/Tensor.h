@@ -69,6 +69,14 @@ public:
 
 	Tensor(double value, const std::vector<int> dims, bool req_grad = false);
 
+	static std::shared_ptr<Tensor> init_weights(int input_count, int neuron_count);
+
+	static std::shared_ptr<Tensor> init_biases(int neuron_count);
+
+	static std::shared_ptr<Tensor> init_kernels(int filter_count, const std::vector<int>& kernel_dims, int input_channels);
+
+	std::shared_ptr<Tensor> copy() const;
+
 	double& operator[](int index);
 
 	const double& operator[](int index) const;

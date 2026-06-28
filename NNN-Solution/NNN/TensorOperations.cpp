@@ -401,9 +401,6 @@ std::shared_ptr<Tensor> Tensor::log(const std::shared_ptr<Tensor>& arg, const st
 				scratch2.resize(element_count);
 				scratch3.resize(element_count);
 
-				std::vector<double> ln_base(element_count);
-				MathUtils::vector_ln(log_base->_data, ln_base);
-
 				MathUtils::vector_ln(log_base->_data, scratch1);
 				if (arg->requires_grad)
 				{

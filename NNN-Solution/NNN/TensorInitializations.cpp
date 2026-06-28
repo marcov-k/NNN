@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "Tensor.h"
+#include "MathUtils.h"
 
 std::vector<int> Tensor::compute_strides(const std::vector<int>& dims)
 {
@@ -51,4 +52,55 @@ Tensor::Tensor(double value, const std::vector<int> dims, bool req_grad) : _dime
 	{
 		_grad.assign(size, 0.0);
 	}
+}
+
+std::shared_ptr<Tensor> Tensor::init_weights(int input_count, int neuron_count)
+{
+	auto weights = std::make_shared<Tensor>(std::vector<int>{input_count, neuron_count}, true);
+
+	double std_dev = std::sqrt(2.0 / input_count);
+	const int element_count = weights->element_count();
+	for (int i = 0; i < element_count; ++i)
+	{
+		weights->_data[i] = MathUtils::next_gaussian(0.0, std_dev);
+	}
+
+	return weights;
+}
+
+std::shared_ptr<Tensor> Tensor::init_biases(int neuron_count)
+{
+	return std::make_shared<Tensor>(0.01, std::vector<int>{neuron_count}, true);
+}
+
+std::shared_ptr<Tensor> Tensor::init_kernels(int filter_count, const std::vector<int>& kernel_dims, int input_channels)
+{
+	std::vector<int> dims;
+	dims.reserve(kernel_dims.size() + 2);
+	dims.push_back(filter_count);
+	int fan_in = input_channels;
+	for (int dim : kernel_dims)
+	{
+		dims.push_back(dim);
+		fan_in *= dim;
+	}
+	dims.push_back(input_channels);
+
+	auto kernels = std::make_shared<Tensor>(dims, true);
+
+	double std_dev = std::sqrt(2.0 / fan_in);
+	const int element_count = kernels->element_count();
+	for (int i = 0; i < element_count; ++i)
+	{
+		kernels->_data[i] = MathUtils::next_gaussian(0.0, std_dev);
+	}
+
+	return kernels;
+}
+
+std::shared_ptr<Tensor> Tensor::copy() const
+{
+	auto copy = std::make_shared<Tensor>(_dimensions, false);
+	copy->_data = _data;
+	return copy;
 }

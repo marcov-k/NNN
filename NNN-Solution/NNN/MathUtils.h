@@ -10,12 +10,24 @@ class MathUtils
 public:
 	MathUtils() = delete;
 
+	// Random number generation
+
 	static double get_random_double(double min = 0.0, double max = 1.0)
 	{
 		thread_local std::random_device rd;
 		thread_local std::mt19937 gen(rd());
 
 		std::uniform_real_distribution dis(min, max);
+
+		return dis(gen);
+	}
+
+	static double next_gaussian(double mean = 0.0, double std_dev = 1.0)
+	{
+		thread_local std::random_device rd;
+		thread_local std::mt19937 gen(rd());
+
+		std::normal_distribution dis(mean, std_dev);
 
 		return dis(gen);
 	}
