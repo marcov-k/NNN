@@ -205,8 +205,8 @@ private:
 		const int* __restrict kernel_strides, const int* __restrict result_strides, const double* __restrict input_data,
 		const double* __restrict kernel_data, const double* __restrict bias_data, double* __restrict result_data);
 
-	static void compute_kernel_grad(int fkp, int spatial_rank, int batch, int out_spatial_size,
-		int filter_count, int kernel_spatial_size, int input_channels, const int* __restrict out_spatial_strides,
+	static void compute_kernel_grad(int fkp, int spatial_rank, int batches, int out_spatial_size,
+		int kernel_spatial_size, int input_channels, const int* __restrict out_spatial_strides,
 		const int* __restrict kernel_spatial_strides, const int* __restrict input_strides,
 		const int* __restrict kernel_strides, const int* __restrict result_strides, const double* __restrict input_data,
 		double* __restrict kernel_grad, const double* __restrict result_grad);
@@ -214,9 +214,8 @@ private:
 	static void compute_input_grad(int batch_in_pos, int spatial_rank, int in_spatial_size, int filter_count,
 		int kernel_spatial_size, int input_channels, const int* __restrict in_spatial_strides,
 		const int* __restrict kernel_spatial_strides, const int* __restrict out_spatial_dims,
-		const int* __restrict out_spatial_strides, const int* __restrict input_strides, const int* __restrict kernel_strides,
-		const int* __restrict result_strides, double* __restrict input_grad, const double* __restrict kernel_data,
-		const double* __restrict result_grad);
+		const int* __restrict input_strides, const int* __restrict kernel_strides, const int* __restrict result_strides,
+		double* __restrict input_grad, const double* __restrict kernel_data, const double* __restrict result_grad);
 };
 
 // Free function operators
