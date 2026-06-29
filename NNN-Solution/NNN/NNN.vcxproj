@@ -172,6 +172,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="TensorActivations.cpp" />
+    <ClCompile Include="TensorCosts.cpp" />
     <ClCompile Include="TensorGraph.cpp" />
     <ClCompile Include="TensorIndexing.cpp" />
     <ClCompile Include="TensorInitializations.cpp" />

@@ -139,140 +139,6 @@ std::shared_ptr<Tensor> Tensor::mean(const std::shared_ptr<Tensor>& t)
 	return result;
 }
 
-std::shared_ptr<Tensor> Tensor::softmax_cross_entropy(const std::shared_ptr<Tensor>& t, const std::shared_ptr<Tensor>& target)
-{
-	const int classes = t->_dimensions.back();
-	const int element_count = t->element_count();
-	const int batches = element_count / classes;
-
-	std::shared_ptr<Tensor> result = get_result_tensor(t, std::vector<int>{batches, 1}, t->requires_grad);
-
-	std::vector<double> probs(element_count);
-
-	for (int b = 0; b < batches; ++b)
-	{
-		const int offset = b * classes;
-
-		std::span<const double> t_slice(t->_data.begin() + offset, classes);
-
-		const double max = MathUtils::vector_max(t_slice);
-
-		std::span<double> p_slice(probs.begin() + offset, classes);
-
-		const __m256d reg_max = _mm256_set1_pd(max);
-		__m256d acc0 = _mm256_setzero_pd();
-		__m256d acc1 = _mm256_setzero_pd();
-		const double* const __restrict p_t = t_slice.data();
-		double* const __restrict p_p = p_slice.data();
-
-		int i = 0;
-		for (; i <= classes - 8; i += 8)
-		{
-			__m256d exp0 = _mm256_exp_pd(_mm256_sub_pd(_mm256_loadu_pd(&p_t[i]), reg_max));
-			__m256d exp1 = _mm256_exp_pd(_mm256_sub_pd(_mm256_loadu_pd(&p_t[i + 4]), reg_max));
-
-			_mm256_storeu_pd(&p_p[i], exp0);
-			_mm256_storeu_pd(&p_p[i + 4], exp1);
-
-			acc0 = _mm256_add_pd(acc0, exp0);
-			acc1 = _mm256_add_pd(acc1, exp1);
-		}
-
-		__m256d acc = _mm256_add_pd(acc0, acc1);
-
-		for (; i <= classes - 4; i += 4)
-		{
-			__m256d exp = _mm256_exp_pd(_mm256_sub_pd(_mm256_loadu_pd(&p_t[i]), reg_max));
-			_mm256_storeu_pd(&p_p[i], exp);
-			acc = _mm256_add_pd(acc, exp);
-		}
-
-		double sum_exp = MathUtils::sum_m256d(acc);
-
-		for (; i < classes; ++i)
-		{
-			double exp = std::exp(p_t[i] - max);
-			p_p[i] = exp;
-			sum_exp += exp;
-		}
-
-		const double log_sum_exp = std::log(sum_exp) + max;
-
-		MathUtils::vector_div(p_slice, sum_exp);
-
-		std::span<const double> g_slice(target->_data.begin() + offset, classes);
-
-		const double dot = MathUtils::vector_dot(g_slice, t_slice);
-
-		result->_data[b] = log_sum_exp - dot;
-	}
-
-	if (!inference)
-	{
-		result->_parents.push_back(t);
-
-		result->_backward = [t, target, result, probs, batches, classes]()
-			{
-				if (!t->requires_grad) return;
-
-				for (int b = 0; b < batches; ++b)
-				{
-					const int offset = b * classes;
-
-					const double r_grad = result->_grad[b];
-
-					std::span<const double> p_slice(probs.begin() + offset, classes);
-					std::span<const double> g_slice(target->_data.begin() + offset, classes);
-					std::span<double> tg_slice(t->_grad.begin() + offset, classes);
-
-					const double* const __restrict p_p = p_slice.data();
-					const double* const __restrict p_g = g_slice.data();
-					double* const __restrict p_tg = tg_slice.data();
-					const __m256d reg_r_grad = _mm256_set1_pd(r_grad);
-
-					int i = 0;
-					for (; i <= classes - 8; i += 8)
-					{
-						__m256d reg_p0 = _mm256_loadu_pd(&p_p[i]);
-						__m256d reg_p1 = _mm256_loadu_pd(&p_p[i + 4]);
-
-						__m256d reg_g0 = _mm256_loadu_pd(&p_g[i]);
-						__m256d reg_g1 = _mm256_loadu_pd(&p_g[i + 4]);
-
-						__m256d reg_tg0 = _mm256_loadu_pd(&p_tg[i]);
-						__m256d reg_tg1 = _mm256_loadu_pd(&p_tg[i + 4]);
-
-						__m256d diff0 = _mm256_sub_pd(reg_p0, reg_g0);
-						__m256d diff1 = _mm256_sub_pd(reg_p1, reg_g1);
-
-						__m256d res0 = _mm256_fmadd_pd(diff0, reg_r_grad, reg_tg0);
-						__m256d res1 = _mm256_fmadd_pd(diff1, reg_r_grad, reg_tg1);
-
-						_mm256_storeu_pd(&p_tg[i], res0);
-						_mm256_storeu_pd(&p_tg[i + 4], res1);
-					}
-
-					for (; i <= classes - 4; i += 4)
-					{
-						__m256d reg_p = _mm256_loadu_pd(&p_p[i]);
-						__m256d reg_g = _mm256_loadu_pd(&p_g[i]);
-						__m256d reg_tg = _mm256_loadu_pd(&p_tg[i]);
-						__m256d diff = _mm256_sub_pd(reg_p, reg_g);
-						__m256d res = _mm256_fmadd_pd(diff, reg_r_grad, reg_tg);
-						_mm256_storeu_pd(&p_tg[i], res);
-					}
-
-					for (; i < classes; ++i)
-					{
-						tg_slice[i] += (p_slice[i] - g_slice[i]) * r_grad;
-					}
-				}
-			};
-	}
-
-	return result;
-}
-
 std::shared_ptr<Tensor> Tensor::transpose(const std::shared_ptr<Tensor>& t, const std::vector<int>& axes)
 {
 	std::vector<int> result_dims(t->rank());
@@ -440,44 +306,17 @@ std::shared_ptr<Tensor> Tensor::clip(const std::shared_ptr<Tensor>& t, double mi
 {
 	std::shared_ptr<Tensor> result = get_result_tensor(t, t->dimensions(), t->requires_grad);
 
-	const int n = t->element_count();
-	const double* __restrict p_t = t->_data.data();
-	double* __restrict p_r = result->_data.data();
-	const __m256d reg_min = _mm256_set1_pd(min);
-	const __m256d reg_max = _mm256_set1_pd(max);
-
-	int i = 0;
-	for (; i <= n - 8; i += 8)
-	{
-		__m256d reg_t0 = _mm256_loadu_pd(&p_t[i]);
-		__m256d reg_t1 = _mm256_loadu_pd(&p_t[i + 4]);
-
-		__m256d clamp0 = _mm256_max_pd(_mm256_min_pd(reg_t0, reg_max), reg_min);
-		__m256d clamp1 = _mm256_max_pd(_mm256_min_pd(reg_t1, reg_max), reg_min);
-
-		_mm256_storeu_pd(&p_r[i], clamp0);
-		_mm256_storeu_pd(&p_r[i + 4], clamp1);
-	}
-
-	for (; i <= n - 4; i += 4)
-	{
-		__m256d reg_t = _mm256_loadu_pd(&p_t[i]);
-		__m256d clamp = _mm256_max_pd(_mm256_min_pd(reg_t, reg_max), reg_min);
-		_mm256_storeu_pd(&p_r[i], clamp);
-	}
-
-	for (; i < n; ++i)
-	{
-		p_r[i] = std::clamp(p_t[i], min, max);
-	}
+	MathUtils::vector_clamp(t->_data, min, max, result->_data);
 
 	if (!inference)
 	{
 		result->_parents.push_back(t);
 
-		result->_backward = [t, result, n, min, max]()
+		result->_backward = [t, result, min, max]()
 			{
 				if (!t->requires_grad) return;
+
+				const size_t n = result->element_count();
 
 				const double* __restrict p_tv = t->_data.data();
 				double* __restrict p_tg = t->_grad.data();
@@ -486,7 +325,7 @@ std::shared_ptr<Tensor> Tensor::clip(const std::shared_ptr<Tensor>& t, double mi
 				const double* __restrict p_rg = result->_grad.data();
 				const __m256d reg_0 = _mm256_setzero_pd();
 
-				int i = 0;
+				size_t i = 0;
 				for (; i <= n - 8; i += 8)
 				{
 					__m256d reg_tv0 = _mm256_loadu_pd(&p_tv[i]);

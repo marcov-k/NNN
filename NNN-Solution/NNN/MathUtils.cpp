@@ -301,6 +301,36 @@ void MathUtils::vector_sub(double a, const double* const __restrict b, double* c
 	}
 }
 
+void MathUtils::vector_sub(double a, double* const __restrict b, size_t n)
+{
+	const __m256d reg_a = _mm256_set1_pd(a);
+
+	size_t i = 0;
+	for (; i <= n - 8; i += 8)
+	{
+		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
+		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
+
+		__m256d dif0 = _mm256_sub_pd(reg_a, reg_b0);
+		__m256d dif1 = _mm256_sub_pd(reg_a, reg_b1);
+
+		_mm256_storeu_pd(&b[i], dif0);
+		_mm256_storeu_pd(&b[i + 4], dif1);
+	}
+
+	for (; i <= n - 4; i += 4)
+	{
+		__m256d reg_b = _mm256_loadu_pd(&b[i]);
+		__m256d dif = _mm256_sub_pd(reg_a, reg_b);
+		_mm256_storeu_pd(&b[i], dif);
+	}
+
+	for (; i < n; ++i)
+	{
+		b[i] = a - b[i];
+	}
+}
+
 void MathUtils::vector_mul(const double* const __restrict a, const double* const __restrict b, double* const __restrict c, size_t n)
 {
 	size_t i = 0;
@@ -578,6 +608,36 @@ void MathUtils::vector_div(double a, const double* const __restrict b, double* c
 	for (; i < n; ++i)
 	{
 		c[i] = a / b[i];
+	}
+}
+
+void MathUtils::vector_div(double a, double* const __restrict b, size_t n)
+{
+	const __m256d reg_a = _mm256_set1_pd(a);
+
+	size_t i = 0;
+	for (; i <= n - 8; i += 8)
+	{
+		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
+		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
+
+		__m256d quo0 = _mm256_div_pd(reg_a, reg_b0);
+		__m256d quo1 = _mm256_div_pd(reg_a, reg_b1);
+
+		_mm256_storeu_pd(&b[i], quo0);
+		_mm256_storeu_pd(&b[i + 4], quo1);
+	}
+
+	for (; i <= n - 4; i += 4)
+	{
+		__m256d reg_b = _mm256_loadu_pd(&b[i]);
+		__m256d quo = _mm256_div_pd(reg_a, reg_b);
+		_mm256_storeu_pd(&b[i], quo);
+	}
+
+	for (; i < n; ++i)
+	{
+		b[i] = a - b[i];
 	}
 }
 
@@ -1577,4 +1637,667 @@ double MathUtils::vector_dot(const double* __restrict a, const double* __restric
 	}
 
 	return dot;
+}
+
+void MathUtils::vector_max(const double* const __restrict a, const double* const __restrict b, double* const __restrict c, size_t n)
+{
+	size_t i = 0;
+	for (; i <= n - 8; i += 8)
+	{
+		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
+		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
+		
+		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
+		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
+
+		__m256d max0 = _mm256_max_pd(reg_a0, reg_b0);
+		__m256d max1 = _mm256_max_pd(reg_a1, reg_b1);
+
+		_mm256_storeu_pd(&c[i], max0);
+		_mm256_storeu_pd(&c[i + 4], max1);
+	}
+
+	for (; i <= n - 4; i += 4)
+	{
+		__m256d reg_a = _mm256_loadu_pd(&a[i]);
+		__m256d reg_b = _mm256_loadu_pd(&b[i]);
+		__m256d max = _mm256_max_pd(reg_a, reg_b);
+		_mm256_storeu_pd(&c[i], max);
+	}
+
+	for (; i < n; ++i)
+	{
+		c[i] = max(a[i], b[i]);
+	}
+}
+
+void MathUtils::vector_max(double* const __restrict a, const double* const __restrict b, size_t n)
+{
+	size_t i = 0;
+	for (; i <= n - 8; i += 8)
+	{
+		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
+		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
+
+		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
+		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
+
+		__m256d max0 = _mm256_max_pd(reg_a0, reg_b0);
+		__m256d max1 = _mm256_max_pd(reg_a1, reg_b1);
+
+		_mm256_storeu_pd(&a[i], max0);
+		_mm256_storeu_pd(&a[i + 4], max1);
+	}
+
+	for (; i <= n - 4; i += 4)
+	{
+		__m256d reg_a = _mm256_loadu_pd(&a[i]);
+		__m256d reg_b = _mm256_loadu_pd(&b[i]);
+		__m256d max = _mm256_max_pd(reg_a, reg_b);
+		_mm256_storeu_pd(&a[i], max);
+	}
+
+	for (; i < n; ++i)
+	{
+		if (b[i] > a[i]) a[i] = b[i];
+	}
+}
+
+void MathUtils::vector_max(const double* const __restrict a, double b, double* const __restrict c, size_t n)
+{
+	const __m256d reg_b = _mm256_set1_pd(b);
+
+	size_t i = 0;
+	for (; i <= n - 8; i += 8)
+	{
+		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
+		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
+
+		__m256d max0 = _mm256_max_pd(reg_a0, reg_b);
+		__m256d max1 = _mm256_max_pd(reg_a1, reg_b);
+
+		_mm256_storeu_pd(&c[i], max0);
+		_mm256_storeu_pd(&c[i + 4], max1);
+	}
+
+	for (; i <= n - 4; i += 4)
+	{
+		__m256d reg_a = _mm256_loadu_pd(&a[i]);
+		__m256d max = _mm256_max_pd(reg_a, reg_b);
+		_mm256_storeu_pd(&c[i], max);
+	}
+
+	for (; i < n; ++i)
+	{
+		c[i] = max(a[i], b);
+	}
+}
+
+void MathUtils::vector_max(double* const __restrict a, double b, size_t n)
+{
+	const __m256d reg_b = _mm256_set1_pd(b);
+
+	size_t i = 0;
+	for (; i <= n - 8; i += 8)
+	{
+		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
+		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
+
+		__m256d max0 = _mm256_max_pd(reg_a0, reg_b);
+		__m256d max1 = _mm256_max_pd(reg_a1, reg_b);
+
+		_mm256_storeu_pd(&a[i], max0);
+		_mm256_storeu_pd(&a[i + 4], max1);
+	}
+
+	for (; i <= n - 4; i += 4)
+	{
+		__m256d reg_a = _mm256_loadu_pd(&a[i]);
+		__m256d max = _mm256_max_pd(reg_a, reg_b);
+		_mm256_storeu_pd(&a[i], max);
+	}
+
+	for (; i < n; ++i)
+	{
+		if (b > a[i]) a[i] = b;
+	}
+}
+
+void MathUtils::vector_min(const double* const __restrict a, const double* const __restrict b, double* const __restrict c, size_t n)
+{
+	size_t i = 0;
+	for (; i <= n - 8; i += 8)
+	{
+		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
+		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
+
+		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
+		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
+
+		__m256d min0 = _mm256_min_pd(reg_a0, reg_b0);
+		__m256d min1 = _mm256_min_pd(reg_a1, reg_b1);
+
+		_mm256_storeu_pd(&c[i], min0);
+		_mm256_storeu_pd(&c[i + 4], min1);
+	}
+
+	for (; i <= n - 4; i += 4)
+	{
+		__m256d reg_a = _mm256_loadu_pd(&a[i]);
+		__m256d reg_b = _mm256_loadu_pd(&b[i]);
+		__m256d min = _mm256_min_pd(reg_a, reg_b);
+		_mm256_storeu_pd(&c[i], min);
+	}
+
+	for (; i < n; ++i)
+	{
+		c[i] = min(a[i], b[i]);
+	}
+}
+
+void MathUtils::vector_min(double* const __restrict a, const double* const __restrict b, size_t n)
+{
+	size_t i = 0;
+	for (; i <= n - 8; i += 8)
+	{
+		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
+		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
+
+		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
+		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
+
+		__m256d min0 = _mm256_min_pd(reg_a0, reg_b0);
+		__m256d min1 = _mm256_min_pd(reg_a1, reg_b1);
+
+		_mm256_storeu_pd(&a[i], min0);
+		_mm256_storeu_pd(&a[i + 4], min1);
+	}
+
+	for (; i <= n - 4; i += 4)
+	{
+		__m256d reg_a = _mm256_loadu_pd(&a[i]);
+		__m256d reg_b = _mm256_loadu_pd(&b[i]);
+		__m256d min = _mm256_min_pd(reg_a, reg_b);
+		_mm256_storeu_pd(&a[i], min);
+	}
+
+	for (; i < n; ++i)
+	{
+		if (b[i] < a[i]) a[i] = b[i];
+	}
+}
+
+void MathUtils::vector_min(const double* const __restrict a, double b, double* const __restrict c, size_t n)
+{
+	const __m256d reg_b = _mm256_set1_pd(b);
+
+	size_t i = 0;
+	for (; i <= n - 8; i += 8)
+	{
+		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
+		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
+
+		__m256d min0 = _mm256_min_pd(reg_a0, reg_b);
+		__m256d min1 = _mm256_min_pd(reg_a1, reg_b);
+
+		_mm256_storeu_pd(&c[i], min0);
+		_mm256_storeu_pd(&c[i + 4], min1);
+	}
+
+	for (; i <= n - 4; i += 4)
+	{
+		__m256d reg_a = _mm256_loadu_pd(&a[i]);
+		__m256d min = _mm256_min_pd(reg_a, reg_b);
+		_mm256_storeu_pd(&c[i], min);
+	}
+
+	for (; i < n; ++i)
+	{
+		c[i] = min(a[i], b);
+	}
+}
+
+void MathUtils::vector_min(double* const __restrict a, double b, size_t n)
+{
+	const __m256d reg_b = _mm256_set1_pd(b);
+
+	size_t i = 0;
+	for (; i <= n - 8; i += 8)
+	{
+		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
+		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
+
+		__m256d min0 = _mm256_min_pd(reg_a0, reg_b);
+		__m256d min1 = _mm256_min_pd(reg_a1, reg_b);
+
+		_mm256_storeu_pd(&a[i], min0);
+		_mm256_storeu_pd(&a[i + 4], min1);
+	}
+
+	for (; i <= n - 4; i += 4)
+	{
+		__m256d reg_a = _mm256_loadu_pd(&a[i]);
+		__m256d min = _mm256_min_pd(reg_a, reg_b);
+		_mm256_storeu_pd(&a[i], min);
+	}
+
+	for (; i < n; ++i)
+	{
+		if (b < a[i]) a[i] = b;
+	}
+}
+
+void MathUtils::vector_clamp(const double* const __restrict a, const double* const __restrict min, const double* const __restrict max,
+	double* const __restrict r, size_t n)
+{
+	size_t i = 0;
+	for (; i <= n - 8; i += 8)
+	{
+		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
+		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
+
+		__m256d reg_min0 = _mm256_loadu_pd(&min[i]);
+		__m256d reg_min1 = _mm256_loadu_pd(&min[i + 4]);
+
+		__m256d reg_max0 = _mm256_loadu_pd(&max[i]);
+		__m256d reg_max1 = _mm256_loadu_pd(&max[i + 4]);
+
+		__m256d clamp0 = _mm256_max_pd(_mm256_min_pd(reg_a0, reg_max0), reg_min0);
+		__m256d clamp1 = _mm256_max_pd(_mm256_min_pd(reg_a1, reg_max1), reg_min1);
+
+		_mm256_storeu_pd(&r[i], clamp0);
+		_mm256_storeu_pd(&r[i + 4], clamp1);
+	}
+
+	for (; i <= n - 4; i += 4)
+	{
+		__m256d reg_a = _mm256_loadu_pd(&a[i]);
+		__m256d reg_min = _mm256_loadu_pd(&min[i]);
+		__m256d reg_max = _mm256_loadu_pd(&max[i]);
+		__m256d clamp = _mm256_max_pd(_mm256_min_pd(reg_a, reg_max), reg_min);
+		_mm256_storeu_pd(&r[i], clamp);
+	}
+
+	for (; i < n; ++i)
+	{
+		r[i] = std::clamp(a[i], min[i], max[i]);
+	}
+}
+
+void MathUtils::vector_clamp(double* const __restrict a, const double* const __restrict min, const double* const __restrict max, size_t n)
+{
+	size_t i = 0;
+	for (; i <= n - 8; i += 8)
+	{
+		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
+		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
+
+		__m256d reg_min0 = _mm256_loadu_pd(&min[i]);
+		__m256d reg_min1 = _mm256_loadu_pd(&min[i + 4]);
+
+		__m256d reg_max0 = _mm256_loadu_pd(&max[i]);
+		__m256d reg_max1 = _mm256_loadu_pd(&max[i + 4]);
+
+		__m256d clamp0 = _mm256_max_pd(_mm256_min_pd(reg_a0, reg_max0), reg_min0);
+		__m256d clamp1 = _mm256_max_pd(_mm256_min_pd(reg_a1, reg_max1), reg_min1);
+
+		_mm256_storeu_pd(&a[i], clamp0);
+		_mm256_storeu_pd(&a[i + 4], clamp1);
+	}
+
+	for (; i <= n - 4; i += 4)
+	{
+		__m256d reg_a = _mm256_loadu_pd(&a[i]);
+		__m256d reg_min = _mm256_loadu_pd(&min[i]);
+		__m256d reg_max = _mm256_loadu_pd(&max[i]);
+		__m256d clamp = _mm256_max_pd(_mm256_min_pd(reg_a, reg_max), reg_min);
+		_mm256_storeu_pd(&a[i], clamp);
+	}
+
+	for (; i < n; ++i)
+	{
+		a[i] = std::clamp(a[i], min[i], max[i]);
+	}
+}
+
+void MathUtils::vector_clamp(const double* const __restrict a, double min, const double* const __restrict max,
+	double* const __restrict r, size_t n)
+{
+	const __m256d reg_min = _mm256_set1_pd(min);
+
+	size_t i = 0;
+	for (; i <= n - 8; i += 8)
+	{
+		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
+		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
+
+		__m256d reg_max0 = _mm256_loadu_pd(&max[i]);
+		__m256d reg_max1 = _mm256_loadu_pd(&max[i + 4]);
+
+		__m256d clamp0 = _mm256_max_pd(_mm256_min_pd(reg_a0, reg_max0), reg_min);
+		__m256d clamp1 = _mm256_max_pd(_mm256_min_pd(reg_a1, reg_max1), reg_min);
+
+		_mm256_storeu_pd(&r[i], clamp0);
+		_mm256_storeu_pd(&r[i + 4], clamp1);
+	}
+
+	for (; i <= n - 4; i += 4)
+	{
+		__m256d reg_a = _mm256_loadu_pd(&a[i]);
+		__m256d reg_max = _mm256_loadu_pd(&max[i]);
+		__m256d clamp = _mm256_max_pd(_mm256_min_pd(reg_a, reg_max), reg_min);
+		_mm256_storeu_pd(&r[i], clamp);
+	}
+
+	for (; i < n; ++i)
+	{
+		r[i] = std::clamp(a[i], min, max[i]);
+	}
+}
+
+void MathUtils::vector_clamp(double* const __restrict a, double min, const double* const __restrict max, size_t n)
+{
+	const __m256d reg_min = _mm256_set1_pd(min);
+
+	size_t i = 0;
+	for (; i <= n - 8; i += 8)
+	{
+		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
+		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
+
+		__m256d reg_max0 = _mm256_loadu_pd(&max[i]);
+		__m256d reg_max1 = _mm256_loadu_pd(&max[i + 4]);
+
+		__m256d clamp0 = _mm256_max_pd(_mm256_min_pd(reg_a0, reg_max0), reg_min);
+		__m256d clamp1 = _mm256_max_pd(_mm256_min_pd(reg_a1, reg_max1), reg_min);
+
+		_mm256_storeu_pd(&a[i], clamp0);
+		_mm256_storeu_pd(&a[i + 4], clamp1);
+	}
+
+	for (; i <= n - 4; i += 4)
+	{
+		__m256d reg_a = _mm256_loadu_pd(&a[i]);
+		__m256d reg_max = _mm256_loadu_pd(&max[i]);
+		__m256d clamp = _mm256_max_pd(_mm256_min_pd(reg_a, reg_max), reg_min);
+		_mm256_storeu_pd(&a[i], clamp);
+	}
+
+	for (; i < n; ++i)
+	{
+		a[i] = std::clamp(a[i], min, max[i]);
+	}
+}
+
+void MathUtils::vector_clamp(const double* const __restrict a, const double* const __restrict min, double max,
+	double* const __restrict r, size_t n)
+{
+	const __m256d reg_max = _mm256_set1_pd(max);
+
+	size_t i = 0;
+	for (; i <= n - 8; i += 8)
+	{
+		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
+		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
+
+		__m256d reg_min0 = _mm256_loadu_pd(&min[i]);
+		__m256d reg_min1 = _mm256_loadu_pd(&min[i + 4]);
+
+		__m256d clamp0 = _mm256_max_pd(_mm256_min_pd(reg_a0, reg_max), reg_min0);
+		__m256d clamp1 = _mm256_max_pd(_mm256_min_pd(reg_a1, reg_max), reg_min1);
+
+		_mm256_storeu_pd(&r[i], clamp0);
+		_mm256_storeu_pd(&r[i + 4], clamp1);
+	}
+
+	for (; i <= n - 4; i += 4)
+	{
+		__m256d reg_a = _mm256_loadu_pd(&a[i]);
+		__m256d reg_min = _mm256_loadu_pd(&min[i]);
+		__m256d clamp = _mm256_max_pd(_mm256_min_pd(reg_a, reg_max), reg_min);
+		_mm256_storeu_pd(&r[i], clamp);
+	}
+
+	for (; i < n; ++i)
+	{
+		r[i] = std::clamp(a[i], min[i], max);
+	}
+}
+
+void MathUtils::vector_clamp(double* const __restrict a, const double* const __restrict min, double max, size_t n)
+{
+	const __m256d reg_max = _mm256_set1_pd(max);
+
+	size_t i = 0;
+	for (; i <= n - 8; i += 8)
+	{
+		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
+		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
+
+		__m256d reg_min0 = _mm256_loadu_pd(&min[i]);
+		__m256d reg_min1 = _mm256_loadu_pd(&min[i + 4]);
+
+		__m256d clamp0 = _mm256_max_pd(_mm256_min_pd(reg_a0, reg_max), reg_min0);
+		__m256d clamp1 = _mm256_max_pd(_mm256_min_pd(reg_a1, reg_max), reg_min1);
+
+		_mm256_storeu_pd(&a[i], clamp0);
+		_mm256_storeu_pd(&a[i + 4], clamp1);
+	}
+
+	for (; i <= n - 4; i += 4)
+	{
+		__m256d reg_a = _mm256_loadu_pd(&a[i]);
+		__m256d reg_min = _mm256_loadu_pd(&min[i]);
+		__m256d clamp = _mm256_max_pd(_mm256_min_pd(reg_a, reg_max), reg_min);
+		_mm256_storeu_pd(&a[i], clamp);
+	}
+
+	for (; i < n; ++i)
+	{
+		a[i] = std::clamp(a[i], min[i], max);
+	}
+}
+
+void MathUtils::vector_clamp(const double* const __restrict a, double min, double max, double* const __restrict r, size_t n)
+{
+	const __m256d reg_min = _mm256_set1_pd(min);
+	const __m256d reg_max = _mm256_set1_pd(max);
+
+	size_t i = 0;
+	for (; i <= n - 8; i += 8)
+	{
+		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
+		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
+
+		__m256d clamp0 = _mm256_max_pd(_mm256_min_pd(reg_a0, reg_max), reg_min);
+		__m256d clamp1 = _mm256_max_pd(_mm256_min_pd(reg_a1, reg_max), reg_min);
+
+		_mm256_storeu_pd(&r[i], clamp0);
+		_mm256_storeu_pd(&r[i + 4], clamp1);
+	}
+
+	for (; i <= n - 4; i += 4)
+	{
+		__m256d reg_a = _mm256_loadu_pd(&a[i]);
+		__m256d clamp = _mm256_max_pd(_mm256_min_pd(reg_a, reg_max), reg_min);
+		_mm256_storeu_pd(&r[i], clamp);
+	}
+
+	for (; i < n; ++i)
+	{
+		r[i] = std::clamp(a[i], min, max);
+	}
+}
+
+void MathUtils::vector_clamp(double* const __restrict a, double min, double max, size_t n)
+{
+	const __m256d reg_min = _mm256_set1_pd(min);
+	const __m256d reg_max = _mm256_set1_pd(max);
+
+	size_t i = 0;
+	for (; i <= n - 8; i += 8)
+	{
+		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
+		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
+
+		__m256d clamp0 = _mm256_max_pd(_mm256_min_pd(reg_a0, reg_max), reg_min);
+		__m256d clamp1 = _mm256_max_pd(_mm256_min_pd(reg_a1, reg_max), reg_min);
+
+		_mm256_storeu_pd(&a[i], clamp0);
+		_mm256_storeu_pd(&a[i + 4], clamp1);
+	}
+
+	for (; i <= n - 4; i += 4)
+	{
+		__m256d reg_a = _mm256_loadu_pd(&a[i]);
+		__m256d clamp = _mm256_max_pd(_mm256_min_pd(reg_a, reg_max), reg_min);
+		_mm256_storeu_pd(&a[i], clamp);
+	}
+
+	for (; i < n; ++i)
+	{
+		a[i] = std::clamp(a[i], min, max);
+	}
+}
+
+void MathUtils::vector_sigmoid(const double* const __restrict a, double* const __restrict r, size_t n)
+{
+	const __m256d neg_mask = _mm256_set1_pd(-0.0);
+	const __m256d reg_one = _mm256_set1_pd(1.0);
+
+	size_t i = 0;
+	for (; i <= n - 8; i += 8)
+	{
+		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
+		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
+
+		__m256d neg0 = _mm256_xor_pd(reg_a0, neg_mask);
+		__m256d neg1 = _mm256_xor_pd(reg_a1, neg_mask);
+
+		__m256d exp0 = _mm256_exp_pd(neg0);
+		__m256d exp1 = _mm256_exp_pd(neg1);
+
+		__m256d denom0 = _mm256_add_pd(exp0, reg_one);
+		__m256d denom1 = _mm256_add_pd(exp1, reg_one);
+
+		__m256d sig0 = _mm256_div_pd(reg_one, denom0);
+		__m256d sig1 = _mm256_div_pd(reg_one, denom1);
+
+		_mm256_storeu_pd(&r[i], sig0);
+		_mm256_storeu_pd(&r[i + 4], sig1);
+	}
+
+	for (; i <= n - 4; i += 4)
+	{
+		__m256d reg_a = _mm256_loadu_pd(&a[i]);
+		__m256d neg = _mm256_xor_pd(reg_a, neg_mask);
+		__m256d exp = _mm256_exp_pd(neg);
+		__m256d denom = _mm256_add_pd(exp, reg_one);
+		__m256d sig = _mm256_div_pd(reg_one, denom);
+		_mm256_storeu_pd(&r[i], sig);
+	}
+
+	for (; i < n; ++i)
+	{
+		r[i] = 1.0 / (1.0 + std::exp(-a[i]));
+	}
+}
+
+void MathUtils::vector_sigmoid(double* const __restrict a, size_t n)
+{
+	const __m256d neg_mask = _mm256_set1_pd(-0.0);
+	const __m256d reg_one = _mm256_set1_pd(1.0);
+
+	size_t i = 0;
+	for (; i <= n - 8; i += 8)
+	{
+		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
+		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
+
+		__m256d neg0 = _mm256_xor_pd(reg_a0, neg_mask);
+		__m256d neg1 = _mm256_xor_pd(reg_a1, neg_mask);
+
+		__m256d exp0 = _mm256_exp_pd(neg0);
+		__m256d exp1 = _mm256_exp_pd(neg1);
+
+		__m256d denom0 = _mm256_add_pd(exp0, reg_one);
+		__m256d denom1 = _mm256_add_pd(exp1, reg_one);
+
+		__m256d sig0 = _mm256_div_pd(reg_one, denom0);
+		__m256d sig1 = _mm256_div_pd(reg_one, denom1);
+
+		_mm256_storeu_pd(&a[i], sig0);
+		_mm256_storeu_pd(&a[i + 4], sig1);
+	}
+
+	for (; i <= n - 4; i += 4)
+	{
+		__m256d reg_a = _mm256_loadu_pd(&a[i]);
+		__m256d neg = _mm256_xor_pd(reg_a, neg_mask);
+		__m256d exp = _mm256_exp_pd(neg);
+		__m256d denom = _mm256_add_pd(exp, reg_one);
+		__m256d sig = _mm256_div_pd(reg_one, denom);
+		_mm256_storeu_pd(&a[i], sig);
+	}
+
+	for (; i < n; ++i)
+	{
+		a[i] = 1.0 / (1.0 + std::exp(-a[i]));
+	}
+}
+
+void MathUtils::vector_tanh(const double* const __restrict a, double* const __restrict r, size_t n)
+{
+	size_t i = 0;
+	for (; i <= n - 8; i += 8)
+	{
+		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
+		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
+
+		__m256d tanh0 = _mm256_tanh_pd(reg_a0);
+		__m256d tanh1 = _mm256_tanh_pd(reg_a1);
+
+		_mm256_storeu_pd(&r[i], tanh0);
+		_mm256_storeu_pd(&r[i + 4], tanh1);
+	}
+
+	for (; i <= n - 4; i += 4)
+	{
+		__m256d reg_a = _mm256_loadu_pd(&a[i]);
+		__m256d tanh = _mm256_tanh_pd(reg_a);
+		_mm256_storeu_pd(&r[i], tanh);
+	}
+
+	for (; i < n; ++i)
+	{
+		r[i] = std::tanh(a[i]);
+	}
+}
+
+void MathUtils::vector_tanh(double* const __restrict a, size_t n)
+{
+	size_t i = 0;
+	for (; i <= n - 8; i += 8)
+	{
+		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
+		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
+
+		__m256d tanh0 = _mm256_tanh_pd(reg_a0);
+		__m256d tanh1 = _mm256_tanh_pd(reg_a1);
+
+		_mm256_storeu_pd(&a[i], tanh0);
+		_mm256_storeu_pd(&a[i + 4], tanh1);
+	}
+
+	for (; i <= n - 4; i += 4)
+	{
+		__m256d reg_a = _mm256_loadu_pd(&a[i]);
+		__m256d tanh = _mm256_tanh_pd(reg_a);
+		_mm256_storeu_pd(&a[i], tanh);
+	}
+
+	for (; i < n; ++i)
+	{
+		a[i] = std::tanh(a[i]);
+	}
 }

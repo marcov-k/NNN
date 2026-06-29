@@ -105,6 +105,13 @@ public:
 		vector_sub(a, b.data(), c.data(), b.size());
 	}
 
+	static void vector_sub(double a, double* const __restrict b, size_t n);
+
+	static void vector_sub(double a, std::span<double> b)
+	{
+		vector_sub(a, b.data(), b.size());
+	}
+
 	// Vector multiplication
 
 	static void vector_mul(const double* const __restrict a, const double* const __restrict b, double* const __restrict c, size_t n);
@@ -170,6 +177,13 @@ public:
 	static void vector_div(double a, std::span<const double> b, std::span<double> c)
 	{
 		vector_div(a, b.data(), c.data(), b.size());
+	}
+
+	static void vector_div(double a, double* const __restrict b, size_t n);
+
+	static void vector_div(double a, std::span<double> b)
+	{
+		vector_div(a, b.data(), b.size());
 	}
 
 	// Vector exponentiation
@@ -398,4 +412,151 @@ public:
 	}
 
 	static double vector_dot(const double* __restrict a, const double* __restrict b, int a_off, int b_off, int n);
+
+	// Vector limiting functions
+
+	static void vector_max(const double* const __restrict a, const double* const __restrict b, double* const __restrict c, size_t n);
+
+	static void vector_max(std::span<const double> a, std::span<const double> b, std::span<double> c)
+	{
+		vector_max(a.data(), b.data(), c.data(), a.size());
+	}
+
+	static void vector_max(double* const __restrict a, const double* const __restrict b, size_t n);
+
+	static void vector_max(std::span<double> a, std::span<const double> b)
+	{
+		vector_max(a.data(), b.data(), a.size());
+	}
+
+	static void vector_max(const double* const __restrict a, double b, double* const __restrict c, size_t n);
+
+	static void vector_max(std::span<const double> a, double b, std::span<double> c)
+	{
+		vector_max(a.data(), b, c.data(), a.size());
+	}
+
+	static void vector_max(double* const __restrict a, double b, size_t n);
+
+	static void vector_max(std::span<double> a, double b)
+	{
+		vector_max(a.data(), b, a.size());
+	}
+
+	static void vector_min(const double* const __restrict a, const double* const __restrict b, double* const __restrict c, size_t n);
+
+	static void vector_min(std::span<const double> a, std::span<const double> b, std::span<double> c)
+	{
+		vector_min(a.data(), b.data(), c.data(), a.size());
+	}
+
+	static void vector_min(double* const __restrict a, const double* const __restrict b, size_t n);
+
+	static void vector_min(std::span<double> a, std::span<const double> b)
+	{
+		vector_min(a.data(), b.data(), a.size());
+	}
+
+	static void vector_min(const double* const __restrict a, double b, double* const __restrict c, size_t n);
+
+	static void vector_min(std::span<const double> a, double b, std::span<double> c)
+	{
+		vector_min(a.data(), b, c.data(), a.size());
+	}
+
+	static void vector_min(double* const __restrict a, double b, size_t n);
+
+	static void vector_min(std::span<double> a, double b)
+	{
+		vector_min(a.data(), b, a.size());
+	}
+
+	static void vector_clamp(const double* const __restrict a, const double* const __restrict min, const double* const __restrict max,
+		double* const __restrict r, size_t n);
+
+	static void vector_clamp(std::span<const double> a, std::span<const double> min, std::span<const double> max, std::span<double> r)
+	{
+		vector_clamp(a.data(), min.data(), max.data(), r.data(), a.size());
+	}
+
+	static void vector_clamp(double* const __restrict a, const double* const __restrict min, const double* const __restrict max, size_t n);
+
+	static void vector_clamp(std::span<double> a, std::span<const double> min, std::span<const double> max)
+	{
+		vector_clamp(a.data(), min.data(), max.data(), a.size());
+	}
+
+	static void vector_clamp(const double* const __restrict a, double min, const double* const __restrict max,
+		double* const __restrict r, size_t n);
+
+	static void vector_clamp(std::span<const double> a, double min, std::span<const double> max, std::span<double> r)
+	{
+		vector_clamp(a.data(), min, max.data(), r.data(), a.size());
+	}
+
+	static void vector_clamp(double* const __restrict a, double min, const double* const __restrict max, size_t n);
+
+	static void vector_clamp(std::span<double> a, double min, std::span<const double> max)
+	{
+		vector_clamp(a.data(), min, max.data(), a.size());
+	}
+
+	static void vector_clamp(const double* const __restrict a, const double* const __restrict min, double max,
+		double* const __restrict r, size_t n);
+
+	static void vector_clamp(std::span<const double> a, std::span<const double> min, double max, std::span<double> r)
+	{
+		vector_clamp(a.data(), min.data(), max, r.data(), a.size());
+	}
+
+	static void vector_clamp(double* const __restrict a, const double* const __restrict min, double max, size_t n);
+
+	static void vector_clamp(std::span<double> a, std::span<const double> min, double max)
+	{
+		vector_clamp(a.data(), min.data(), max, a.size());
+	}
+
+	static void vector_clamp(const double* const __restrict a, double min, double max, double* const __restrict r, size_t n);
+
+	static void vector_clamp(std::span<const double> a, double min, double max, std::span<double> r)
+	{
+		vector_clamp(a.data(), min, max, r.data(), a.size());
+	}
+
+	static void vector_clamp(double* const __restrict a, double min, double max, size_t n);
+
+	static void vector_clamp(std::span<double> a, double min, double max)
+	{
+		vector_clamp(a.data(), min, max, a.size());
+	}
+
+	// Vector trigonometric functions
+
+	static void vector_sigmoid(const double* const __restrict a, double* const __restrict r, size_t n);
+
+	static void vector_sigmoid(std::span<const double> a, std::span<double> r)
+	{
+		vector_sigmoid(a.data(), r.data(), a.size());
+	}
+
+	static void vector_sigmoid(double* const __restrict a, size_t n);
+
+	static void vector_sigmoid(std::span<double> a)
+	{
+		vector_sigmoid(a.data(), a.size());
+	}
+
+	static void vector_tanh(const double* const __restrict a, double* const __restrict r, size_t n);
+
+	static void vector_tanh(std::span<const double> a, std::span<double> r)
+	{
+		vector_tanh(a.data(), r.data(), a.size());
+	}
+
+	static void vector_tanh(double* const __restrict a, size_t n);
+
+	static void vector_tanh(std::span<double> a)
+	{
+		vector_tanh(a.data(), a.size());
+	}
 };

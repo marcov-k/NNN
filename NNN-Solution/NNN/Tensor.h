@@ -144,8 +144,6 @@ public:
 
 	static std::shared_ptr<Tensor> mean(const std::shared_ptr<Tensor>& t);
 
-	static std::shared_ptr<Tensor> softmax_cross_entropy(const std::shared_ptr<Tensor>& t, const std::shared_ptr<Tensor>& target);
-
 	static std::shared_ptr<Tensor> transpose(const std::shared_ptr<Tensor>& t, const std::vector<int>& axes);
 
 	static std::shared_ptr<Tensor> transpose(const std::shared_ptr<Tensor>& t);
@@ -163,6 +161,22 @@ public:
 	static std::shared_ptr<Tensor> get_dense_dropout_mask(const std::vector<int>& dims, double dropout);
 
 	static std::shared_ptr<Tensor> get_spatial_dropout_mask(const std::vector<int>& dims, double dropout);
+
+	static std::shared_ptr<Tensor> relu(const std::shared_ptr<Tensor>& t);
+
+	static std::shared_ptr<Tensor> leaky_relu(const std::shared_ptr<Tensor>& t, double tau);
+
+	static std::shared_ptr<Tensor> sigmoid(const std::shared_ptr<Tensor>& t);
+
+	static std::shared_ptr<Tensor> tanh(const std::shared_ptr<Tensor>& t);
+
+	static std::shared_ptr<Tensor> softmax(const std::shared_ptr<Tensor>& t);
+
+	static std::shared_ptr<Tensor> mse(const std::shared_ptr<Tensor>& t, const std::shared_ptr<const Tensor>& target);
+
+	static std::shared_ptr<Tensor> huber(const std::shared_ptr<Tensor>& t, const std::shared_ptr<const Tensor>& target, double delta);
+
+	static std::shared_ptr<Tensor> softmax_cross_entropy(const std::shared_ptr<Tensor>& t, const std::shared_ptr<const Tensor>& target);
 
 private:
 	std::vector<double> _data;
