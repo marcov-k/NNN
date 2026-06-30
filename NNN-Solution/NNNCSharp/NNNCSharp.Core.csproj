@@ -13,7 +13,7 @@
   </PropertyGroup>
 
 	<ItemGroup>
-		<None Include="..\x64\$(Configuration)\NNN.dll">
+		<None Include="$(SolutionDir)x64\$(Configuration)\NNN.dll">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
 	</ItemGroup>

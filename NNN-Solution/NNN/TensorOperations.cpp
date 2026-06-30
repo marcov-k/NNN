@@ -557,8 +557,7 @@ std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const s
 	auto result = get_result_tensor(owner, result_dims, a->requires_grad || b->requires_grad);
 
 	const bool use_parallel = (long)total_rows * n * p > PARALLEL_THRESHOLD;
-	thread_local std::vector<double> b_t;
-	b_t.resize(b_mat_size * batch_size);
+	std::vector<double> b_t(b_mat_size * batch_size);
 	int b_src_off = 0;
 	for (int batch = 0; batch < batch_size; ++batch)
 	{
@@ -587,8 +586,8 @@ std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const s
 
 				const bool par = (long)m * n * p > PARALLEL_THRESHOLD;
 
-				thread_local std::vector<double> a_t;
-				thread_local std::vector<double> d_out_t;
+				std::vector<double> a_t;
+				std::vector<double> d_out_t;
 
 				int b_off = 0;
 				for (int batch = 0; batch < batch_size; ++batch)
@@ -827,14 +826,12 @@ std::shared_ptr<Tensor> Tensor::convolve(const std::shared_ptr<Tensor>& input, c
 	const int filter_count = kernels->_dimensions[0];
 	const int input_channels = kernels->_dimensions.back();
 
-	thread_local std::vector<int> out_spatial_dims;
-	thread_local std::vector<int> in_spatial_strides;
-	thread_local std::vector<int> out_spatial_strides;
-	thread_local std::vector<int> kernel_spatial_strides;
-	thread_local std::vector<int> result_dims;
+	std::vector<int> out_spatial_dims(spatial_rank);
+	std::vector<int> in_spatial_strides(spatial_rank);
+	std::vector<int> out_spatial_strides(spatial_rank);
+	std::vector<int> kernel_spatial_strides(spatial_rank);
+	std::vector<int> result_dims(input->rank());
 
-	out_spatial_dims.resize(spatial_rank);
-	result_dims.resize(input->rank());
 	result_dims[0] = batches;
 	result_dims.back() = filter_count;
 	int out_spatial_size = 1;
@@ -851,9 +848,6 @@ std::shared_ptr<Tensor> Tensor::convolve(const std::shared_ptr<Tensor>& input, c
 
 	const int kernel_volume_size = kernel_spatial_size * input_channels;
 
-	in_spatial_strides.resize(spatial_rank);
-	out_spatial_strides.resize(spatial_rank);
-	kernel_spatial_strides.resize(spatial_rank);
 	in_spatial_strides.back() = 1;
 	out_spatial_strides.back() = 1;
 	kernel_spatial_strides.back() = 1;
@@ -884,14 +878,9 @@ std::shared_ptr<Tensor> Tensor::convolve(const std::shared_ptr<Tensor>& input, c
 		result->_parents.push_back(kernels);
 		result->_parents.push_back(biases);
 
-		std::vector<int> cap_in_spatial_strides(in_spatial_strides.begin(), in_spatial_strides.end());
-		std::vector<int> cap_kernel_spatial_strides(kernel_spatial_strides.begin(), kernel_spatial_strides.end());
-		std::vector<int> cap_out_spatial_dims(out_spatial_dims.begin(), out_spatial_dims.end());
-		std::vector<int> cap_out_spatial_strides(out_spatial_strides.begin(), out_spatial_strides.end());
-
-		result->_backward = [batches, spatial_rank, filter_count, input_channels, input, in_spatial_size, cap_in_spatial_strides,
-			kernels, kernel_spatial_size, cap_kernel_spatial_strides, kernel_volume_size, biases, result, out_spatial_size,
-			cap_out_spatial_dims, cap_out_spatial_strides]()
+		result->_backward = [batches, spatial_rank, filter_count, input_channels, input, in_spatial_size, in_spatial_strides,
+			kernels, kernel_spatial_size, kernel_spatial_strides, kernel_volume_size, biases, result, out_spatial_size,
+			out_spatial_dims, out_spatial_strides]()
 			{
 				const bool par = (long)batches * out_spatial_size * filter_count * kernel_volume_size > PARALLEL_THRESHOLD;
 
@@ -917,7 +906,7 @@ std::shared_ptr<Tensor> Tensor::convolve(const std::shared_ptr<Tensor>& input, c
 					for (int fkp = 0; fkp < filter_count * kernel_spatial_size; ++fkp)
 					{
 						compute_kernel_grad(fkp, spatial_rank, batches, out_spatial_size,
-							kernel_spatial_size, input_channels, cap_out_spatial_strides.data(), cap_kernel_spatial_strides.data(),
+							kernel_spatial_size, input_channels, out_spatial_strides.data(), kernel_spatial_strides.data(),
 							input->_strides.data(), kernels->_strides.data(), result->_strides.data(), input->_data.data(),
 							kernels->_grad.data(), result->_grad.data());
 					}
@@ -929,7 +918,7 @@ std::shared_ptr<Tensor> Tensor::convolve(const std::shared_ptr<Tensor>& input, c
 					for (int batch_in_pos = 0; batch_in_pos < batches * in_spatial_size; ++batch_in_pos)
 					{
 						compute_input_grad(batch_in_pos, spatial_rank, in_spatial_size, filter_count, kernel_spatial_size,
-							input_channels, cap_in_spatial_strides.data(), cap_kernel_spatial_strides.data(), cap_out_spatial_dims.data(),
+							input_channels, in_spatial_strides.data(), kernel_spatial_strides.data(), out_spatial_dims.data(),
 							input->_strides.data(), kernels->_strides.data(), result->_strides.data(),
 							input->_grad.data(), kernels->_data.data(), result->_grad.data());
 					}
