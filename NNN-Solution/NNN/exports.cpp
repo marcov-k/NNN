@@ -60,6 +60,12 @@ extern "C"
 		return (*tensor_handle)->dimensions().data();
 	}
 
+	const int* tensor_strides_ptr(void* handle)
+	{
+		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
+		return (*tensor_handle)->strides().data();
+	}
+
 	int tensor_element_count(void* handle)
 	{
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
@@ -82,6 +88,32 @@ extern "C"
 	{
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		return (*tensor_handle)->mutable_grad().data();
+	}
+
+	double tensor_get_at(void* handle, int index)
+	{
+		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
+		return (**tensor_handle)[index];
+	}
+
+	void tensor_set_at(void* handle, double value, int index)
+	{
+		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
+		(**tensor_handle)[index] = value;
+	}
+
+	double tensor_get_at_spatial(void* handle, const int* indices, int rank)
+	{
+		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
+		std::vector<int> indices_vec(indices, indices + rank);
+		return (*tensor_handle)->at(indices_vec);
+	}
+
+	void tensor_set_at_spatial(void* handle, double value, const int* indices, int rank)
+	{
+		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
+		std::vector<int> indices_vec(indices, indices + rank);
+		(*tensor_handle)->at(indices_vec) = value;
 	}
 
 	bool tensor_get_requires_grad(void* handle)
@@ -229,6 +261,12 @@ extern "C"
 	{
 		auto* tensor_handle_log_base = static_cast<std::shared_ptr<Tensor>*>(handle_log_base);
 		return wrap_handle(Tensor::log(arg, *tensor_handle_log_base));
+	}
+
+	void* tensor_ln(void* handle)
+	{
+		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
+		return wrap_handle(Tensor::ln(*tensor_handle));
 	}
 
 	void* tensor_matmul(void* handle_a, void* handle_b)

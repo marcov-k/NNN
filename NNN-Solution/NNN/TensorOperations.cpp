@@ -486,6 +486,32 @@ std::shared_ptr<Tensor> Tensor::log(double arg, const std::shared_ptr<Tensor>& l
 	return result;
 }
 
+std::shared_ptr<Tensor> Tensor::ln(const std::shared_ptr<Tensor>& t)
+{
+	auto result = get_result_tensor(t, t->_dimensions, t->requires_grad);
+
+	MathUtils::vector_ln(t->_data, result->_data);
+
+	if (!inference)
+	{
+		result->_parents.push_back(t);
+
+		result->_backward = [t, result]()
+			{
+				if (!t->requires_grad) return;
+
+				thread_local std::vector<double> scratch1;
+
+				const int element_count = result->element_count();
+				scratch1.resize(element_count);
+				MathUtils::vector_div(1.0, t->_data, scratch1);
+				MathUtils::vector_fmadd(t->_grad, scratch1, result->_grad);
+			};
+	}
+
+	return result;
+}
+
 void Tensor::transpose_matrix(const double* __restrict src, double* __restrict dst, int src_off, int dst_off,
 	int rows, int cols)
 {

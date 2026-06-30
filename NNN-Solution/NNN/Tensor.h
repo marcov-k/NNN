@@ -139,6 +139,8 @@ public:
 
 	static std::shared_ptr<Tensor> log(double arg, const std::shared_ptr<Tensor>& log_base);
 
+	static std::shared_ptr<Tensor> ln(const std::shared_ptr<Tensor>& t);
+
 	static std::shared_ptr<Tensor> matmul(const std::shared_ptr<Tensor>& a, const std::shared_ptr<Tensor>& b);
 
 	static std::shared_ptr<Tensor> convolve(const std::shared_ptr<Tensor>& input, const std::shared_ptr<Tensor>& kernels,

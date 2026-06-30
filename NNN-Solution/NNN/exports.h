@@ -22,11 +22,21 @@ extern "C"
 
 	__declspec(dllexport) const int* tensor_dims_ptr(void* handle);
 
+	__declspec(dllexport) const int* tensor_strides_ptr(void* handle);
+
 	__declspec(dllexport) int tensor_element_count(void* handle);
 
 	__declspec(dllexport) int tensor_grad_count(void* handle);
 
 	__declspec(dllexport) double* tensor_data_ptr(void* handle);
+
+	__declspec(dllexport) double tensor_get_at(void* handle, int index);
+
+	__declspec(dllexport) void tensor_set_at(void* handle, double value, int index);
+
+	__declspec(dllexport) double tensor_get_at_spatial(void* handle, const int* indices, int rank);
+
+	__declspec(dllexport) void tensor_set_at_spatial(void* handle, double value, const int* indices, int rank);
 
 	__declspec(dllexport) double* tensor_grad_ptr(void* handle);
 
@@ -77,6 +87,8 @@ extern "C"
 	__declspec(dllexport) void* tensor_log_scalar(void* handle_arg, double log_base);
 
 	__declspec(dllexport) void* tensor_log_scalar_left(double arg, void* handle_log_base);
+
+	__declspec(dllexport) void* tensor_ln(void* handle);
 
 	__declspec(dllexport) void* tensor_matmul(void* handle_a, void* handle_b);
 
