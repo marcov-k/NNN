@@ -14,6 +14,11 @@ extern "C"
 		return wrap_handle(std::make_shared<Tensor>(dims_vec, requires_grad));
 	}
 
+	void* tensor_create_empty()
+	{
+		return wrap_handle(std::make_shared<Tensor>());
+	}
+
 	void* tensor_create_scalar(double value, const int* dims, int rank, bool requires_grad)
 	{
 		std::vector<int> dims_vec(dims, dims + rank);
@@ -84,12 +89,6 @@ extern "C"
 		return (*tensor_handle)->mutable_data().data();
 	}
 
-	double* tensor_grad_ptr(void* handle)
-	{
-		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
-		return (*tensor_handle)->mutable_grad().data();
-	}
-
 	double tensor_get_at(void* handle, int index)
 	{
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
@@ -114,6 +113,26 @@ extern "C"
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		std::vector<int> indices_vec(indices, indices + rank);
 		(*tensor_handle)->at(indices_vec) = value;
+	}
+
+	int tensor_linear_index(void* handle, const int* indices, int rank)
+	{
+		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
+		std::vector<int> indices_vec(indices, indices + rank);
+		return (*tensor_handle)->linear_index(indices_vec);
+	}
+
+	void tensor_get_full_indices(void* handle, int index, int* out_indices)
+	{
+		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
+		auto indices = (*tensor_handle)->get_full_indices(index);
+		std::copy(indices.begin(), indices.end(), out_indices);
+	}
+
+	double* tensor_grad_ptr(void* handle)
+	{
+		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
+		return (*tensor_handle)->mutable_grad().data();
 	}
 
 	bool tensor_get_requires_grad(void* handle)

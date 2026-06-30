@@ -6,6 +6,8 @@ extern "C"
 {
 	__declspec(dllexport) void* tensor_create(const int* dims, int rank, bool requires_grad);
 
+	__declspec(dllexport) void* tensor_create_empty();
+
 	__declspec(dllexport) void* tensor_create_scalar(double value, const int* dims, int rank, bool requires_grad);
 
 	__declspec(dllexport) void* tensor_init_weights(int input_count, int neuron_count);
@@ -39,6 +41,10 @@ extern "C"
 	__declspec(dllexport) void tensor_set_at_spatial(void* handle, double value, const int* indices, int rank);
 
 	__declspec(dllexport) double* tensor_grad_ptr(void* handle);
+
+	__declspec(dllexport) int tensor_linear_index(void* handle, const int* indices, int rank);
+
+	__declspec(dllexport) void tensor_get_full_indices(void* handle, int index, int* out_indices);
 
 	__declspec(dllexport) bool tensor_get_requires_grad(void* handle);
 

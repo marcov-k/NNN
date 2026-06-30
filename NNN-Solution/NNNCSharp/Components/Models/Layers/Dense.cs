@@ -1,5 +1,5 @@
 ﻿using NNNCSharp.Components.Activations;
-using NNNCSharp.Components.Autodiff;
+using NNNCSharp.Components.Interop;
 using NNNCSharp.Components.Utilities.SaveSystem;
 
 namespace NNNCSharp.Components.Models.Layers;
@@ -66,7 +66,7 @@ public class Dense : Layer
     {
         var flatInput = input.Rank > 2 ? Tensor.Flatten(input, 1) : input; // flatten input to a 2D (batch * state elements) tensor
         var output = flatInput ^ Weights;
-        output += Tensor.Broadcast(Biases, output.Dimensions);
+        output += Tensor.Broadcast(Biases, output.Dimensions.ToArray());
         output = Activation.Forward(output);
 
         if (Dropout > 0.0)

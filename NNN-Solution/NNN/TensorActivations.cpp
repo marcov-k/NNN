@@ -24,7 +24,7 @@ std::shared_ptr<Tensor> Tensor::relu(const std::shared_ptr<Tensor>& t)
 				const __m256d reg_0 = _mm256_setzero_pd();
 
 				size_t i = 0;
-				for (; i <= n - 8; i += 8)
+				for (; i + 8 <= n; i += 8)
 				{
 					__m256d reg_tv0 = _mm256_loadu_pd(&p_tv[i]);
 					__m256d reg_tv1 = _mm256_loadu_pd(&p_tv[i + 4]);
@@ -48,7 +48,7 @@ std::shared_ptr<Tensor> Tensor::relu(const std::shared_ptr<Tensor>& t)
 					_mm256_storeu_pd(&p_tg[i + 4], grad1);
 				}
 
-				for (; i <= n - 4; i += 4)
+				for (; i + 4 <= n; i += 4)
 				{
 					__m256d reg_tv = _mm256_loadu_pd(&p_tv[i]);
 					__m256d reg_tg = _mm256_loadu_pd(&p_tg[i]);
@@ -86,7 +86,7 @@ std::shared_ptr<Tensor> Tensor::leaky_relu(const std::shared_ptr<Tensor>& t, dou
 	const __m256d reg_0 = _mm256_setzero_pd();
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_r0 = _mm256_loadu_pd(&p_r[i]);
 		__m256d reg_r1 = _mm256_loadu_pd(&p_r[i + 4]);
@@ -101,7 +101,7 @@ std::shared_ptr<Tensor> Tensor::leaky_relu(const std::shared_ptr<Tensor>& t, dou
 		_mm256_storeu_pd(&p_r[i + 4], res1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_r = _mm256_loadu_pd(&p_r[i]);
 		__m256d mask = _mm256_cmp_pd(reg_r, reg_0, _CMP_LE_OS);
@@ -131,7 +131,7 @@ std::shared_ptr<Tensor> Tensor::leaky_relu(const std::shared_ptr<Tensor>& t, dou
 				const __m256d reg_1 = _mm256_set1_pd(1.0);
 
 				size_t i = 0;
-				for (; i <= n - 8; i += 8)
+				for (; i + 8 <= n; i += 8)
 				{
 					__m256d reg_tv0 = _mm256_loadu_pd(&p_tv[i]);
 					__m256d reg_tv1 = _mm256_loadu_pd(&p_tv[i + 4]);
@@ -155,7 +155,7 @@ std::shared_ptr<Tensor> Tensor::leaky_relu(const std::shared_ptr<Tensor>& t, dou
 					_mm256_storeu_pd(&p_tg[i + 4], grad1);
 				}
 
-				for (; i <= n - 4; i += 4)
+				for (; i + 4 <= n; i += 4)
 				{
 					__m256d reg_tv = _mm256_loadu_pd(&p_tv[i]);
 					__m256d reg_tg = _mm256_loadu_pd(&p_tg[i]);
@@ -253,7 +253,7 @@ std::shared_ptr<Tensor> Tensor::softmax(const std::shared_ptr<Tensor>& t)
 		double* const __restrict p_r = result->_data.data() + offset;
 
 		size_t i = 0;
-		for (; i <= classes - 8; i += 8)
+		for (; i + 8 <= classes; i += 8)
 		{
 			__m256d exp0 = _mm256_exp_pd(_mm256_sub_pd(_mm256_loadu_pd(&p_t[i]), reg_max));
 			__m256d exp1 = _mm256_exp_pd(_mm256_sub_pd(_mm256_loadu_pd(&p_t[i + 4]), reg_max));
@@ -267,7 +267,7 @@ std::shared_ptr<Tensor> Tensor::softmax(const std::shared_ptr<Tensor>& t)
 
 		__m256d acc = _mm256_add_pd(acc0, acc1);
 
-		for (; i <= classes - 4; i += 4)
+		for (; i + 4 <= classes; i += 4)
 		{
 			__m256d exp = _mm256_exp_pd(_mm256_sub_pd(_mm256_loadu_pd(&p_t[i]), reg_max));
 			_mm256_storeu_pd(&p_r[i], exp);

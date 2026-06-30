@@ -24,7 +24,7 @@ double MathUtils::max_m256d(__m256d v)
 void MathUtils::vector_add(const double* const __restrict a, const double* const __restrict b, double* const __restrict c, size_t n)
 {
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -39,7 +39,7 @@ void MathUtils::vector_add(const double* const __restrict a, const double* const
 		_mm256_storeu_pd(&c[i + 4], sum1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d reg_b = _mm256_loadu_pd(&b[i]);
@@ -57,7 +57,7 @@ void MathUtils::vector_add(const double* const __restrict a, const double* const
 void MathUtils::vector_add(double* const __restrict a, const double* const __restrict b, size_t n)
 {
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -72,7 +72,7 @@ void MathUtils::vector_add(double* const __restrict a, const double* const __res
 		_mm256_storeu_pd(&a[i + 4], sum1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d reg_b = _mm256_loadu_pd(&b[i]);
@@ -92,7 +92,7 @@ void MathUtils::vector_add(const double* const __restrict a, double b, double* c
 	const __m256d reg_b = _mm256_set1_pd(b);
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -104,7 +104,7 @@ void MathUtils::vector_add(const double* const __restrict a, double b, double* c
 		_mm256_storeu_pd(&c[i + 4], sum1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d sum = _mm256_add_pd(reg_a, reg_b);
@@ -122,7 +122,7 @@ void MathUtils::vector_add(double* const __restrict a, double b, size_t n)
 	const __m256d reg_b = _mm256_set1_pd(b);
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -134,7 +134,7 @@ void MathUtils::vector_add(double* const __restrict a, double b, size_t n)
 		_mm256_storeu_pd(&a[i + 4], sum1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d sum = _mm256_add_pd(reg_a, reg_b);
@@ -150,7 +150,7 @@ void MathUtils::vector_add(double* const __restrict a, double b, size_t n)
 void MathUtils::vector_sub(const double* const __restrict a, const double* const __restrict b, double* const __restrict c, size_t n)
 {
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -165,7 +165,7 @@ void MathUtils::vector_sub(const double* const __restrict a, const double* const
 		_mm256_storeu_pd(&c[i + 4], dif1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d reg_b = _mm256_loadu_pd(&b[i]);
@@ -182,7 +182,7 @@ void MathUtils::vector_sub(const double* const __restrict a, const double* const
 void MathUtils::vector_sub(double* const __restrict a, const double* const __restrict b, size_t n)
 {
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -197,7 +197,7 @@ void MathUtils::vector_sub(double* const __restrict a, const double* const __res
 		_mm256_storeu_pd(&a[i + 4], dif1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d reg_b = _mm256_loadu_pd(&b[i]);
@@ -216,7 +216,7 @@ void MathUtils::vector_sub(const double* const __restrict a, double b, double* c
 	const __m256d reg_b = _mm256_set1_pd(b);
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -228,7 +228,7 @@ void MathUtils::vector_sub(const double* const __restrict a, double b, double* c
 		_mm256_storeu_pd(&c[i + 4], dif1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d dif = _mm256_sub_pd(reg_a, reg_b);
@@ -246,7 +246,7 @@ void MathUtils::vector_sub(double* const __restrict a, double b, size_t n)
 	const __m256d reg_b = _mm256_set1_pd(b);
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -258,7 +258,7 @@ void MathUtils::vector_sub(double* const __restrict a, double b, size_t n)
 		_mm256_storeu_pd(&a[i + 4], dif1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d dif = _mm256_sub_pd(reg_a, reg_b);
@@ -276,7 +276,7 @@ void MathUtils::vector_sub(double a, const double* const __restrict b, double* c
 	const __m256d reg_a = _mm256_set1_pd(a);
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
 		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
@@ -288,7 +288,7 @@ void MathUtils::vector_sub(double a, const double* const __restrict b, double* c
 		_mm256_storeu_pd(&c[i + 4], dif1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_b = _mm256_loadu_pd(&b[i]);
 		__m256d dif = _mm256_sub_pd(reg_a, reg_b);
@@ -306,7 +306,7 @@ void MathUtils::vector_sub(double a, double* const __restrict b, size_t n)
 	const __m256d reg_a = _mm256_set1_pd(a);
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
 		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
@@ -318,7 +318,7 @@ void MathUtils::vector_sub(double a, double* const __restrict b, size_t n)
 		_mm256_storeu_pd(&b[i + 4], dif1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_b = _mm256_loadu_pd(&b[i]);
 		__m256d dif = _mm256_sub_pd(reg_a, reg_b);
@@ -334,7 +334,7 @@ void MathUtils::vector_sub(double a, double* const __restrict b, size_t n)
 void MathUtils::vector_mul(const double* const __restrict a, const double* const __restrict b, double* const __restrict c, size_t n)
 {
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -349,7 +349,7 @@ void MathUtils::vector_mul(const double* const __restrict a, const double* const
 		_mm256_storeu_pd(&c[i + 4], pro1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d reg_b = _mm256_loadu_pd(&b[i]);
@@ -366,7 +366,7 @@ void MathUtils::vector_mul(const double* const __restrict a, const double* const
 void MathUtils::vector_mul(double* const __restrict a, const double* const __restrict b, size_t n)
 {
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -381,7 +381,7 @@ void MathUtils::vector_mul(double* const __restrict a, const double* const __res
 		_mm256_storeu_pd(&a[i + 4], pro1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d reg_b = _mm256_loadu_pd(&b[i]);
@@ -400,7 +400,7 @@ void MathUtils::vector_mul(const double* const __restrict a, double b, double* c
 	const __m256d reg_b = _mm256_set1_pd(b);
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -412,7 +412,7 @@ void MathUtils::vector_mul(const double* const __restrict a, double b, double* c
 		_mm256_storeu_pd(&c[i + 4], pro1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d pro = _mm256_mul_pd(reg_a, reg_b);
@@ -430,7 +430,7 @@ void MathUtils::vector_mul(double* const __restrict a, double b, size_t n)
 	const __m256d reg_b = _mm256_set1_pd(b);
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -442,7 +442,7 @@ void MathUtils::vector_mul(double* const __restrict a, double b, size_t n)
 		_mm256_storeu_pd(&a[i + 4], pro1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d pro = _mm256_mul_pd(reg_a, reg_b);
@@ -458,7 +458,7 @@ void MathUtils::vector_mul(double* const __restrict a, double b, size_t n)
 void MathUtils::vector_div(const double* const __restrict a, const double* const __restrict b, double* const __restrict c, size_t n)
 {
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -473,7 +473,7 @@ void MathUtils::vector_div(const double* const __restrict a, const double* const
 		_mm256_storeu_pd(&c[i + 4], quo1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d reg_b = _mm256_loadu_pd(&b[i]);
@@ -490,7 +490,7 @@ void MathUtils::vector_div(const double* const __restrict a, const double* const
 void MathUtils::vector_div(double* const __restrict a, const double* const __restrict b, size_t n)
 {
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -505,7 +505,7 @@ void MathUtils::vector_div(double* const __restrict a, const double* const __res
 		_mm256_storeu_pd(&a[i + 4], quo1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d reg_b = _mm256_loadu_pd(&b[i]);
@@ -525,7 +525,7 @@ void MathUtils::vector_div(const double* const __restrict a, double b, double* c
 	const __m256d reg_recip_b = _mm256_set1_pd(recip_b);
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -537,7 +537,7 @@ void MathUtils::vector_div(const double* const __restrict a, double b, double* c
 		_mm256_storeu_pd(&c[i + 4], quo1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d quo = _mm256_mul_pd(reg_a, reg_recip_b);
@@ -556,7 +556,7 @@ void MathUtils::vector_div(double* const __restrict a, double b, size_t n)
 	const __m256d reg_recip_b = _mm256_set1_pd(recip_b);
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -568,7 +568,7 @@ void MathUtils::vector_div(double* const __restrict a, double b, size_t n)
 		_mm256_storeu_pd(&a[i + 4], quo1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d quo = _mm256_mul_pd(reg_a, reg_recip_b);
@@ -586,7 +586,7 @@ void MathUtils::vector_div(double a, const double* const __restrict b, double* c
 	const __m256d reg_a = _mm256_set1_pd(a);
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
 		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
@@ -598,7 +598,7 @@ void MathUtils::vector_div(double a, const double* const __restrict b, double* c
 		_mm256_storeu_pd(&c[i + 4], quo1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_b = _mm256_loadu_pd(&b[i]);
 		__m256d quo = _mm256_div_pd(reg_a, reg_b);
@@ -616,7 +616,7 @@ void MathUtils::vector_div(double a, double* const __restrict b, size_t n)
 	const __m256d reg_a = _mm256_set1_pd(a);
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
 		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
@@ -628,7 +628,7 @@ void MathUtils::vector_div(double a, double* const __restrict b, size_t n)
 		_mm256_storeu_pd(&b[i + 4], quo1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_b = _mm256_loadu_pd(&b[i]);
 		__m256d quo = _mm256_div_pd(reg_a, reg_b);
@@ -644,7 +644,7 @@ void MathUtils::vector_div(double a, double* const __restrict b, size_t n)
 void MathUtils::vector_pow(const double* const __restrict a, const double* const __restrict b, double* const __restrict c, size_t n)
 {
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -659,7 +659,7 @@ void MathUtils::vector_pow(const double* const __restrict a, const double* const
 		_mm256_storeu_pd(&c[i + 4], exp1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d reg_b = _mm256_loadu_pd(&b[i]);
@@ -676,7 +676,7 @@ void MathUtils::vector_pow(const double* const __restrict a, const double* const
 void MathUtils::vector_pow(double* const __restrict a, const double* const __restrict b, size_t n)
 {
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -691,7 +691,7 @@ void MathUtils::vector_pow(double* const __restrict a, const double* const __res
 		_mm256_storeu_pd(&a[i + 4], exp1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d reg_b = _mm256_loadu_pd(&b[i]);
@@ -710,7 +710,7 @@ void MathUtils::vector_pow(const double* const __restrict a, double b, double* c
 	const __m256d reg_b = _mm256_set1_pd(b);
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -722,7 +722,7 @@ void MathUtils::vector_pow(const double* const __restrict a, double b, double* c
 		_mm256_storeu_pd(&c[i + 4], exp1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d exp = _mm256_pow_pd(reg_a, reg_b);
@@ -740,7 +740,7 @@ void MathUtils::vector_pow(double* const __restrict a, double b, size_t n)
 	const __m256d reg_b = _mm256_set1_pd(b);
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -752,7 +752,7 @@ void MathUtils::vector_pow(double* const __restrict a, double b, size_t n)
 		_mm256_storeu_pd(&a[i + 4], exp1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d exp = _mm256_pow_pd(reg_a, reg_b);
@@ -770,7 +770,7 @@ void MathUtils::vector_pow(double a, const double* const __restrict b, double* c
 	const __m256d reg_a = _mm256_set1_pd(a);
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
 		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
@@ -782,7 +782,7 @@ void MathUtils::vector_pow(double a, const double* const __restrict b, double* c
 		_mm256_storeu_pd(&c[i + 4], exp1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_b = _mm256_loadu_pd(&b[i]);
 		__m256d exp = _mm256_pow_pd(reg_a, reg_b);
@@ -798,7 +798,7 @@ void MathUtils::vector_pow(double a, const double* const __restrict b, double* c
 void MathUtils::vector_log(const double* const __restrict arg, const double* const __restrict log_base, double* const __restrict r, size_t n)
 {
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_arg0 = _mm256_loadu_pd(&arg[i]);
 		__m256d reg_arg1 = _mm256_loadu_pd(&arg[i + 4]);
@@ -819,7 +819,7 @@ void MathUtils::vector_log(const double* const __restrict arg, const double* con
 		_mm256_storeu_pd(&r[i + 4], log1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_arg = _mm256_loadu_pd(&arg[i]);
 		__m256d reg_base = _mm256_loadu_pd(&log_base[i]);
@@ -838,7 +838,7 @@ void MathUtils::vector_log(const double* const __restrict arg, const double* con
 void MathUtils::vector_log(double* const __restrict arg, const double* const __restrict log_base, size_t n)
 {
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_arg0 = _mm256_loadu_pd(&arg[i]);
 		__m256d reg_arg1 = _mm256_loadu_pd(&arg[i + 4]);
@@ -859,7 +859,7 @@ void MathUtils::vector_log(double* const __restrict arg, const double* const __r
 		_mm256_storeu_pd(&arg[i + 4], log1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_arg = _mm256_loadu_pd(&arg[i]);
 		__m256d reg_base = _mm256_loadu_pd(&log_base[i]);
@@ -881,7 +881,7 @@ void MathUtils::vector_log(const double* const __restrict arg, double log_base, 
 	const __m256d reg_ln_base = _mm256_set1_pd(ln_base);
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_arg0 = _mm256_loadu_pd(&arg[i]);
 		__m256d reg_arg1 = _mm256_loadu_pd(&arg[i + 4]);
@@ -896,7 +896,7 @@ void MathUtils::vector_log(const double* const __restrict arg, double log_base, 
 		_mm256_storeu_pd(&r[i + 4], log1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_arg = _mm256_loadu_pd(&arg[i]);
 		__m256d ln_arg = _mm256_log_pd(reg_arg);
@@ -916,7 +916,7 @@ void MathUtils::vector_log(double* const __restrict arg, double log_base, size_t
 	const __m256d reg_ln_base = _mm256_set1_pd(ln_base);
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_arg0 = _mm256_loadu_pd(&arg[i]);
 		__m256d reg_arg1 = _mm256_loadu_pd(&arg[i + 4]);
@@ -931,7 +931,7 @@ void MathUtils::vector_log(double* const __restrict arg, double log_base, size_t
 		_mm256_storeu_pd(&arg[i + 4], log1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_arg = _mm256_loadu_pd(&arg[i]);
 		__m256d ln_arg = _mm256_log_pd(reg_arg);
@@ -951,7 +951,7 @@ void MathUtils::vector_log(double arg, const double* const __restrict log_base, 
 	const __m256d reg_ln_arg = _mm256_set1_pd(ln_arg);
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_base0 = _mm256_loadu_pd(&log_base[i]);
 		__m256d reg_base1 = _mm256_loadu_pd(&log_base[i + 4]);
@@ -966,7 +966,7 @@ void MathUtils::vector_log(double arg, const double* const __restrict log_base, 
 		_mm256_storeu_pd(&r[i + 4], log1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_base = _mm256_loadu_pd(&log_base[i]);
 		__m256d ln_base = _mm256_log_pd(reg_base);
@@ -984,7 +984,7 @@ void MathUtils::vector_fmadd(const double* const __restrict a, const double* con
 	double* const __restrict r, size_t n)
 {
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -1002,7 +1002,7 @@ void MathUtils::vector_fmadd(const double* const __restrict a, const double* con
 		_mm256_storeu_pd(&r[i + 4], fmadd0);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d reg_b = _mm256_loadu_pd(&b[i]);
@@ -1020,7 +1020,7 @@ void MathUtils::vector_fmadd(const double* const __restrict a, const double* con
 void MathUtils::vector_fmadd(double* const __restrict a, const double* const __restrict b, const double* const __restrict c, size_t n)
 {
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -1038,7 +1038,7 @@ void MathUtils::vector_fmadd(double* const __restrict a, const double* const __r
 		_mm256_storeu_pd(&a[i + 4], fmadd1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d reg_b = _mm256_loadu_pd(&b[i]);
@@ -1059,7 +1059,7 @@ void MathUtils::vector_fmadd(const double* const __restrict a, const double* con
 	const __m256d reg_c = _mm256_set1_pd(c);
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -1074,7 +1074,7 @@ void MathUtils::vector_fmadd(const double* const __restrict a, const double* con
 		_mm256_storeu_pd(&r[i + 4], fmadd1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d reg_b = _mm256_loadu_pd(&b[i]);
@@ -1093,7 +1093,7 @@ void MathUtils::vector_fmadd(double* const __restrict a, const double* const __r
 	const __m256d reg_c = _mm256_set1_pd(c);
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -1108,7 +1108,7 @@ void MathUtils::vector_fmadd(double* const __restrict a, const double* const __r
 		_mm256_storeu_pd(&a[i + 4], fmadd1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d reg_b = _mm256_loadu_pd(&b[i]);
@@ -1126,7 +1126,7 @@ void MathUtils::vector_fnmadd(const double* const __restrict a, const double* co
 	double* const __restrict r, size_t n)
 {
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -1144,7 +1144,7 @@ void MathUtils::vector_fnmadd(const double* const __restrict a, const double* co
 		_mm256_storeu_pd(&r[i + 4], fnmadd1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d reg_b = _mm256_loadu_pd(&b[i]);
@@ -1162,7 +1162,7 @@ void MathUtils::vector_fnmadd(const double* const __restrict a, const double* co
 void MathUtils::vector_fnmadd(double* const __restrict a, const double* const __restrict b, const double* const __restrict c, size_t n)
 {
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -1180,7 +1180,7 @@ void MathUtils::vector_fnmadd(double* const __restrict a, const double* const __
 		_mm256_storeu_pd(&a[i + 4], fnmadd1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d reg_b = _mm256_loadu_pd(&b[i]);
@@ -1201,7 +1201,7 @@ void MathUtils::vector_fnmadd(const double* const __restrict a, const double* co
 	const __m256d reg_c = _mm256_set1_pd(c);
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -1216,7 +1216,7 @@ void MathUtils::vector_fnmadd(const double* const __restrict a, const double* co
 		_mm256_storeu_pd(&r[i + 4], fnmadd1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d reg_b = _mm256_loadu_pd(&b[i]);
@@ -1235,7 +1235,7 @@ void MathUtils::vector_fnmadd(double* const __restrict a, const double* const __
 	const __m256d reg_c = _mm256_set1_pd(c);
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -1250,7 +1250,7 @@ void MathUtils::vector_fnmadd(double* const __restrict a, const double* const __
 		_mm256_storeu_pd(&a[i + 4], fnmadd1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d reg_b = _mm256_loadu_pd(&b[i]);
@@ -1267,7 +1267,7 @@ void MathUtils::vector_fnmadd(double* const __restrict a, const double* const __
 void MathUtils::vector_sq(const double* const __restrict a, double* const __restrict r, size_t n)
 {
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -1279,7 +1279,7 @@ void MathUtils::vector_sq(const double* const __restrict a, double* const __rest
 		_mm256_storeu_pd(&r[i + 4], sq1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d sq = _mm256_mul_pd(reg_a, reg_a);
@@ -1295,7 +1295,7 @@ void MathUtils::vector_sq(const double* const __restrict a, double* const __rest
 void MathUtils::vector_sq(double* const __restrict a, size_t n)
 {
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -1307,7 +1307,7 @@ void MathUtils::vector_sq(double* const __restrict a, size_t n)
 		_mm256_storeu_pd(&a[i + 4], sq1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d sq = _mm256_mul_pd(reg_a, reg_a);
@@ -1323,7 +1323,7 @@ void MathUtils::vector_sq(double* const __restrict a, size_t n)
 void MathUtils::vector_sqrt(const double* const __restrict a, double* const __restrict r, size_t n)
 {
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -1335,7 +1335,7 @@ void MathUtils::vector_sqrt(const double* const __restrict a, double* const __re
 		_mm256_storeu_pd(&r[i + 4], sqrt1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d sqrt = _mm256_sqrt_pd(reg_a);
@@ -1351,7 +1351,7 @@ void MathUtils::vector_sqrt(const double* const __restrict a, double* const __re
 void MathUtils::vector_sqrt(double* const __restrict a, size_t n)
 {
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -1363,7 +1363,7 @@ void MathUtils::vector_sqrt(double* const __restrict a, size_t n)
 		_mm256_storeu_pd(&a[i + 4], sqrt1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d sqrt = _mm256_sqrt_pd(reg_a);
@@ -1379,7 +1379,7 @@ void MathUtils::vector_sqrt(double* const __restrict a, size_t n)
 void MathUtils::vector_exp(const double* const __restrict a, double* const __restrict r, size_t n)
 {
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -1391,7 +1391,7 @@ void MathUtils::vector_exp(const double* const __restrict a, double* const __res
 		_mm256_storeu_pd(&r[i + 4], exp1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d exp = _mm256_exp_pd(reg_a);
@@ -1407,7 +1407,7 @@ void MathUtils::vector_exp(const double* const __restrict a, double* const __res
 void MathUtils::vector_exp(double* const __restrict a, size_t n)
 {
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -1419,7 +1419,7 @@ void MathUtils::vector_exp(double* const __restrict a, size_t n)
 		_mm256_storeu_pd(&a[i + 4], exp1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d exp = _mm256_exp_pd(reg_a);
@@ -1435,7 +1435,7 @@ void MathUtils::vector_exp(double* const __restrict a, size_t n)
 void MathUtils::vector_ln(const double* const __restrict a, double* const __restrict r, size_t n)
 {
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -1447,7 +1447,7 @@ void MathUtils::vector_ln(const double* const __restrict a, double* const __rest
 		_mm256_storeu_pd(&r[i + 4], ln1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d ln = _mm256_log_pd(reg_a);
@@ -1463,7 +1463,7 @@ void MathUtils::vector_ln(const double* const __restrict a, double* const __rest
 void MathUtils::vector_ln(double* const __restrict a, size_t n)
 {
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -1475,7 +1475,7 @@ void MathUtils::vector_ln(double* const __restrict a, size_t n)
 		_mm256_storeu_pd(&a[i + 4], ln1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d ln = _mm256_log_pd(reg_a);
@@ -1494,7 +1494,7 @@ double MathUtils::vector_sum(const double* const __restrict a, size_t n)
 	__m256d acc1 = _mm256_setzero_pd();
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg1 = _mm256_loadu_pd(&a[i + 4]);
@@ -1505,7 +1505,7 @@ double MathUtils::vector_sum(const double* const __restrict a, size_t n)
 
 	__m256d total_acc = _mm256_add_pd(acc0, acc1);
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg = _mm256_loadu_pd(&a[i]);
 		total_acc = _mm256_add_pd(total_acc, reg);
@@ -1527,7 +1527,7 @@ double MathUtils::vector_max(const double* const __restrict a, size_t n)
 	__m256d max1 = _mm256_set1_pd(std::numeric_limits<double>::lowest());
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg1 = _mm256_loadu_pd(&a[i + 4]);
@@ -1538,7 +1538,7 @@ double MathUtils::vector_max(const double* const __restrict a, size_t n)
 
 	__m256d total_max = _mm256_max_pd(max0, max1);
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg = _mm256_loadu_pd(&a[i]);
 		total_max = _mm256_max_pd(total_max, reg);
@@ -1560,7 +1560,7 @@ double MathUtils::vector_dot(const double* const __restrict a, const double* con
 	__m256d acc1 = _mm256_setzero_pd();
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -1577,7 +1577,7 @@ double MathUtils::vector_dot(const double* const __restrict a, const double* con
 
 	__m256d total_acc = _mm256_add_pd(acc0, acc1);
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d reg_b = _mm256_loadu_pd(&b[i]);
@@ -1604,7 +1604,7 @@ double MathUtils::vector_dot(const double* __restrict a, const double* __restric
 	__m256d acc1 = _mm256_setzero_pd();
 
 	int i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&p_a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&p_a[i + 4]);
@@ -1621,7 +1621,7 @@ double MathUtils::vector_dot(const double* __restrict a, const double* __restric
 
 	__m256d total_acc = _mm256_add_pd(acc0, acc1);
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&p_a[i]);
 		__m256d reg_b = _mm256_loadu_pd(&p_b[i]);
@@ -1642,7 +1642,7 @@ double MathUtils::vector_dot(const double* __restrict a, const double* __restric
 void MathUtils::vector_max(const double* const __restrict a, const double* const __restrict b, double* const __restrict c, size_t n)
 {
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -1657,7 +1657,7 @@ void MathUtils::vector_max(const double* const __restrict a, const double* const
 		_mm256_storeu_pd(&c[i + 4], max1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d reg_b = _mm256_loadu_pd(&b[i]);
@@ -1674,7 +1674,7 @@ void MathUtils::vector_max(const double* const __restrict a, const double* const
 void MathUtils::vector_max(double* const __restrict a, const double* const __restrict b, size_t n)
 {
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -1689,7 +1689,7 @@ void MathUtils::vector_max(double* const __restrict a, const double* const __res
 		_mm256_storeu_pd(&a[i + 4], max1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d reg_b = _mm256_loadu_pd(&b[i]);
@@ -1708,7 +1708,7 @@ void MathUtils::vector_max(const double* const __restrict a, double b, double* c
 	const __m256d reg_b = _mm256_set1_pd(b);
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -1720,7 +1720,7 @@ void MathUtils::vector_max(const double* const __restrict a, double b, double* c
 		_mm256_storeu_pd(&c[i + 4], max1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d max = _mm256_max_pd(reg_a, reg_b);
@@ -1738,7 +1738,7 @@ void MathUtils::vector_max(double* const __restrict a, double b, size_t n)
 	const __m256d reg_b = _mm256_set1_pd(b);
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -1750,7 +1750,7 @@ void MathUtils::vector_max(double* const __restrict a, double b, size_t n)
 		_mm256_storeu_pd(&a[i + 4], max1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d max = _mm256_max_pd(reg_a, reg_b);
@@ -1766,7 +1766,7 @@ void MathUtils::vector_max(double* const __restrict a, double b, size_t n)
 void MathUtils::vector_min(const double* const __restrict a, const double* const __restrict b, double* const __restrict c, size_t n)
 {
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -1781,7 +1781,7 @@ void MathUtils::vector_min(const double* const __restrict a, const double* const
 		_mm256_storeu_pd(&c[i + 4], min1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d reg_b = _mm256_loadu_pd(&b[i]);
@@ -1798,7 +1798,7 @@ void MathUtils::vector_min(const double* const __restrict a, const double* const
 void MathUtils::vector_min(double* const __restrict a, const double* const __restrict b, size_t n)
 {
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -1813,7 +1813,7 @@ void MathUtils::vector_min(double* const __restrict a, const double* const __res
 		_mm256_storeu_pd(&a[i + 4], min1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d reg_b = _mm256_loadu_pd(&b[i]);
@@ -1832,7 +1832,7 @@ void MathUtils::vector_min(const double* const __restrict a, double b, double* c
 	const __m256d reg_b = _mm256_set1_pd(b);
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -1844,7 +1844,7 @@ void MathUtils::vector_min(const double* const __restrict a, double b, double* c
 		_mm256_storeu_pd(&c[i + 4], min1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d min = _mm256_min_pd(reg_a, reg_b);
@@ -1862,7 +1862,7 @@ void MathUtils::vector_min(double* const __restrict a, double b, size_t n)
 	const __m256d reg_b = _mm256_set1_pd(b);
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -1874,7 +1874,7 @@ void MathUtils::vector_min(double* const __restrict a, double b, size_t n)
 		_mm256_storeu_pd(&a[i + 4], min1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d min = _mm256_min_pd(reg_a, reg_b);
@@ -1891,7 +1891,7 @@ void MathUtils::vector_clamp(const double* const __restrict a, const double* con
 	double* const __restrict r, size_t n)
 {
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -1909,7 +1909,7 @@ void MathUtils::vector_clamp(const double* const __restrict a, const double* con
 		_mm256_storeu_pd(&r[i + 4], clamp1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d reg_min = _mm256_loadu_pd(&min[i]);
@@ -1927,7 +1927,7 @@ void MathUtils::vector_clamp(const double* const __restrict a, const double* con
 void MathUtils::vector_clamp(double* const __restrict a, const double* const __restrict min, const double* const __restrict max, size_t n)
 {
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -1945,7 +1945,7 @@ void MathUtils::vector_clamp(double* const __restrict a, const double* const __r
 		_mm256_storeu_pd(&a[i + 4], clamp1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d reg_min = _mm256_loadu_pd(&min[i]);
@@ -1966,7 +1966,7 @@ void MathUtils::vector_clamp(const double* const __restrict a, double min, const
 	const __m256d reg_min = _mm256_set1_pd(min);
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -1981,7 +1981,7 @@ void MathUtils::vector_clamp(const double* const __restrict a, double min, const
 		_mm256_storeu_pd(&r[i + 4], clamp1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d reg_max = _mm256_loadu_pd(&max[i]);
@@ -2000,7 +2000,7 @@ void MathUtils::vector_clamp(double* const __restrict a, double min, const doubl
 	const __m256d reg_min = _mm256_set1_pd(min);
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -2015,7 +2015,7 @@ void MathUtils::vector_clamp(double* const __restrict a, double min, const doubl
 		_mm256_storeu_pd(&a[i + 4], clamp1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d reg_max = _mm256_loadu_pd(&max[i]);
@@ -2035,7 +2035,7 @@ void MathUtils::vector_clamp(const double* const __restrict a, const double* con
 	const __m256d reg_max = _mm256_set1_pd(max);
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -2050,7 +2050,7 @@ void MathUtils::vector_clamp(const double* const __restrict a, const double* con
 		_mm256_storeu_pd(&r[i + 4], clamp1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d reg_min = _mm256_loadu_pd(&min[i]);
@@ -2069,7 +2069,7 @@ void MathUtils::vector_clamp(double* const __restrict a, const double* const __r
 	const __m256d reg_max = _mm256_set1_pd(max);
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -2084,7 +2084,7 @@ void MathUtils::vector_clamp(double* const __restrict a, const double* const __r
 		_mm256_storeu_pd(&a[i + 4], clamp1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d reg_min = _mm256_loadu_pd(&min[i]);
@@ -2104,7 +2104,7 @@ void MathUtils::vector_clamp(const double* const __restrict a, double min, doubl
 	const __m256d reg_max = _mm256_set1_pd(max);
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -2116,7 +2116,7 @@ void MathUtils::vector_clamp(const double* const __restrict a, double min, doubl
 		_mm256_storeu_pd(&r[i + 4], clamp1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d clamp = _mm256_max_pd(_mm256_min_pd(reg_a, reg_max), reg_min);
@@ -2135,7 +2135,7 @@ void MathUtils::vector_clamp(double* const __restrict a, double min, double max,
 	const __m256d reg_max = _mm256_set1_pd(max);
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -2147,7 +2147,7 @@ void MathUtils::vector_clamp(double* const __restrict a, double min, double max,
 		_mm256_storeu_pd(&a[i + 4], clamp1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d clamp = _mm256_max_pd(_mm256_min_pd(reg_a, reg_max), reg_min);
@@ -2166,7 +2166,7 @@ void MathUtils::vector_sigmoid(const double* const __restrict a, double* const _
 	const __m256d reg_one = _mm256_set1_pd(1.0);
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -2187,7 +2187,7 @@ void MathUtils::vector_sigmoid(const double* const __restrict a, double* const _
 		_mm256_storeu_pd(&r[i + 4], sig1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d neg = _mm256_xor_pd(reg_a, neg_mask);
@@ -2209,7 +2209,7 @@ void MathUtils::vector_sigmoid(double* const __restrict a, size_t n)
 	const __m256d reg_one = _mm256_set1_pd(1.0);
 
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -2230,7 +2230,7 @@ void MathUtils::vector_sigmoid(double* const __restrict a, size_t n)
 		_mm256_storeu_pd(&a[i + 4], sig1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d neg = _mm256_xor_pd(reg_a, neg_mask);
@@ -2249,7 +2249,7 @@ void MathUtils::vector_sigmoid(double* const __restrict a, size_t n)
 void MathUtils::vector_tanh(const double* const __restrict a, double* const __restrict r, size_t n)
 {
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -2261,7 +2261,7 @@ void MathUtils::vector_tanh(const double* const __restrict a, double* const __re
 		_mm256_storeu_pd(&r[i + 4], tanh1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d tanh = _mm256_tanh_pd(reg_a);
@@ -2277,7 +2277,7 @@ void MathUtils::vector_tanh(const double* const __restrict a, double* const __re
 void MathUtils::vector_tanh(double* const __restrict a, size_t n)
 {
 	size_t i = 0;
-	for (; i <= n - 8; i += 8)
+	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
 		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
@@ -2289,7 +2289,7 @@ void MathUtils::vector_tanh(double* const __restrict a, size_t n)
 		_mm256_storeu_pd(&a[i + 4], tanh1);
 	}
 
-	for (; i <= n - 4; i += 4)
+	for (; i + 4 <= n; i += 4)
 	{
 		__m256d reg_a = _mm256_loadu_pd(&a[i]);
 		__m256d tanh = _mm256_tanh_pd(reg_a);

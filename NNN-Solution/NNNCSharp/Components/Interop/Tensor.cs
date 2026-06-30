@@ -9,19 +9,25 @@ public sealed class Tensor : IDisposable
 
     internal Tensor(IntPtr handle)
     {
-        _handle = new TensorSafeHandle(handle);
+        _handle = new(handle);
     }
 
     public Tensor(int[] dims, bool requiresGrad = false)
     {
         IntPtr rawHandle = NativeMethods.tensor_create(dims, dims.Length, requiresGrad);
-        _handle = new TensorSafeHandle(rawHandle);
+        _handle = new(rawHandle);
+    }
+
+    public Tensor()
+    {
+        IntPtr rawHandle = NativeMethods.tensor_create_empty();
+        _handle = new(rawHandle);
     }
 
     public Tensor(double value, int[] dims, bool requiresGrad = false)
     {
         IntPtr rawHandle = NativeMethods.tensor_create_scalar(value, dims, dims.Length, requiresGrad);
-        _handle = new TensorSafeHandle(rawHandle);
+        _handle = new(rawHandle);
     }
 
     public static Tensor Scalar(double value, int[] dims, bool requiresGrad = false)
@@ -110,6 +116,25 @@ public sealed class Tensor : IDisposable
     {
         get => NativeMethods.tensor_get_at_spatial(Handle, indices, indices.Length);
         set => NativeMethods.tensor_set_at_spatial(Handle, value, indices, indices.Length);
+    }
+
+    public int LinearIndex(params int[] indices)
+    {
+        return NativeMethods.tensor_linear_index(Handle, indices, indices.Length);
+    }
+
+    public int[] GetFullIndices(int index)
+    {
+        var indices = new int[Rank];
+        NativeMethods.tensor_get_full_indices(Handle, index, indices);
+        return indices;
+    }
+
+    public void GetFullIndices(int index, Span<int> indices)
+    {
+        var indices_arr = new int[Rank];
+        NativeMethods.tensor_get_full_indices(Handle, index, indices_arr);
+        indices_arr.AsSpan().CopyTo(indices);
     }
 
     public bool RequiresGrad

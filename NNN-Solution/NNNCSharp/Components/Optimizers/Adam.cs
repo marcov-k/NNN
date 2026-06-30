@@ -1,4 +1,4 @@
-﻿using NNNCSharp.Components.Autodiff;
+﻿using NNNCSharp.Components.Interop;
 using System.Numerics;
 using System.Runtime.InteropServices;
 
@@ -88,8 +88,8 @@ public class Adam(double learningRate = 0.001, double beta1 = 0.9, double beta2 
 
         var mVecs = MemoryMarshal.Cast<double, Vector<double>>(m.AsSpan());
         var vVecs = MemoryMarshal.Cast<double, Vector<double>>(v.AsSpan());
-        var gradVecs = MemoryMarshal.Cast<double, Vector<double>>(parameter.Grad.AsSpan());
-        var paramVecs = MemoryMarshal.Cast<double, Vector<double>>(parameter.Data.AsSpan());
+        var gradVecs = MemoryMarshal.Cast<double, Vector<double>>(parameter.Grad);
+        var paramVecs = MemoryMarshal.Cast<double, Vector<double>>(parameter.Data);
 
         // Update vectorized parameters based on moments
         for (int i = 0; i < paramVecs.Length; i++)

@@ -1,4 +1,4 @@
-﻿using NNNCSharp.Components.Autodiff;
+﻿using NNNCSharp.Components.Interop;
 using NNNCSharp.Components.Buffers;
 using NNNCSharp.Components.Costs;
 using NNNCSharp.Components.Models;

@@ -1,4 +1,4 @@
-﻿using NNNCSharp.Components.Autodiff;
+﻿using NNNCSharp.Components.Interop;
 using NNNCSharp.Components.Models.Layers;
 using NNNCSharp.Components.Utilities.SaveSystem;
 using System.Numerics;
@@ -132,7 +132,7 @@ public class Model
         double totalNorm = 0.0;
         foreach (var param in Parameters)
         {
-            var gradVecs = MemoryMarshal.Cast<double, Vector<double>>(param.Grad.AsSpan());
+            var gradVecs = MemoryMarshal.Cast<double, Vector<double>>(param.Grad);
             var acc = Vector<double>.Zero;
             for (int i = 0; i < gradVecs.Length; i++)
             {
@@ -157,7 +157,7 @@ public class Model
 
             foreach (var param in Parameters)
             {
-                var gradVecs = MemoryMarshal.Cast<double, Vector<double>>(param.Grad.AsSpan());
+                var gradVecs = MemoryMarshal.Cast<double, Vector<double>>(param.Grad);
                 for (int i = 0; i < gradVecs.Length; i++)
                 {
                     gradVecs[i] *= scaleVec;

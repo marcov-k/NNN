@@ -1,5 +1,5 @@
 ﻿using NNNCSharp.Components.Activations;
-using NNNCSharp.Components.Autodiff;
+using NNNCSharp.Components.Interop;
 using NNNCSharp.Components.Utilities;
 using NNNCSharp.Components.Utilities.SaveSystem;
 
@@ -113,7 +113,7 @@ public class Conv : Layer
     {
         FilterCount = FileUtils.ReadInt32(stream);
         Kernels = FileUtils.ReadTensor(stream);
-        KernelDims = Kernels.Dimensions[1..^1];
+        KernelDims = Kernels.Dimensions[1..^1].ToArray();
     }
 
     protected override string PrintUniqueLayer(FileStream stream)

@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "NNNCSharp.Core": {
+      "commandName": "Project",
+      "debugEngines": "managed,native"
+    }
+  }
+}

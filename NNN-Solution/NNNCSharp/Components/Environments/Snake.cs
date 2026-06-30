@@ -1,4 +1,4 @@
-﻿using NNNCSharp.Components.Autodiff;
+﻿using NNNCSharp.Components.Interop;
 using NNNCSharp.Components.Episodes;
 using NNNCSharp.Components.Models;
 using NNNCSharp.Components.Utilities.SaveSystem;
@@ -143,7 +143,7 @@ public class Snake : Environment
 
     public override Tensor GetState()
     {
-        Tensor state = new(StateFormat.Dimensions[1..]);
+        Tensor state = new(StateFormat.Dimensions[1..].ToArray());
 
         // Encode the state based on the internal game representation
         int[] contentIndices = new int[3];

@@ -1,4 +1,4 @@
-﻿using NNNCSharp.Components.Autodiff;
+﻿using NNNCSharp.Components.Interop;
 using NNNCSharp.Components.Episodes;
 using NNNCSharp.Components.Models;
 

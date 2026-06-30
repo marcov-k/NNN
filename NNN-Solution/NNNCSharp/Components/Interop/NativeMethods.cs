@@ -10,6 +10,9 @@ internal static class NativeMethods
     internal static extern IntPtr tensor_create(int[] dims, int rank, [MarshalAs(UnmanagedType.I1)] bool requires_grad);
 
     [DllImport(DllName)]
+    internal static extern IntPtr tensor_create_empty();
+
+    [DllImport(DllName)]
     internal static extern IntPtr tensor_create_scalar(double value, int[] dims, int rank, [MarshalAs(UnmanagedType.I1)] bool requires_grad);
 
     [DllImport(DllName)]
@@ -46,9 +49,6 @@ internal static class NativeMethods
     internal static extern IntPtr tensor_data_ptr(IntPtr handle);
 
     [DllImport(DllName)]
-    internal static extern IntPtr tensor_grad_ptr(IntPtr handle);
-
-    [DllImport(DllName)]
     internal static extern double tensor_get_at(IntPtr handle, int index);
 
     [DllImport(DllName)]
@@ -59,6 +59,15 @@ internal static class NativeMethods
 
     [DllImport(DllName)]
     internal static extern void tensor_set_at_spatial(IntPtr handle, double value, int[] indices, int rank);
+
+    [DllImport(DllName)]
+    internal static extern IntPtr tensor_grad_ptr(IntPtr handle);
+
+    [DllImport(DllName)]
+    internal static extern int tensor_linear_index(IntPtr handle, int[] indices, int rank);
+
+    [DllImport(DllName)]
+    internal static extern void tensor_get_full_indices(IntPtr handle, int index, int[] out_indices);
 
     [DllImport(DllName)]
     [return: MarshalAs(UnmanagedType.I1)]

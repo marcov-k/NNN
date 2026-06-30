@@ -97,7 +97,7 @@ std::shared_ptr<Tensor> Tensor::softmax_cross_entropy(const std::shared_ptr<Tens
 		double* const __restrict p_p = p_slice.data();
 
 		size_t i = 0;
-		for (; i <= classes - 8; i += 8)
+		for (; i + 8 <= classes; i += 8)
 		{
 			__m256d exp0 = _mm256_exp_pd(_mm256_sub_pd(_mm256_loadu_pd(&p_t[i]), reg_max));
 			__m256d exp1 = _mm256_exp_pd(_mm256_sub_pd(_mm256_loadu_pd(&p_t[i + 4]), reg_max));
@@ -111,7 +111,7 @@ std::shared_ptr<Tensor> Tensor::softmax_cross_entropy(const std::shared_ptr<Tens
 
 		__m256d acc = _mm256_add_pd(acc0, acc1);
 
-		for (; i <= classes - 4; i += 4)
+		for (; i + 4 <= classes; i += 4)
 		{
 			__m256d exp = _mm256_exp_pd(_mm256_sub_pd(_mm256_loadu_pd(&p_t[i]), reg_max));
 			_mm256_storeu_pd(&p_p[i], exp);
@@ -161,8 +161,8 @@ std::shared_ptr<Tensor> Tensor::softmax_cross_entropy(const std::shared_ptr<Tens
 					double* const __restrict p_tg = tg_slice.data();
 					const __m256d reg_r_grad = _mm256_set1_pd(r_grad);
 
-					int i = 0;
-					for (; i <= classes - 8; i += 8)
+					size_t i = 0;
+					for (; i + 8 <= classes; i += 8)
 					{
 						__m256d reg_p0 = _mm256_loadu_pd(&p_p[i]);
 						__m256d reg_p1 = _mm256_loadu_pd(&p_p[i + 4]);
@@ -183,7 +183,7 @@ std::shared_ptr<Tensor> Tensor::softmax_cross_entropy(const std::shared_ptr<Tens
 						_mm256_storeu_pd(&p_tg[i + 4], res1);
 					}
 
-					for (; i <= classes - 4; i += 4)
+					for (; i + 4 <= classes; i += 4)
 					{
 						__m256d reg_p = _mm256_loadu_pd(&p_p[i]);
 						__m256d reg_g = _mm256_loadu_pd(&p_g[i]);

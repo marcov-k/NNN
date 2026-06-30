@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "NNNExplorer": {
+      "commandName": "Project",
+      "debugEngines": "managed,native"
+    }
+  }
+}

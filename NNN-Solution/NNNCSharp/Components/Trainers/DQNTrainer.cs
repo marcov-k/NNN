@@ -1,4 +1,4 @@
-﻿using NNNCSharp.Components.Autodiff;
+﻿using NNNCSharp.Components.Interop;
 using NNNCSharp.Components.Buffers;
 using NNNCSharp.Components.Costs;
 using NNNCSharp.Components.Environments;
@@ -334,7 +334,7 @@ public class DQNTrainer(Model agent, Environments.Environment environment, Optim
             var stateDims = batch[0].State.Dimensions;
             var batchDims = new int[stateDims.Length + 1];
             batchDims[0] = BatchSize;
-            stateDims.CopyTo(batchDims, 1);
+            stateDims.CopyTo(batchDims.AsSpan(1));
             _currentBatch = new(batchDims);
             _nextBatch = new(batchDims);
         }
@@ -344,8 +344,8 @@ public class DQNTrainer(Model agent, Environments.Environment environment, Optim
         for (int b = 0; b < BatchSize; b++)
         {
             batchOffset = b * Environment.StateSize;
-            Array.Copy(batch[b].State.Data, 0, _currentBatch.Data, batchOffset, Environment.StateSize);
-            Array.Copy(batch[b].NextState.Data, 0, _nextBatch.Data, batchOffset, Environment.StateSize);
+            batch[b].State.Data[0..Environment.StateSize].CopyTo(_currentBatch.Data.Slice(batchOffset, Environment.StateSize));
+            batch[b].NextState.Data[0..Environment.StateSize].CopyTo(_nextBatch.Data.Slice(batchOffset, Environment.StateSize));
         }
 
         // Predict future values of actions
@@ -376,8 +376,8 @@ public class DQNTrainer(Model agent, Environments.Environment environment, Optim
         // Gradually update target model parameters
         for (int i = 0; i < TargetModel.ParameterCount; i++)
         {
-            var agentParamVecs = MemoryMarshal.Cast<double, Vector<double>>(Agent.Parameters[i].Data.AsSpan());
-            var targetParamVecs = MemoryMarshal.Cast<double, Vector<double>>(TargetModel.Parameters[i].Data.AsSpan());
+            var agentParamVecs = MemoryMarshal.Cast<double, Vector<double>>(Agent.Parameters[i].Data);
+            var targetParamVecs = MemoryMarshal.Cast<double, Vector<double>>(TargetModel.Parameters[i].Data);
             for (int j = 0; j < agentParamVecs.Length; j++)
             {
                 targetParamVecs[j] = (TauVec * agentParamVecs[j]) + (OneMinusTauVec * targetParamVecs[j]);
@@ -403,7 +403,7 @@ public class DQNTrainer(Model agent, Environments.Environment environment, Optim
     {
         // Initialize persistent buffers if not yet initialized
         _targetQs ??= new([BatchSize, 1]);
-        _nextState ??= new(batch[0].NextState.Dimensions);
+        _nextState ??= new(batch[0].NextState.Dimensions.ToArray());
 
         // Ensure persistent buffers do not store unnecessary graphs
         _targetQs.ClearGraph();
@@ -420,7 +420,7 @@ public class DQNTrainer(Model agent, Environments.Environment environment, Optim
             // Calculate predicted future value of the action
             if (!batch[i].Done)
             {
-                Array.Copy(_nextBatch!.Data, i * stateSize, _nextState.Data, 0, stateSize); // update the next state buffer with relevant data from the next batch buffer
+                _nextBatch!.Data.Slice(i * stateSize, stateSize).CopyTo(_nextState.Data[0..stateSize]); // update the next state buffer with relevant data from the next batch buffer
 
                 // Find the best valid action predicted by the agent for the next state
                 int bestAction = -1;

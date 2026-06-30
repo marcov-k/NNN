@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "NNNTrainer": {
+      "commandName": "Project",
+      "debugEngines": "managed,native"
+    }
+  }
+}

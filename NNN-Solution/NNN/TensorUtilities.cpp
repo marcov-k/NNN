@@ -326,7 +326,7 @@ std::shared_ptr<Tensor> Tensor::clip(const std::shared_ptr<Tensor>& t, double mi
 				const __m256d reg_0 = _mm256_setzero_pd();
 
 				size_t i = 0;
-				for (; i <= n - 8; i += 8)
+				for (; i + 8 <= n; i += 8)
 				{
 					__m256d reg_tv0 = _mm256_loadu_pd(&p_tv[i]);
 					__m256d reg_tv1 = _mm256_loadu_pd(&p_tv[i + 4]);
@@ -350,7 +350,7 @@ std::shared_ptr<Tensor> Tensor::clip(const std::shared_ptr<Tensor>& t, double mi
 					_mm256_storeu_pd(&p_tg[i + 4], grad1);
 				}
 
-				for (; i <= n - 4; i += 4)
+				for (; i + 4 <= n; i += 4)
 				{
 					__m256d reg_tv = _mm256_loadu_pd(&p_tv[i]);
 					__m256d reg_tg = _mm256_loadu_pd(&p_tg[i]);

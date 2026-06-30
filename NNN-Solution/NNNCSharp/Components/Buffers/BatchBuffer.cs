@@ -1,4 +1,4 @@
-﻿using NNNCSharp.Components.Autodiff;
+﻿using NNNCSharp.Components.Interop;
 using NNNCSharp.Components.Utilities;
 
 namespace NNNCSharp.Components.Buffers;
@@ -21,11 +21,11 @@ public class BatchBuffer(Tensor[] data, Tensor[] targets)
     /// <summary>
     /// Dimensions of an unbatched training input.
     /// </summary>
-    readonly int[] DataDims = data[0].Dimensions;
+    readonly int[] DataDims = data[0].Dimensions.ToArray();
     /// <summary>
     /// Dimensions of an unbatched training target.
     /// </summary>
-    readonly int[] TargetDims = targets[0].Dimensions;
+    readonly int[] TargetDims = targets[0].Dimensions.ToArray();
     /// <summary>
     /// Persistent array of batch input tensors.
     /// </summary>
@@ -72,14 +72,14 @@ public class BatchBuffer(Tensor[] data, Tensor[] targets)
         var batchItems = ArrayUtils.GetRandomElements(Data, batchSize);
         for (int i = 0; i < batchSize; i++)
         {
-            Array.Copy(batchItems[i].Element.Data, 0, BatchInputs[0].Data, i * itemLength, itemLength);
+            batchItems[i].Element.Data[0..itemLength].CopyTo(BatchInputs[0].Data.Slice(i * itemLength, itemLength));
         }
 
         // Fill batched target tensor with targets corresponding to selected inputs
         int targetLength = Targets[0].ElementCount;
         for (int i = 0; i < batchSize; i++)
         {
-            Array.Copy(Targets[batchItems[i].OriginalIndex].Data, 0, BatchTargets[0].Data, i * targetLength, targetLength);
+            Targets[batchItems[i].OriginalIndex].Data[0..targetLength].CopyTo(BatchTargets[0].Data.Slice(i * targetLength, targetLength));
         }
 
         return (BatchInputs[0], BatchTargets[0]);
@@ -149,8 +149,8 @@ public class BatchBuffer(Tensor[] data, Tensor[] targets)
             int batchOffset = b * batchSize;
             for (int i = 0; i < batchSize; i++)
             {
-                Array.Copy(shuffledData[batchOffset + i].Element.Data, 0, BatchInputs[b].Data, i * itemLength, itemLength);
-                Array.Copy(shuffledTargets[batchOffset + i].Data, 0, BatchTargets[b].Data, i * targetLength, targetLength);
+                shuffledData[batchOffset + i].Element.Data[0..itemLength].CopyTo(BatchInputs[b].Data.Slice(i * itemLength, itemLength));
+                shuffledTargets[batchOffset + i].Data[0..targetLength].CopyTo(BatchTargets[b].Data.Slice(i * targetLength, targetLength));
             }
         }
         if (tailBatchLength > 0)
@@ -158,8 +158,8 @@ public class BatchBuffer(Tensor[] data, Tensor[] targets)
             int batchOffset = fullBatchCount * batchSize;
             for (int i = 0; i < tailBatchLength; i++)
             {
-                Array.Copy(shuffledData[batchOffset + i].Element.Data, 0, BatchInputs[fullBatchCount].Data, i * itemLength, itemLength);
-                Array.Copy(shuffledTargets[batchOffset + i].Data, 0, BatchTargets[fullBatchCount].Data, i * targetLength, targetLength);
+                shuffledData[batchOffset + i].Element.Data[0..itemLength].CopyTo(BatchInputs[fullBatchCount].Data.Slice(i * itemLength, itemLength));
+                shuffledTargets[batchOffset + i].Data[0..targetLength].CopyTo(BatchTargets[fullBatchCount].Data.Slice(i * targetLength, targetLength));
             }
         }
 

@@ -1,4 +1,4 @@
-﻿using NNNCSharp.Components.Autodiff;
+﻿using NNNCSharp.Components.Interop;
 using NNNCSharp.Components.Models;
 using NNNCSharp.Components.Models.Layers;
 using System.Buffers.Binary;
@@ -131,9 +131,9 @@ public static class FileUtils
     /// <param name="data">Tensor to write.</param>
     public static void WriteTensor(FileStream stream, Tensor data)
     {
-        WriteInt32Array(stream, data.Dimensions);
+        WriteInt32Array(stream, data.Dimensions.ToArray());
         WriteBool(stream, data.RequiresGrad);
-        WriteDoubleArray(stream, data.Data); // write linear data array
+        WriteDoubleArray(stream, data.Data.ToArray()); // write linear data array
     }
 
     /// <summary>
@@ -281,7 +281,7 @@ public static class FileUtils
 
         // Create new tensor instance using read data
         Tensor tensor = new(dims, requiresGrad);
-        Array.Copy(data, tensor.Data, data.Length);
+        data.AsSpan().CopyTo(tensor.Data);
         return tensor;
     }
 

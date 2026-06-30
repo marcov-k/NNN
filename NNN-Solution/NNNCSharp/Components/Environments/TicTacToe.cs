@@ -1,4 +1,4 @@
-﻿using NNNCSharp.Components.Autodiff;
+﻿using NNNCSharp.Components.Interop;
 using NNNCSharp.Components.Episodes;
 using NNNCSharp.Components.Models;
 using NNNCSharp.Components.Utilities.SaveSystem;
@@ -332,7 +332,11 @@ public class TicTacToe : Environment, ISelfPlay
     bool BoardFilled(Tensor? state = null)
     {
         state ??= State; // assume current environment state if no state is given
-        return !state.Data.Any(p => p == 0.0);
+        foreach (var p in state.Data)
+        {
+            if (p == 0.0) return false;
+        }
+        return true;
     }
 
     /// <summary>

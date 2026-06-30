@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "NNNTester": {
+      "commandName": "Project",
+      "debugEngines": "managed,native"
+    }
+  }
+}
