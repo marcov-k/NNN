@@ -36,7 +36,15 @@ public:
 	{
 		return _data;
 	}
+	std::vector<double>& mutable_data()
+	{
+		return _data;
+	}
 	const std::vector<double>& grad() const
+	{
+		return _grad;
+	}
+	std::vector<double>& mutable_grad()
 	{
 		return _grad;
 	}

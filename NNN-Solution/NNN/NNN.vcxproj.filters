@@ -65,5 +65,8 @@
     <ClCompile Include="TensorCosts.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="exports.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

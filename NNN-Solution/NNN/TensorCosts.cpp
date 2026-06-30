@@ -80,7 +80,7 @@ std::shared_ptr<Tensor> Tensor::softmax_cross_entropy(const std::shared_ptr<Tens
 
 	std::vector<double> probs(element_count);
 
-	for (int b = 0; b < batches; ++b)
+	for (size_t b = 0; b < batches; ++b)
 	{
 		const size_t offset = b * classes;
 
