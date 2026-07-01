@@ -19,7 +19,7 @@ void Optimizers::clip_gradients(const std::vector<std::shared_ptr<Tensor>*>& par
 
 	if (total_norm > max_norm)
 	{
-		const double scale = 1.0 / (total_norm + 1e-8);
+		const double scale = max_norm / (total_norm + 1e-8);
 
 		for (std::shared_ptr<Tensor>* para_ptr : paras)
 		{

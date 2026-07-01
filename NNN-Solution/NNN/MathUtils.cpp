@@ -637,7 +637,7 @@ void MathUtils::vector_div(double a, double* const __restrict b, size_t n)
 
 	for (; i < n; ++i)
 	{
-		b[i] = a - b[i];
+		b[i] = a / b[i];
 	}
 }
 
@@ -999,7 +999,7 @@ void MathUtils::vector_fmadd(const double* const __restrict a, const double* con
 		__m256d fmadd1 = _mm256_fmadd_pd(reg_b1, reg_c1, reg_a1);
 
 		_mm256_storeu_pd(&r[i], fmadd0);
-		_mm256_storeu_pd(&r[i + 4], fmadd0);
+		_mm256_storeu_pd(&r[i + 4], fmadd1);
 	}
 
 	for (; i + 4 <= n; i += 4)

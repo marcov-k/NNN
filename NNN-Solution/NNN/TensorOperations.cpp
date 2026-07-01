@@ -616,7 +616,7 @@ std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const s
 							}
 						}
 
-						#pragma omp parallel for if(par)
+						#pragma omp parallel for if(par && b_batched)
 						for (int k = 0; k < n; ++k)
 						{
 							for (int j = 0; j < p; ++j)
@@ -646,7 +646,7 @@ std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const s
 						transpose_matrix(a->_data.data(), a_t.data(), a_off, 0, m, n);
 						transpose_matrix(result->_grad.data(), d_out_t.data(), r_off, 0, m, p);
 
-						#pragma omp parallel for if(par)
+						#pragma omp parallel for if(par && b_batched)
 						for (int k = 0; k < n; ++k)
 						{
 							for (int j = 0; j < p; ++j)
