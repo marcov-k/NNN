@@ -2,7 +2,8 @@
   "profiles": {
     "NNNTrainer": {
       "commandName": "Project",
-      "debugEngines": "managed,native"
+      "debugEngines": "managed,native",
+      "hotReloadEnabled": false
     }
   }
 }

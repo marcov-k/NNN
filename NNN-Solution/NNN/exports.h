@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Tensor.h"
+#include "Optimizers.h"
 
 extern "C"
 {
@@ -141,4 +142,11 @@ extern "C"
 	__declspec(dllexport) void* tensor_huber(void* handle_t, void* handle_target, double delta);
 
 	__declspec(dllexport) void* tensor_softmax_cross_entropy(void* handle_t, void* handle_target);
+
+	__declspec(dllexport) void optimizers_clip_gradients(void** handles, int para_count, double max_norm);
+
+	__declspec(dllexport) void optimizers_sgd(void* handle_para, double lr);
+
+	__declspec(dllexport) void optimizers_adam(void* handle_para, double lr, int iter, double* m, double* v, int moments_count,
+		double beta1, double one_minus_beta1, double beta2, double one_minus_beta2, double epsilon, double weight_decay);
 }

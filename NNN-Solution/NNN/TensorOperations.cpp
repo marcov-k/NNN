@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "Tensor.h"
 #include "MathUtils.h"
+#include <Windows.h>
 
 std::shared_ptr<Tensor> Tensor::add(const std::shared_ptr<Tensor>& a, const std::shared_ptr<Tensor>& b)
 {
@@ -556,7 +557,7 @@ std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const s
 	const auto& owner = a->requires_grad ? a : b;
 	auto result = get_result_tensor(owner, result_dims, a->requires_grad || b->requires_grad);
 
-	const bool use_parallel = (long)total_rows * n * p > PARALLEL_THRESHOLD;
+	const bool use_parallel = total_rows > 16 && (long)m * n * p > PARALLEL_THRESHOLD;
 	std::vector<double> b_t(b_mat_size * batch_size);
 	int b_src_off = 0;
 	for (int batch = 0; batch < batch_size; ++batch)
@@ -571,6 +572,7 @@ std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const s
 	{
 		const int batch = row / m;
 		const int i = row % m;
+
 		compute_row(i, n, p, a->_data.data(), b_t.data(), result->_data.data(), batch * a_mat_size, batch * b_mat_size, batch * r_mat_size);
 	}
 

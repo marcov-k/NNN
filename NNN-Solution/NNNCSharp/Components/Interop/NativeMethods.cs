@@ -214,4 +214,14 @@ internal static class NativeMethods
 
     [DllImport(DllName)]
     internal static extern IntPtr tensor_softmax_cross_entropy(IntPtr handle_t, IntPtr handle_target);
+
+    [DllImport(DllName)]
+    internal static extern void optimizers_clip_gradients(IntPtr[] handles, int para_count, double max_norm);
+
+    [DllImport(DllName)]
+    internal static extern void optimizers_sgd(IntPtr handle_para, double lr);
+
+    [DllImport(DllName)]
+    internal static extern void optimizers_adam(IntPtr handle_para, double lr, int iter, double[] m, double[] v, int moments_count,
+        double beta1, double one_minus_beta1, double beta2, double one_minus_beta2, double epsilon, double weight_decay);
 }

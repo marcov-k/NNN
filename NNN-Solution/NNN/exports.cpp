@@ -435,4 +435,30 @@ extern "C"
 		auto* tensor_handle_target = static_cast<std::shared_ptr<Tensor>*>(handle_target);
 		return wrap_handle(Tensor::softmax_cross_entropy(*tensor_handle_t, *tensor_handle_target));
 	}
+
+	void optimizers_clip_gradients(void** handles, int para_count, double max_norm)
+	{
+		std::vector<std::shared_ptr<Tensor>*> paras(para_count);
+		for (int i = 0; i < para_count; ++i)
+		{
+			paras[i] = static_cast<std::shared_ptr<Tensor>*>(handles[i]);
+		}
+		Optimizers::clip_gradients(paras, max_norm);
+	}
+
+	void optimizers_sgd(void* handle_para, double lr)
+	{
+		auto* tensor_handle_para = static_cast<std::shared_ptr<Tensor>*>(handle_para);
+		Optimizers::sgd(*tensor_handle_para, lr);
+	}
+
+	void optimizers_adam(void* handle_para, double lr, int iter, double* m, double* v, int moments_count,
+		double beta1, double one_minus_beta1, double beta2, double one_minus_beta2, double epsilon, double weight_decay)
+	{
+		auto* tensor_handle_para = static_cast<std::shared_ptr<Tensor>*>(handle_para);
+		std::span<double> m_span(m, moments_count);
+		std::span<double> v_span(v, moments_count);
+		Optimizers::adam(*tensor_handle_para, lr, iter, m_span, v_span, beta1, one_minus_beta1, beta2, one_minus_beta2,
+			epsilon, weight_decay);
+	}
 }

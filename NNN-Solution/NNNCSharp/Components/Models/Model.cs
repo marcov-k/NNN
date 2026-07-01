@@ -128,47 +128,8 @@ public class Model
     /// <param name="maxNorm">Maximum total magnitude of gradients without clipping.</param>
     public void ClipGradients(double maxNorm)
     {
-        // Calculate total magnitude of gradients
-        double totalNorm = 0.0;
-        foreach (var param in Parameters)
-        {
-            var gradVecs = MemoryMarshal.Cast<double, Vector<double>>(param.Grad);
-            var acc = Vector<double>.Zero;
-            for (int i = 0; i < gradVecs.Length; i++)
-            {
-                acc += gradVecs[i] * gradVecs[i];
-            }
-            totalNorm += Vector.Sum(acc);
-
-            for (int i = gradVecs.Length * VectorSize; i < param.GradCount; i++)
-            {
-                double grad = param.Grad[i];
-
-                totalNorm += grad * grad;
-            }
-        }
-        totalNorm = Math.Sqrt(totalNorm);
-
-        // Scale (clip) gradients if necessary
-        if (totalNorm > maxNorm)
-        {
-            double scale = maxNorm / (totalNorm + 1e-8);
-            var scaleVec = new Vector<double>(scale);
-
-            foreach (var param in Parameters)
-            {
-                var gradVecs = MemoryMarshal.Cast<double, Vector<double>>(param.Grad);
-                for (int i = 0; i < gradVecs.Length; i++)
-                {
-                    gradVecs[i] *= scaleVec;
-                }
-
-                for (int i = gradVecs.Length * VectorSize; i < param.GradCount; i++)
-                {
-                    param.Grad[i] *= scale;
-                }
-            }
-        }
+        var handles = Parameters.Select(p => p.Handle).ToArray();
+        NativeMethods.optimizers_clip_gradients(handles, handles.Length, maxNorm);
     }
 
     /// <summary>

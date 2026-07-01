@@ -1,5 +1,4 @@
 ﻿using NNNCSharp.Components.Interop;
-using System.Numerics;
 
 namespace NNNCSharp.Components.Optimizers;
 
@@ -12,27 +11,7 @@ public abstract class Optimizer(double learningRate)
     /// <summary>
     /// Gradient scaling factor for parameter updates.
     /// </summary>
-    public double LR
-    {
-        get => _lr;
-        set
-        {
-            _lr = value;
-            LRVec = new(value);
-        }
-    }
-    /// <summary>
-    /// Internal learning rate property.
-    /// </summary>
-    protected double _lr = learningRate;
-    /// <summary>
-    /// Preallocated vectorization of learning rate.
-    /// </summary>
-    protected Vector<double> LRVec = new(learningRate);
-    /// <summary>
-    /// Size of vectors in the current CPU architecture.
-    /// </summary>
-    protected static readonly int VectorSize = Vector<double>.Count;
+    public double LR { get; set; } = learningRate;
 
     /// <summary>
     /// Updates the parameter based on its gradient.
