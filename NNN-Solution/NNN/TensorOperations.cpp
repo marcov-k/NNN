@@ -671,11 +671,10 @@ void Tensor::compute_output_position(int batch_out_pos, int spatial_rank, int ou
 {
 	const int b = batch_out_pos / out_spatial_size;
 
-	thread_local std::vector<int> out_coords;
-	thread_local std::vector<int> kernel_coords;
-	thread_local std::vector<double> sums;
+	std::vector<int> out_coords(spatial_rank);
+	std::vector<int> kernel_coords(spatial_rank);
+	std::vector<double> sums(filter_count);
 
-	out_coords.resize(spatial_rank);
 	int result_offset = b * result_strides[0];
 	int rem = batch_out_pos % out_spatial_size;
 	for (int i = 0; i < spatial_rank; ++i)
@@ -688,8 +687,6 @@ void Tensor::compute_output_position(int batch_out_pos, int spatial_rank, int ou
 	const int input_offset_base = b * input_strides[0];
 	const int kernel_offset_base_coeff = kernel_spatial_size * input_channels;
 
-	kernel_coords.resize(spatial_rank);
-	sums.resize(filter_count);
 	std::copy_n(bias_data, filter_count, sums.data());
 
 	for (int kp = 0; kp < kernel_spatial_size; ++kp)
@@ -723,20 +720,16 @@ void Tensor::compute_kernel_grad(int fkp, int spatial_rank, int batches, int out
 {
 	const int f = fkp / kernel_spatial_size;
 
-	thread_local std::vector<int> kernel_coords;
-	thread_local std::vector<int> out_coords;
+	std::vector<int> kernel_coords(spatial_rank);
+	std::vector<int> out_coords(spatial_rank);
 
-	kernel_coords.resize(spatial_rank);
-	int kernel_offset = fkp * input_channels;
 	int rem = fkp % kernel_spatial_size;
+	const int kernel_offset = f * kernel_strides[0] + rem * input_channels;
 	for (int i = 0; i < spatial_rank; ++i)
 	{
 		kernel_coords[i] = rem / kernel_spatial_strides[i];
-		kernel_offset += kernel_coords[i] * kernel_strides[i + 1];
 		rem %= kernel_spatial_strides[i];
 	}
-
-	out_coords.resize(spatial_rank);
 
 	for (int b = 0; b < batches; ++b)
 	{
@@ -770,11 +763,9 @@ void Tensor::compute_input_grad(int batch_in_pos, int spatial_rank, int in_spati
 {
 	const int b = batch_in_pos / in_spatial_size;
 
-	thread_local std::vector<int> in_coords;
-	thread_local std::vector<int> kernel_coords;
+	std::vector<int> in_coords(spatial_rank);
+	std::vector<int> kernel_coords(spatial_rank);
 
-	in_coords.resize(spatial_rank);
-	kernel_coords.resize(spatial_rank);
 	int input_offset = b * input_strides[0];
 	int rem = batch_in_pos % in_spatial_size;
 	for (int i = 0; i < spatial_rank; ++i)

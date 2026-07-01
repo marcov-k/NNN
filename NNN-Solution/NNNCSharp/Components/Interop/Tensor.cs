@@ -143,6 +143,11 @@ public sealed class Tensor : IDisposable
         set => NativeMethods.tensor_set_requires_grad(Handle, value);
     }
 
+    public static bool LogDebug
+    {
+        set => NativeMethods.tensor_set_log_debug(value);
+    }
+
     public static bool Inference
     {
         get => NativeMethods.tensor_get_inference();
@@ -157,111 +162,173 @@ public sealed class Tensor : IDisposable
 
     public static Tensor operator +(Tensor a, Tensor b)
     {
-        return new(NativeMethods.tensor_add(a.Handle, b.Handle));
+        IntPtr h = NativeMethods.tensor_add(a.Handle, b.Handle);
+        GC.KeepAlive(a);
+        GC.KeepAlive(b);
+        return new(h);
     }
 
     public static Tensor operator +(Tensor a, double b)
     {
-        return new(NativeMethods.tensor_add_scalar(a.Handle, b));
+        IntPtr h = NativeMethods.tensor_add_scalar(a.Handle, b);
+        GC.KeepAlive(a);
+        return new(h);
     }
 
-    public static Tensor operator +(double a, Tensor b) => b + a;
+    public static Tensor operator +(double a, Tensor b)
+    {
+        IntPtr h = NativeMethods.tensor_add_scalar(b.Handle, a);
+        GC.KeepAlive(b);
+        return new(h);
+    }
 
     public static Tensor operator -(Tensor a, Tensor b)
     {
-        return new(NativeMethods.tensor_sub(a.Handle, b.Handle));
+        IntPtr h = NativeMethods.tensor_sub(a.Handle, b.Handle);
+        GC.KeepAlive(a);
+        GC.KeepAlive(b);
+        return new(h);
     }
 
     public static Tensor operator -(Tensor a, double b)
     {
-        return new(NativeMethods.tensor_sub_scalar(a.Handle, b));
+        IntPtr h = NativeMethods.tensor_sub_scalar(a.Handle, b);
+        GC.KeepAlive(a);
+        return new(h);
     }
 
     public static Tensor operator -(double a, Tensor b)
     {
-        return new(NativeMethods.tensor_sub_scalar_left(a, b.Handle));
+        IntPtr h = NativeMethods.tensor_sub_scalar_left(a, b.Handle);
+        GC.KeepAlive(b);
+        return new(h);
     }
 
     public static Tensor operator *(Tensor a, Tensor b)
     {
-        return new(NativeMethods.tensor_mul(a.Handle, b.Handle));
+        IntPtr h = NativeMethods.tensor_mul(a.Handle, b.Handle);
+        GC.KeepAlive(a);
+        GC.KeepAlive(b);
+        return new(h);
     }
 
     public static Tensor operator *(Tensor a, double b)
     {
-        return new(NativeMethods.tensor_mul_scalar(a.Handle, b));
+        IntPtr h = NativeMethods.tensor_mul_scalar(a.Handle, b);
+        GC.KeepAlive(a);
+        return new(h);
     }
 
-    public static Tensor operator *(double a, Tensor b) => b * a;
+    public static Tensor operator *(double a, Tensor b)
+    {
+        IntPtr h = NativeMethods.tensor_mul_scalar(b.Handle, a);
+        GC.KeepAlive(b);
+        return new(h);
+    }
 
     public static Tensor operator /(Tensor a, Tensor b)
     {
-        return new(NativeMethods.tensor_div(a.Handle, b.Handle));
+        IntPtr h = NativeMethods.tensor_div(a.Handle, b.Handle);
+        GC.KeepAlive(a);
+        GC.KeepAlive(b);
+        return new(h);
     }
 
     public static Tensor operator /(Tensor a, double b)
     {
-        return new(NativeMethods.tensor_div_scalar(a.Handle, b));
+        IntPtr h = NativeMethods.tensor_div_scalar(a.Handle, b);
+        GC.KeepAlive(a);
+        return new(h);
     }
 
     public static Tensor operator /(double a, Tensor b)
     {
-        return new(NativeMethods.tensor_div_scalar_left(a, b.Handle));
+        IntPtr h = NativeMethods.tensor_div_scalar_left(a, b.Handle);
+        GC.KeepAlive(b);
+        return new(h);
     }
 
     public static Tensor Pow(Tensor a, Tensor exp)
     {
-        return new(NativeMethods.tensor_pow(a.Handle, exp.Handle));
+        IntPtr h = NativeMethods.tensor_pow(a.Handle, exp.Handle);
+        GC.KeepAlive(a);
+        GC.KeepAlive(exp);
+        return new(h);
     }
 
     public static Tensor Pow(Tensor a, double exp)
     {
-        return new(NativeMethods.tensor_pow_scalar(a.Handle, exp));
+        IntPtr h = NativeMethods.tensor_pow_scalar(a.Handle, exp);
+        GC.KeepAlive(a);
+        return new(h);
     }
 
     public static Tensor Pow(double a, Tensor exp)
     {
-        return new(NativeMethods.tensor_pow_scalar_left(a, exp.Handle));
+        IntPtr h = NativeMethods.tensor_pow_scalar_left(a, exp.Handle);
+        GC.KeepAlive(exp);
+        return new(h);
     }
 
     public static Tensor Exp(Tensor t)
     {
-        return new(NativeMethods.tensor_exp(t.Handle));
+        IntPtr h = NativeMethods.tensor_exp(t.Handle);
+        GC.KeepAlive(t);
+        return new(h);
     }
 
     public static Tensor Log(Tensor arg, Tensor logBase)
     {
-        return new(NativeMethods.tensor_log(arg.Handle, logBase.Handle));
+        IntPtr h = NativeMethods.tensor_log(arg.Handle, logBase.Handle);
+        GC.KeepAlive(arg);
+        GC.KeepAlive(logBase);
+        return new(h);
     }
 
     public static Tensor Log(Tensor arg, double logBase)
     {
-        return new(NativeMethods.tensor_log_scalar(arg.Handle, logBase));
+        IntPtr h = NativeMethods.tensor_log_scalar(arg.Handle, logBase);
+        GC.KeepAlive(arg);
+        return new(h);
     }
 
     public static Tensor Log(double arg, Tensor logBase)
     {
-        return new(NativeMethods.tensor_log_scalar_left(arg, logBase.Handle));
+        IntPtr h = NativeMethods.tensor_log_scalar_left(arg, logBase.Handle);
+        GC.KeepAlive(logBase);
+        return new(h);
     }
 
     public static Tensor Ln(Tensor t)
     {
-        return new(NativeMethods.tensor_ln(t.Handle));
+        IntPtr h = NativeMethods.tensor_ln(t.Handle);
+        GC.KeepAlive(t);
+        return new(h);
     }
 
     public static Tensor operator ^(Tensor a, Tensor b)
     {
-        return new(NativeMethods.tensor_matmul(a.Handle, b.Handle));
+        IntPtr h = NativeMethods.tensor_matmul(a.Handle, b.Handle);
+        GC.KeepAlive(a);
+        GC.KeepAlive(b);
+        return new(h);
     }
 
     public static Tensor Convolve(Tensor input, Tensor kernels, Tensor biases)
     {
-        return new(NativeMethods.tensor_convolve(input.Handle, kernels.Handle, biases.Handle));
+        IntPtr h = NativeMethods.tensor_convolve(input.Handle, kernels.Handle, biases.Handle);
+        GC.KeepAlive(input);
+        GC.KeepAlive(kernels);
+        GC.KeepAlive(biases);
+        return new(h);
     }
 
     public static Tensor MaskActions(Tensor qValues, int[] actions)
     {
-        return new(NativeMethods.tensor_mask_actions(qValues.Handle, actions, actions.Length));
+        IntPtr h = NativeMethods.tensor_mask_actions(qValues.Handle, actions, actions.Length);
+        GC.KeepAlive(qValues);
+        GC.KeepAlive(actions);
+        return new(h);
     }
 
     public static Tensor MaskActions(Tensor qValues, List<Experience> batch)
@@ -277,101 +344,149 @@ public sealed class Tensor : IDisposable
 
     public static int ArgMax(Tensor t)
     {
-        return NativeMethods.tensor_arg_max(t.Handle);
+        int argMax = NativeMethods.tensor_arg_max(t.Handle);
+        GC.KeepAlive(t);
+        return argMax;
     }
 
     public static Tensor Sum(Tensor t)
     {
-        return new(NativeMethods.tensor_sum(t.Handle));
+        IntPtr h = NativeMethods.tensor_sum(t.Handle);
+        GC.KeepAlive(t);
+        return new(h);
     }
 
     public static Tensor Mean(Tensor t)
     {
-        return new(NativeMethods.tensor_mean(t.Handle));
+        IntPtr h = NativeMethods.tensor_mean(t.Handle);
+        GC.KeepAlive(t);
+        return new(h);
     }
 
     public static Tensor Transpose(Tensor t, int[] axes)
     {
-        return new(NativeMethods.tensor_transpose(t.Handle, axes, axes.Length));
+        IntPtr h = NativeMethods.tensor_transpose(t.Handle, axes, axes.Length);
+        GC.KeepAlive(t);
+        GC.KeepAlive(axes);
+        return new(h);
     }
 
     public static Tensor Transpose(Tensor t)
     {
-        return new(NativeMethods.tensor_transpose_default(t.Handle));
+        IntPtr h = NativeMethods.tensor_transpose_default(t.Handle);
+        GC.KeepAlive(t);
+        return new(h);
     }
 
     public static Tensor Broadcast(Tensor t, int[] targetDims)
     {
-        return new(NativeMethods.tensor_broadcast(t.Handle, targetDims, targetDims.Length));
+        IntPtr h = NativeMethods.tensor_broadcast(t.Handle, targetDims, targetDims.Length);
+        GC.KeepAlive(t);
+        GC.KeepAlive(targetDims);
+        return new(h);
     }
 
     public static Tensor Reshape(Tensor t, int[] newDims)
     {
-        return new(NativeMethods.tensor_reshape(t.Handle, newDims, newDims.Length));
+        IntPtr h = NativeMethods.tensor_reshape(t.Handle, newDims, newDims.Length);
+        GC.KeepAlive(t);
+        GC.KeepAlive(newDims);
+        return new(h);
     }
 
     public static Tensor Flatten(Tensor t, int startAxis = 0)
     {
-        return new(NativeMethods.tensor_flatten(t.Handle, startAxis));
+        IntPtr h = NativeMethods.tensor_flatten(t.Handle, startAxis);
+        GC.KeepAlive(t);
+        return new(h);
     }
 
     public static Tensor WrapBatch(Tensor t)
     {
-        return new(NativeMethods.tensor_wrap_batch(t.Handle));
+        IntPtr h = NativeMethods.tensor_wrap_batch(t.Handle);
+        GC.KeepAlive(t);
+        return new(h);
     }
 
     public static Tensor Clip(Tensor t, double min, double max)
     {
-        return new(NativeMethods.tensor_clip(t.Handle, min, max));
+        IntPtr h = NativeMethods.tensor_clip(t.Handle, min, max);
+        GC.KeepAlive(t);
+        return new(h);
     }
 
     public static Tensor GetDenseDropoutMask(Tensor t, double dropout)
     {
-        return new(NativeMethods.tensor_get_dense_dropout_mask(t.Dimensions.ToArray(), t.Rank, dropout));
+        var dims = t.Dimensions.ToArray();
+        IntPtr h = NativeMethods.tensor_get_dense_dropout_mask(dims, dims.Length, dropout);
+        GC.KeepAlive(dims);
+        return new(h);
     }
 
     public static Tensor GetSpatialDropoutMask(Tensor t, double dropout)
     {
-        return new(NativeMethods.tensor_get_spatial_dropout_mask(t.Dimensions.ToArray(), t.Rank, dropout));
+        var dims = t.Dimensions.ToArray();
+        IntPtr h = NativeMethods.tensor_get_spatial_dropout_mask(dims, dims.Length, dropout);
+        GC.KeepAlive(dims);
+        return new(h);
     }
 
     public static Tensor ReLU(Tensor t)
     {
-        return new(NativeMethods.tensor_relu(t.Handle));
+        IntPtr h = NativeMethods.tensor_relu(t.Handle);
+        GC.KeepAlive(t);
+        return new(h);
     }
 
     public static Tensor LeakyReLU(Tensor t, double tau)
     {
-        return new(NativeMethods.tensor_leaky_relu(t.Handle, tau));
+        IntPtr h = NativeMethods.tensor_leaky_relu(t.Handle, tau);
+        GC.KeepAlive(t);
+        return new(h);
     }
 
     public static Tensor Sigmoid(Tensor t)
     {
-        return new(NativeMethods.tensor_sigmoid(t.Handle));
+        IntPtr h = NativeMethods.tensor_sigmoid(t.Handle);
+        GC.KeepAlive(t);
+        return new(h);
     }
 
     public static Tensor Tanh(Tensor t)
     {
-        return new(NativeMethods.tensor_tanh(t.Handle));
+        IntPtr h = NativeMethods.tensor_tanh(t.Handle);
+        GC.KeepAlive(t);
+        return new(h);
     }
 
     public static Tensor Softmax(Tensor t)
     {
-        return new(NativeMethods.tensor_softmax(t.Handle));
+        IntPtr h = NativeMethods.tensor_softmax(t.Handle);
+        GC.KeepAlive(t);
+        return new(h);
     }
 
     public static Tensor MSE(Tensor t, Tensor target)
     {
-        return new(NativeMethods.tensor_mse(t.Handle, target.Handle));
+        IntPtr h = NativeMethods.tensor_mse(t.Handle, target.Handle);
+        GC.KeepAlive(t);
+        GC.KeepAlive(target);
+        return new(h);
     }
 
     public static Tensor Huber(Tensor t, Tensor target, double delta)
     {
-        return new(NativeMethods.tensor_huber(t.Handle, target.Handle, delta));
+        IntPtr h = NativeMethods.tensor_huber(t.Handle, target.Handle, delta);
+        GC.KeepAlive(t);
+        GC.KeepAlive(target);
+        return new(h);
     }
 
     public static Tensor SoftmaxCrossEntropy(Tensor t, Tensor target)
     {
-        return new(NativeMethods.tensor_softmax_cross_entropy(t.Handle, target.Handle));
+        IntPtr h = NativeMethods.tensor_softmax_cross_entropy(t.Handle, target.Handle);
+        GC.KeepAlive(t);
+        GC.KeepAlive(target);
+        return new(h);
     }
 }

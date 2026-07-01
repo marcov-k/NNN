@@ -71,6 +71,7 @@ public:
 	}
 	bool requires_grad = false;
 	static bool inference;
+	static bool log_debug;
 
 	Tensor();
 

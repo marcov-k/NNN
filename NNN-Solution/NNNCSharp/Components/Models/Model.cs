@@ -130,6 +130,7 @@ public class Model
     {
         var handles = Parameters.Select(p => p.Handle).ToArray();
         NativeMethods.optimizers_clip_gradients(handles, handles.Length, maxNorm);
+        foreach (var param in Parameters) GC.KeepAlive(param);
     }
 
     /// <summary>

@@ -2,6 +2,9 @@
   "profiles": {
     "NNNTrainer": {
       "commandName": "Project",
+      "environmentVariables": {
+        "ASAN_WIN_CONTINUE_ON_INTERCEPTION_FAILURE": "true"
+      },
       "debugEngines": "managed,native",
       "hotReloadEnabled": false
     }

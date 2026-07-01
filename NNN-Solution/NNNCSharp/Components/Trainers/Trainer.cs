@@ -68,7 +68,6 @@ public class Trainer(Model model, Optimizer optimizer, Cost cost, double maxGrad
         totalTimer.Start();
         epochTimer.Start();
 
-        /*
         if (testFunc is not null)
         {
             Console.WriteLine($"\nEvaluating initial model performance...");
@@ -80,7 +79,6 @@ public class Trainer(Model model, Optimizer optimizer, Cost cost, double maxGrad
             double successPercent = ((double)successes / testLength) * 100.0;
             Console.WriteLine($"Model success percentage: {successPercent:F2}%");
         }
-        */
 
         // Train for the given number of epochs
         int optimizerStep = 0;

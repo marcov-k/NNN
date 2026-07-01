@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Tensor.h"
-#include "Optimizers.h"
 
 extern "C"
 {
@@ -50,6 +49,8 @@ extern "C"
 	__declspec(dllexport) bool tensor_get_requires_grad(void* handle);
 
 	__declspec(dllexport) void tensor_set_requires_grad(void* handle, bool requires_grad);
+
+	__declspec(dllexport) void tensor_set_log_debug(bool log_debug);
 
 	__declspec(dllexport) bool tensor_get_inference();
 
@@ -149,4 +150,7 @@ extern "C"
 
 	__declspec(dllexport) void optimizers_adam(void* handle_para, double lr, int iter, double* m, double* v, int moments_count,
 		double beta1, double one_minus_beta1, double beta2, double one_minus_beta2, double epsilon, double weight_decay);
+
+	__declspec(dllexport) void models_soft_update(void** handles_agent, void** handles_target, int para_count, double tau,
+		double one_minus_tau);
 }

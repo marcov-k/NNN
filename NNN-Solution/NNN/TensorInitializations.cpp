@@ -100,7 +100,7 @@ std::shared_ptr<Tensor> Tensor::init_kernels(int filter_count, const std::vector
 
 std::shared_ptr<Tensor> Tensor::copy() const
 {
-	auto copy = std::make_shared<Tensor>(_dimensions, false);
+	auto copy = std::make_shared<Tensor>(_dimensions, requires_grad);
 	copy->_data = _data;
 	return copy;
 }

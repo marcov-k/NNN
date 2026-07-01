@@ -53,5 +53,6 @@ public class Adam(double learningRate = 0.001, double beta1 = 0.9, double beta2 
 
         NativeMethods.optimizers_adam(parameter.Handle, LR, iteration, m, v, m.Length, Beta1, OneMinusBeta1, Beta2,
             OneMinusBeta2, Epsilon, WeightDecay);
+        GC.KeepAlive(parameter);
     }
 }

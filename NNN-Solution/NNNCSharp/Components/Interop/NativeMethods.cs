@@ -77,6 +77,9 @@ internal static class NativeMethods
     internal static extern void tensor_set_requires_grad(IntPtr handle, [MarshalAs(UnmanagedType.I1)] bool requires_grad);
 
     [DllImport(DllName)]
+    internal static extern void tensor_set_log_debug([MarshalAs(UnmanagedType.I1)] bool log_debug);
+
+    [DllImport(DllName)]
     [return: MarshalAs(UnmanagedType.I1)]
     internal static extern bool tensor_get_inference();
 
@@ -224,4 +227,8 @@ internal static class NativeMethods
     [DllImport(DllName)]
     internal static extern void optimizers_adam(IntPtr handle_para, double lr, int iter, double[] m, double[] v, int moments_count,
         double beta1, double one_minus_beta1, double beta2, double one_minus_beta2, double epsilon, double weight_decay);
+
+    [DllImport(DllName)]
+    internal static extern void models_soft_update(IntPtr[] handles_agent, IntPtr[] handles_target, int para_count, double tau,
+        double one_minus_tau);
 }

@@ -109,14 +109,6 @@ public class DQNTrainer(Model agent, Environments.Environment environment, Optim
     /// Precalculated 1 - tau value.
     /// </summary>
     readonly double OneMinusTau = 1.0 - tau;
-    /// <summary>
-    /// Preallocated vectorization of tau value.
-    /// </summary>
-    readonly Vector<double> TauVec = new(tau);
-    /// <summary>
-    /// Preallocated vectorization of 1 - tau value.
-    /// </summary>
-    readonly Vector<double> OneMinusTauVec = new(1.0 - tau);
 
     // Self-play parameters
     /// <summary>
@@ -145,10 +137,6 @@ public class DQNTrainer(Model agent, Environments.Environment environment, Optim
     /// Total loss accumulated during the episode.
     /// </summary>
     double totalLoss = 0.0;
-    /// <summary>
-    /// Size of vectors in the current CPU architecture.
-    /// </summary>
-    static readonly int VectorSize = Vector<double>.Count;
 
     // Persistent training buffers
     /// <summary>
@@ -374,20 +362,9 @@ public class DQNTrainer(Model agent, Environments.Environment environment, Optim
         }
 
         // Gradually update target model parameters
-        for (int i = 0; i < TargetModel.ParameterCount; i++)
-        {
-            var agentParamVecs = MemoryMarshal.Cast<double, Vector<double>>(Agent.Parameters[i].Data);
-            var targetParamVecs = MemoryMarshal.Cast<double, Vector<double>>(TargetModel.Parameters[i].Data);
-            for (int j = 0; j < agentParamVecs.Length; j++)
-            {
-                targetParamVecs[j] = (TauVec * agentParamVecs[j]) + (OneMinusTauVec * targetParamVecs[j]);
-            }
-
-            for (int j = agentParamVecs.Length * VectorSize; j < TargetModel.Parameters[i].ElementCount; j++)
-            {
-                TargetModel.Parameters[i][j] = (Tau * Agent.Parameters[i][j]) + (OneMinusTau * TargetModel.Parameters[i][j]);
-            }
-        }
+        var handlesAgent = Agent.Parameters.Select(p => p.Handle).ToArray();
+        var handlesTarget = TargetModel.Parameters.Select(p => p.Handle).ToArray();
+        NativeMethods.models_soft_update(handlesAgent, handlesTarget, handlesAgent.Length, Tau, OneMinusTau);
 
         optimizerSteps++;
     }

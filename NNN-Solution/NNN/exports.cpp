@@ -1,9 +1,14 @@
 #include "pch.h"
 #include "exports.h"
+#include "Tensor.h"
+#include "Optimizers.h"
+#include "Models.h"
 
 static void* wrap_handle(const std::shared_ptr<Tensor>& t)
 {
-	return static_cast<void*>(new std::shared_ptr<Tensor>(t));
+	auto* p = static_cast<void*>(new std::shared_ptr<Tensor>(t));
+	if (Tensor::log_debug) if (Tensor::log_debug) printf("CREATE wrapper=%p tensor=%p\n", p, t.get());
+	return p;
 }
 
 extern "C"
@@ -43,6 +48,7 @@ extern "C"
 
 	void* tensor_copy(void* handle)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		return wrap_handle((*tensor_handle)->copy());
 	}
@@ -50,59 +56,69 @@ extern "C"
 	void tensor_release(void* handle)
 	{
 		auto* tensor_ptr = static_cast<std::shared_ptr<Tensor>*>(handle);
+		if (Tensor::log_debug) printf("DELETE wrapper=%p tensor=%p\n", handle, tensor_ptr->get());
 		delete tensor_ptr;
 	}
 
 	int tensor_rank(void* handle)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		return (*tensor_handle)->rank();
 	}
 
 	const int* tensor_dims_ptr(void* handle)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		return (*tensor_handle)->dimensions().data();
 	}
 
 	const int* tensor_strides_ptr(void* handle)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		return (*tensor_handle)->strides().data();
 	}
 
 	int tensor_element_count(void* handle)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		return (*tensor_handle)->element_count();
 	}
 
 	int tensor_grad_count(void* handle)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		return (*tensor_handle)->grad_count();
 	}
 
 	double* tensor_data_ptr(void* handle)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		return (*tensor_handle)->mutable_data().data();
 	}
 
 	double tensor_get_at(void* handle, int index)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		return (**tensor_handle)[index];
 	}
 
 	void tensor_set_at(void* handle, double value, int index)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		(**tensor_handle)[index] = value;
 	}
 
 	double tensor_get_at_spatial(void* handle, const int* indices, int rank)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		std::vector<int> indices_vec(indices, indices + rank);
 		return (*tensor_handle)->at(indices_vec);
@@ -110,6 +126,7 @@ extern "C"
 
 	void tensor_set_at_spatial(void* handle, double value, const int* indices, int rank)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		std::vector<int> indices_vec(indices, indices + rank);
 		(*tensor_handle)->at(indices_vec) = value;
@@ -117,6 +134,7 @@ extern "C"
 
 	int tensor_linear_index(void* handle, const int* indices, int rank)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		std::vector<int> indices_vec(indices, indices + rank);
 		return (*tensor_handle)->linear_index(indices_vec);
@@ -124,6 +142,7 @@ extern "C"
 
 	void tensor_get_full_indices(void* handle, int index, int* out_indices)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		auto indices = (*tensor_handle)->get_full_indices(index);
 		std::copy(indices.begin(), indices.end(), out_indices);
@@ -131,20 +150,28 @@ extern "C"
 
 	double* tensor_grad_ptr(void* handle)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		return (*tensor_handle)->mutable_grad().data();
 	}
 
 	bool tensor_get_requires_grad(void* handle)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		return (*tensor_handle)->requires_grad;
 	}
 
 	void tensor_set_requires_grad(void* handle, bool requires_grad)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		(*tensor_handle)->requires_grad = requires_grad;
+	}
+
+	void tensor_set_log_debug(bool log_debug)
+	{
+		Tensor::log_debug = log_debug;
 	}
 
 	bool tensor_get_inference()
@@ -164,18 +191,21 @@ extern "C"
 
 	void tensor_clear_graph(void* handle)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		(*tensor_handle)->clear_graph();
 	}
 
 	void tensor_backward(void* handle)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		(*tensor_handle)->backward();
 	}
 
 	void* tensor_add(void* handle_a, void* handle_b)
 	{
+		if (Tensor::log_debug) printf("USE wrapper_a=%p wrapper_b=%p\n", handle_a, handle_b);
 		auto* tensor_handle_a = static_cast<std::shared_ptr<Tensor>*>(handle_a);
 		auto* tensor_handle_b = static_cast<std::shared_ptr<Tensor>*>(handle_b);
 		return wrap_handle(Tensor::add(*tensor_handle_a, *tensor_handle_b));
@@ -183,12 +213,14 @@ extern "C"
 
 	void* tensor_add_scalar(void* handle_a, double b)
 	{
+		if (Tensor::log_debug) printf("USE wrapper_a=%p\n", handle_a);
 		auto* tensor_handle_a = static_cast<std::shared_ptr<Tensor>*>(handle_a);
 		return wrap_handle(Tensor::add(*tensor_handle_a, b));
 	}
 
 	void* tensor_sub(void* handle_a, void* handle_b)
 	{
+		if (Tensor::log_debug) printf("USE wrapper_a=%p wrapper_b=%p\n", handle_a, handle_b);
 		auto* tensor_handle_a = static_cast<std::shared_ptr<Tensor>*>(handle_a);
 		auto* tensor_handle_b = static_cast<std::shared_ptr<Tensor>*>(handle_b);
 		return wrap_handle(Tensor::sub(*tensor_handle_a, *tensor_handle_b));
@@ -196,18 +228,21 @@ extern "C"
 
 	void* tensor_sub_scalar(void* handle_a, double b)
 	{
+		if (Tensor::log_debug) printf("USE wrapper_a=%p\n", handle_a);
 		auto* tensor_handle_a = static_cast<std::shared_ptr<Tensor>*>(handle_a);
 		return wrap_handle(Tensor::sub(*tensor_handle_a, b));
 	}
 
 	void* tensor_sub_scalar_left(double a, void* handle_b)
 	{
+		if (Tensor::log_debug) printf("USE wrapper_b=%p\n", handle_b);
 		auto* tensor_handle_b = static_cast<std::shared_ptr<Tensor>*>(handle_b);
 		return wrap_handle(Tensor::sub(a, *tensor_handle_b));
 	}
 
 	void* tensor_mul(void* handle_a, void* handle_b)
 	{
+		if (Tensor::log_debug) printf("USE wrapper_a=%p wrapper_b=%p\n", handle_a, handle_b);
 		auto* tensor_handle_a = static_cast<std::shared_ptr<Tensor>*>(handle_a);
 		auto* tensor_handle_b = static_cast<std::shared_ptr<Tensor>*>(handle_b);
 		return wrap_handle(Tensor::mul(*tensor_handle_a, *tensor_handle_b));
@@ -215,12 +250,14 @@ extern "C"
 
 	void* tensor_mul_scalar(void* handle_a, double b)
 	{
+		if (Tensor::log_debug) printf("USE wrapper_a=%p\n", handle_a);
 		auto* tensor_handle_a = static_cast<std::shared_ptr<Tensor>*>(handle_a);
 		return wrap_handle(Tensor::mul(*tensor_handle_a, b));
 	}
 
 	void* tensor_div(void* handle_a, void* handle_b)
 	{
+		if (Tensor::log_debug) printf("USE wrapper_a=%p wrapper_b=%p\n", handle_a, handle_b);
 		auto* tensor_handle_a = static_cast<std::shared_ptr<Tensor>*>(handle_a);
 		auto* tensor_handle_b = static_cast<std::shared_ptr<Tensor>*>(handle_b);
 		return wrap_handle(Tensor::div(*tensor_handle_a, *tensor_handle_b));
@@ -228,18 +265,21 @@ extern "C"
 
 	void* tensor_div_scalar(void* handle_a, double b)
 	{
+		if (Tensor::log_debug) printf("USE wrapper_a=%p\n", handle_a);
 		auto* tensor_handle_a = static_cast<std::shared_ptr<Tensor>*>(handle_a);
 		return wrap_handle(Tensor::div(*tensor_handle_a, b));
 	}
 
 	void* tensor_div_scalar_left(double a, void* handle_b)
 	{
+		if (Tensor::log_debug) printf("USE wrapper_b=%p\n", handle_b);
 		auto* tensor_handle_b = static_cast<std::shared_ptr<Tensor>*>(handle_b);
 		return wrap_handle(Tensor::div(a, *tensor_handle_b));
 	}
 
 	void* tensor_pow(void* handle_a, void* handle_exp)
 	{
+		if (Tensor::log_debug) printf("USE wrapper_a=%p wrapper_exp=%p\n", handle_a, handle_exp);
 		auto* tensor_handle_a = static_cast<std::shared_ptr<Tensor>*>(handle_a);
 		auto* tensor_handle_exp = static_cast<std::shared_ptr<Tensor>*>(handle_exp);
 		return wrap_handle(Tensor::pow(*tensor_handle_a, *tensor_handle_exp));
@@ -247,24 +287,28 @@ extern "C"
 
 	void* tensor_pow_scalar(void* handle_a, double exp)
 	{
+		if (Tensor::log_debug) printf("USE wrapper_a=%p\n", handle_a);
 		auto* tensor_handle_a = static_cast<std::shared_ptr<Tensor>*>(handle_a);
 		return wrap_handle(Tensor::pow(*tensor_handle_a, exp));
 	}
 
 	void* tensor_pow_scalar_left(double a, void* handle_exp)
 	{
+		if (Tensor::log_debug) printf("USE wrapper_exp=%p\n", handle_exp);
 		auto* tensor_handle_exp = static_cast<std::shared_ptr<Tensor>*>(handle_exp);
 		return wrap_handle(Tensor::pow(a, *tensor_handle_exp));
 	}
 
 	void* tensor_exp(void* handle)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		return wrap_handle(Tensor::exp(*tensor_handle));
 	}
 
 	void* tensor_log(void* handle_arg, void* handle_log_base)
 	{
+		if (Tensor::log_debug) printf("USE wrapper_arg=%p wrapper_log_base=%p\n", handle_arg, handle_log_base);
 		auto* tensor_handle_arg = static_cast<std::shared_ptr<Tensor>*>(handle_arg);
 		auto* tensor_handle_log_base = static_cast<std::shared_ptr<Tensor>*>(handle_log_base);
 		return wrap_handle(Tensor::log(*tensor_handle_arg, *tensor_handle_log_base));
@@ -272,24 +316,28 @@ extern "C"
 
 	void* tensor_log_scalar(void* handle_arg, double log_base)
 	{
+		if (Tensor::log_debug) printf("USE wrapper_arg=%p\n", handle_arg);
 		auto* tensor_handle_arg = static_cast<std::shared_ptr<Tensor>*>(handle_arg);
 		return wrap_handle(Tensor::log(*tensor_handle_arg, log_base));
 	}
 
 	void* tensor_log_scalar_left(double arg, void* handle_log_base)
 	{
+		if (Tensor::log_debug) printf("USE wrapper_log_base=%p\n", handle_log_base);
 		auto* tensor_handle_log_base = static_cast<std::shared_ptr<Tensor>*>(handle_log_base);
 		return wrap_handle(Tensor::log(arg, *tensor_handle_log_base));
 	}
 
 	void* tensor_ln(void* handle)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		return wrap_handle(Tensor::ln(*tensor_handle));
 	}
 
 	void* tensor_matmul(void* handle_a, void* handle_b)
 	{
+		if (Tensor::log_debug) printf("USE wrapper_a=%p wrapper_b=%p\n", handle_a, handle_b);
 		auto* tensor_handle_a = static_cast<std::shared_ptr<Tensor>*>(handle_a);
 		auto* tensor_handle_b = static_cast<std::shared_ptr<Tensor>*>(handle_b);
 		return wrap_handle(Tensor::matmul(*tensor_handle_a, *tensor_handle_b));
@@ -297,6 +345,7 @@ extern "C"
 
 	void* tensor_convolve(void* handle_input, void* handle_kernels, void* handle_biases)
 	{
+		if (Tensor::log_debug) printf("USE wrapper_input=%p wrapper_kernels=%p wrapper_biases=%p\n", handle_input, handle_kernels, handle_biases);
 		auto* tensor_handle_input = static_cast<std::shared_ptr<Tensor>*>(handle_input);
 		auto* tensor_handle_kernels = static_cast<std::shared_ptr<Tensor>*>(handle_kernels);
 		auto* tensor_handle_biases = static_cast<std::shared_ptr<Tensor>*>(handle_biases);
@@ -305,6 +354,7 @@ extern "C"
 
 	void* tensor_mask_actions(void* handle_q_values, const int* actions, int action_count)
 	{
+		if (Tensor::log_debug) printf("USE wrapper_q_values=%p\n", handle_q_values);
 		auto* tensor_handle_q_values = static_cast<std::shared_ptr<Tensor>*>(handle_q_values);
 		std::vector<int> actions_vec(actions, actions + action_count);
 		return wrap_handle(Tensor::mask_actions(*tensor_handle_q_values, actions_vec));
@@ -312,24 +362,28 @@ extern "C"
 
 	int tensor_arg_max(void* handle)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		return Tensor::arg_max(*tensor_handle);
 	}
 
 	void* tensor_sum(void* handle)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		return wrap_handle(Tensor::sum(*tensor_handle));
 	}
 
 	void* tensor_mean(void* handle)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		return wrap_handle(Tensor::mean(*tensor_handle));
 	}
 
 	void* tensor_transpose(void* handle, const int* axes, int axes_length)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		std::vector<int> axes_vec(axes, axes + axes_length);
 		return wrap_handle(Tensor::transpose(*tensor_handle, axes_vec));
@@ -337,12 +391,14 @@ extern "C"
 
 	void* tensor_transpose_default(void* handle)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		return wrap_handle(Tensor::transpose(*tensor_handle));
 	}
 
 	void* tensor_broadcast(void* handle, const int* target_dims, int target_dims_length)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		std::vector<int> target_dims_vec(target_dims, target_dims + target_dims_length);
 		return wrap_handle(Tensor::broadcast(*tensor_handle, target_dims_vec));
@@ -350,6 +406,7 @@ extern "C"
 
 	void* tensor_reshape(void* handle, const int* new_dims, int new_dims_length)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		std::vector<int> new_dims_vec(new_dims, new_dims + new_dims_length);
 		return wrap_handle(Tensor::reshape(*tensor_handle, new_dims_vec));
@@ -357,18 +414,21 @@ extern "C"
 
 	void* tensor_flatten(void* handle, int start_axis)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		return wrap_handle(Tensor::flatten(*tensor_handle, start_axis));
 	}
 
 	void* tensor_wrap_batch(void* handle)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		return wrap_handle(Tensor::wrap_batch(*tensor_handle));
 	}
 
 	void* tensor_clip(void* handle, double min, double max)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		return wrap_handle(Tensor::clip(*tensor_handle, min, max));
 	}
@@ -387,36 +447,42 @@ extern "C"
 
 	void* tensor_relu(void* handle)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		return wrap_handle(Tensor::relu(*tensor_handle));
 	}
 
 	void* tensor_leaky_relu(void* handle, double tau)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		return wrap_handle(Tensor::leaky_relu(*tensor_handle, tau));
 	}
 
 	void* tensor_sigmoid(void* handle)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		return wrap_handle(Tensor::sigmoid(*tensor_handle));
 	}
 
 	void* tensor_tanh(void* handle)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		return wrap_handle(Tensor::tanh(*tensor_handle));
 	}
 
 	void* tensor_softmax(void* handle)
 	{
+		if (Tensor::log_debug) printf("USE wrapper=%p\n", handle);
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		return wrap_handle(Tensor::softmax(*tensor_handle));
 	}
 
 	void* tensor_mse(void* handle_t, void* handle_target)
 	{
+		if (Tensor::log_debug) printf("USE wrapper_t=%p wrapper_target=%p\n", handle_t, handle_target);
 		auto* tensor_handle_t = static_cast<std::shared_ptr<Tensor>*>(handle_t);
 		auto* tensor_handle_target = static_cast<std::shared_ptr<Tensor>*>(handle_target);
 		return wrap_handle(Tensor::mse(*tensor_handle_t, *tensor_handle_target));
@@ -424,6 +490,7 @@ extern "C"
 
 	void* tensor_huber(void* handle_t, void* handle_target, double delta)
 	{
+		if (Tensor::log_debug) printf("USE wrapper_t=%p wrapper_target=%p\n", handle_t, handle_target);
 		auto* tensor_handle_t = static_cast<std::shared_ptr<Tensor>*>(handle_t);
 		auto* tensor_handle_target = static_cast<std::shared_ptr<Tensor>*>(handle_target);
 		return wrap_handle(Tensor::huber(*tensor_handle_t, *tensor_handle_target, delta));
@@ -431,6 +498,7 @@ extern "C"
 
 	void* tensor_softmax_cross_entropy(void* handle_t, void* handle_target)
 	{
+		if (Tensor::log_debug) printf("USE wrapper_t=%p wrapper_target=%p\n", handle_t, handle_target);
 		auto* tensor_handle_t = static_cast<std::shared_ptr<Tensor>*>(handle_t);
 		auto* tensor_handle_target = static_cast<std::shared_ptr<Tensor>*>(handle_target);
 		return wrap_handle(Tensor::softmax_cross_entropy(*tensor_handle_t, *tensor_handle_target));
@@ -448,6 +516,7 @@ extern "C"
 
 	void optimizers_sgd(void* handle_para, double lr)
 	{
+		if (Tensor::log_debug) printf("USE wrapper_para=%p\n", handle_para);
 		auto* tensor_handle_para = static_cast<std::shared_ptr<Tensor>*>(handle_para);
 		Optimizers::sgd(*tensor_handle_para, lr);
 	}
@@ -455,10 +524,23 @@ extern "C"
 	void optimizers_adam(void* handle_para, double lr, int iter, double* m, double* v, int moments_count,
 		double beta1, double one_minus_beta1, double beta2, double one_minus_beta2, double epsilon, double weight_decay)
 	{
+		if (Tensor::log_debug) printf("USE wrapper_para=%p\n", handle_para);
 		auto* tensor_handle_para = static_cast<std::shared_ptr<Tensor>*>(handle_para);
 		std::span<double> m_span(m, moments_count);
 		std::span<double> v_span(v, moments_count);
 		Optimizers::adam(*tensor_handle_para, lr, iter, m_span, v_span, beta1, one_minus_beta1, beta2, one_minus_beta2,
 			epsilon, weight_decay);
+	}
+
+	void models_soft_update(void** handles_agent, void** handles_target, int para_count, double tau, double one_minus_tau)
+	{
+		std::vector<std::shared_ptr<Tensor>*> agent_paras(para_count);
+		std::vector<std::shared_ptr<Tensor>*> target_paras(para_count);
+		for (int i = 0; i < para_count; ++i)
+		{
+			agent_paras[i] = static_cast<std::shared_ptr<Tensor>*>(handles_agent[i]);
+			target_paras[i] = static_cast<std::shared_ptr<Tensor>*>(handles_target[i]);
+		}
+		Models::soft_update(agent_paras, target_paras, tau, one_minus_tau);
 	}
 }
