@@ -1,6 +1,11 @@
 #include "pch.h"
 #include "MathUtils.h"
 
+// Collection of various math and vectorization utility functions.
+
+/* Register operations */
+
+// Computes the sum of a 256-bit register of doubles.
 double MathUtils::sum_m256d(__m256d v)
 {
 	__m128d hi = _mm256_extractf128_pd(v, 1);
@@ -21,6 +26,9 @@ double MathUtils::max_m256d(__m256d v)
 	return _mm_cvtsd_f64(max64);
 }
 
+/* Vector addition */
+
+// Vectorizes the addition of two vectors and writes the result into the provided vector -> c = a + b
 void MathUtils::vector_add(const double* const __restrict a, const double* const __restrict b, double* const __restrict c, size_t n)
 {
 	size_t i = 0;
@@ -147,6 +155,9 @@ void MathUtils::vector_add(double* const __restrict a, double b, size_t n)
 	}
 }
 
+/* Vector subtraction */
+
+// Vectorizes the subtraction of two vectors and writes the result into the provided vector -> c = a - b
 void MathUtils::vector_sub(const double* const __restrict a, const double* const __restrict b, double* const __restrict c, size_t n)
 {
 	size_t i = 0;
@@ -331,6 +342,9 @@ void MathUtils::vector_sub(double a, double* const __restrict b, size_t n)
 	}
 }
 
+/* Vector multiplication */
+
+// Vectorizes the multiplication of two vectors and writes the result into the provided vector -> c = a * b
 void MathUtils::vector_mul(const double* const __restrict a, const double* const __restrict b, double* const __restrict c, size_t n)
 {
 	size_t i = 0;
@@ -455,6 +469,9 @@ void MathUtils::vector_mul(double* const __restrict a, double b, size_t n)
 	}
 }
 
+/* Vector division */
+
+// Vectorizes the division of two vectors and writes the result into the provided vector -> c = a / b
 void MathUtils::vector_div(const double* const __restrict a, const double* const __restrict b, double* const __restrict c, size_t n)
 {
 	size_t i = 0;
@@ -641,6 +658,9 @@ void MathUtils::vector_div(double a, double* const __restrict b, size_t n)
 	}
 }
 
+/* Vector exponentiation */
+
+// Vectorizes the exponentiation of two vectors and writes the result into the provided vector -> c = a ^ b
 void MathUtils::vector_pow(const double* const __restrict a, const double* const __restrict b, double* const __restrict c, size_t n)
 {
 	size_t i = 0;
@@ -795,6 +815,9 @@ void MathUtils::vector_pow(double a, const double* const __restrict b, double* c
 	}
 }
 
+/* Vector logarithm */
+
+// Vectorizes the logarithm of a vector argument and base and writes the result into the provided vector -> r = log_base(arg)
 void MathUtils::vector_log(const double* const __restrict arg, const double* const __restrict log_base, double* const __restrict r, size_t n)
 {
 	size_t i = 0;
@@ -980,6 +1003,9 @@ void MathUtils::vector_log(double arg, const double* const __restrict log_base, 
 	}
 }
 
+/* Vector fused multiply addition */
+
+// Vectorizes the fused multiply addition of three vectors and writes the result into the provided vector -> r = a + b * c
 void MathUtils::vector_fmadd(const double* const __restrict a, const double* const __restrict b, const double* const __restrict c,
 	double* const __restrict r, size_t n)
 {
@@ -1122,6 +1148,9 @@ void MathUtils::vector_fmadd(double* const __restrict a, const double* const __r
 	}
 }
 
+/* Vector fused negative multiply addition */
+
+// Vectorizes the fused negative multiply addition of three vectors and writes the result into the provided vector -> r = a - b * c
 void MathUtils::vector_fnmadd(const double* const __restrict a, const double* const __restrict b, const double* const __restrict c,
 	double* const __restrict r, size_t n)
 {
@@ -1264,6 +1293,9 @@ void MathUtils::vector_fnmadd(double* const __restrict a, const double* const __
 	}
 }
 
+/* Vector square */
+
+// Vectorizes the square of a vector and writes the result into the provided vector -> r = a ^ 2
 void MathUtils::vector_sq(const double* const __restrict a, double* const __restrict r, size_t n)
 {
 	size_t i = 0;
@@ -1320,6 +1352,9 @@ void MathUtils::vector_sq(double* const __restrict a, size_t n)
 	}
 }
 
+/* Vector square root */
+
+// Vectorizes the square root of a vector and writes the result into the provided vector -> r = sqrt(a)
 void MathUtils::vector_sqrt(const double* const __restrict a, double* const __restrict r, size_t n)
 {
 	size_t i = 0;
@@ -1376,6 +1411,9 @@ void MathUtils::vector_sqrt(double* const __restrict a, size_t n)
 	}
 }
 
+/* Vector natural exponentiation */
+
+// Vectorizes the natural exponentiation of a vector and writes the result into the provided vector -> r = e ^ a
 void MathUtils::vector_exp(const double* const __restrict a, double* const __restrict r, size_t n)
 {
 	size_t i = 0;
@@ -1432,6 +1470,9 @@ void MathUtils::vector_exp(double* const __restrict a, size_t n)
 	}
 }
 
+/* Vector natural logarithm */
+
+// Vectorizes the natural logarithm of a vector and writes the result into the provided vector -> r = ln(a)
 void MathUtils::vector_ln(const double* const __restrict a, double* const __restrict r, size_t n)
 {
 	size_t i = 0;
@@ -1488,6 +1529,9 @@ void MathUtils::vector_ln(double* const __restrict a, size_t n)
 	}
 }
 
+/* Vector operations */
+
+// Vectorizes the sum of a vector.
 double MathUtils::vector_sum(const double* const __restrict a, size_t n)
 {
 	__m256d acc0 = _mm256_setzero_pd();
@@ -1639,6 +1683,9 @@ double MathUtils::vector_dot(const double* __restrict a, const double* __restric
 	return dot;
 }
 
+/* Vector limiting functions */
+
+// Vectorizes the max of two vectors and writes the result into the provided vector -> c = max(a, b)
 void MathUtils::vector_max(const double* const __restrict a, const double* const __restrict b, double* const __restrict c, size_t n)
 {
 	size_t i = 0;
@@ -2160,6 +2207,9 @@ void MathUtils::vector_clamp(double* const __restrict a, double min, double max,
 	}
 }
 
+/* Vector activation functions */
+
+// Vectorizes the sigmoid function applied to a vector and writes the result into the provided vector -> r = sigmoid(a)
 void MathUtils::vector_sigmoid(const double* const __restrict a, double* const __restrict r, size_t n)
 {
 	const __m256d neg_mask = _mm256_set1_pd(-0.0);

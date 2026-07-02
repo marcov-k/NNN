@@ -7,7 +7,7 @@
 // Exported methods for interop with C#.
 extern "C"
 {
-	// Initialization and disposal
+	/* Initialization and disposal */
 
 	// Creates a new tensor instance with the given dimensions and requires_grad flag.
 	__declspec(dllexport) void* tensor_create(const int* dims, int rank, bool requires_grad);
@@ -33,7 +33,7 @@ extern "C"
 	// Releases the given tensor - deletes its export handle.
 	__declspec(dllexport) void tensor_release(void* handle);
 
-	// Data access
+	/* Data access */
 
 	// Returns the rank of the given tensor.
 	__declspec(dllexport) int tensor_rank(void* handle);
@@ -80,12 +80,12 @@ extern "C"
 	// Sets the requires_grad flag of the given tensor.
 	__declspec(dllexport) void tensor_set_requires_grad(void* handle, bool requires_grad);
 
-	// Debug flags
+	/* Debug flags */
 
 	// Sets the log_debug flag of the C++ DLL.
 	__declspec(dllexport) void tensor_set_log_debug(bool log_debug);
 
-	// Autograd graph
+	/* Autograd graph */
 
 	// Returns the inference flag of the C++ autograd engine.
 	__declspec(dllexport) bool tensor_get_inference();
@@ -102,7 +102,7 @@ extern "C"
 	// Triggers the backward gradient calculation for the autograd graph starting at the given tensor.
 	__declspec(dllexport) void tensor_backward(void* handle);
 
-	// Tensor operations
+	/* Tensor operations */
 
 	// Adds the given tensors -> (a (T) + b (T))
 	__declspec(dllexport) void* tensor_add(void* handle_a, void* handle_b);
@@ -164,7 +164,7 @@ extern "C"
 	// Performs a convolution of the given input, kernels, and bias tensors -> (convolve(input, kernels) + biases)
 	__declspec(dllexport) void* tensor_convolve(void* handle_input, void* handle_kernels, void* handle_biases);
 
-	// Tensor utilities
+	/* Tensor utilities */
 
 	// Masks the given Q Values tensor based on the given action indices.
 	__declspec(dllexport) void* tensor_mask_actions(void* handle_q_values, const int* actions, int action_count);
@@ -205,7 +205,7 @@ extern "C"
 	// Initializes a new mask applying spatial dropout to a tensor with the given dimensions.
 	__declspec(dllexport) void* tensor_get_spatial_dropout_mask(const int* dims, int dims_length, double dropout);
 
-	// Activation functions
+	/* Activation functions */
 
 	// Applies the ReLU activation function to the given tensor.
 	__declspec(dllexport) void* tensor_relu(void* handle);
@@ -222,7 +222,7 @@ extern "C"
 	// Applies the Softmax activation function to the given tensor.
 	__declspec(dllexport) void* tensor_softmax(void* handle);
 
-	// Cost functions
+	/* Cost functions */
 
 	// Computes the per-element Mean Squared Error loss of the given tensor using the given target tensor.
 	__declspec(dllexport) void* tensor_mse(void* handle_t, void* handle_target);
@@ -233,7 +233,7 @@ extern "C"
 	// Computes the per-element Softmax Cross Entropy loss of the given tensor using the given target tensor.
 	__declspec(dllexport) void* tensor_softmax_cross_entropy(void* handle_t, void* handle_target);
 
-	// Optimizers
+	/* Optimizers */
 
 	// Clips the gradients of the given parameter tensors using the given max norm.
 	__declspec(dllexport) void optimizers_clip_gradients(void** handles, int para_count, double max_norm);
@@ -245,7 +245,7 @@ extern "C"
 	__declspec(dllexport) void optimizers_adam(void* handle_para, double lr, int iter, double* m, double* v, int moments_count,
 		double beta1, double one_minus_beta1, double beta2, double one_minus_beta2, double epsilon, double weight_decay);
 
-	// Models
+	/* Models */
 
 	// Applies a soft update to the given target model's parameters based on the given agent model's parameters.
 	__declspec(dllexport) void models_soft_update(void** handles_agent, void** handles_target, int para_count, double tau,

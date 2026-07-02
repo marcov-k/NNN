@@ -11,7 +11,7 @@ static void* wrap_handle(const std::shared_ptr<Tensor>& t)
 // Exported methods for interop with C# - unwrap and/or wrap tensor handles, and pass inputs to C++ implementations and outputs to C#.
 extern "C"
 {
-	// Initialization and disposal
+	/* Initialization and disposal */
 
 	// Creates a new tensor instance with the given dimensions and requires_grad flag.
 	void* tensor_create(const int* dims, int rank, bool requires_grad)
@@ -59,7 +59,7 @@ extern "C"
 		delete tensor_ptr;
 	}
 
-	// Data access
+	/* Data access */
 
 	// Returns the rank of the given tensor.
 	int tensor_rank(void* handle)
@@ -156,7 +156,7 @@ extern "C"
 		(*tensor_handle)->requires_grad = requires_grad;
 	}
 
-	// Debug flags
+	/* Debug flags */
 
 	// Sets the log_debug flag of the C++ DLL.
 	void tensor_set_log_debug(bool log_debug)
@@ -164,7 +164,7 @@ extern "C"
 		Tensor::log_debug = log_debug;
 	}
 
-	// Autograd graph
+	/* Autograd graph */
 
 	// Returns the inference flag of the C++ autograd engine.
 	bool tensor_get_inference()
@@ -194,7 +194,7 @@ extern "C"
 		(*tensor_handle)->backward();
 	}
 
-	// Tensor operations
+	/* Tensor operations */
 
 	// Adds the given tensors -> (a (T) + b (T))
 	void* tensor_add(void* handle_a, void* handle_b)
@@ -326,7 +326,7 @@ extern "C"
 		return wrap_handle(Tensor::convolve(*tensor_handle_input, *tensor_handle_kernels, *tensor_handle_biases));
 	}
 
-	// Tensor utilities
+	/* Tensor utilities */
 
 	// Masks the given Q Values tensor based on the given action indices.
 	void* tensor_mask_actions(void* handle_q_values, const int* actions, int action_count)
@@ -411,7 +411,7 @@ extern "C"
 		return wrap_handle(Tensor::get_spatial_dropout_mask(dims_vec, dropout));
 	}
 
-	// Activation functions
+	/* Activation functions */
 
 	// Applies the ReLU activation function to the given tensor.
 	void* tensor_relu(void* handle)
@@ -444,7 +444,7 @@ extern "C"
 		return wrap_handle(Tensor::softmax(*tensor_handle));
 	}
 
-	// Cost functions
+	/* Cost functions */
 
 	// Computes the per-element Mean Squared Error loss of the given tensor using the given target tensor.
 	void* tensor_mse(void* handle_t, void* handle_target)
@@ -468,7 +468,7 @@ extern "C"
 		return wrap_handle(Tensor::softmax_cross_entropy(*tensor_handle_t, *tensor_handle_target));
 	}
 
-	// Optimizers
+	/* Optimizers */
 
 	// Clips the gradients of the given parameter tensors using the given max norm.
 	void optimizers_clip_gradients(void** handles, int para_count, double max_norm)
@@ -497,7 +497,7 @@ extern "C"
 			epsilon, weight_decay);
 	}
 
-	// Models
+	/* Models */
 
 	// Applies a soft update to the given target model's parameters based on the given agent model's parameters.
 	void models_soft_update(void** handles_agent, void** handles_target, int para_count, double tau, double one_minus_tau)
