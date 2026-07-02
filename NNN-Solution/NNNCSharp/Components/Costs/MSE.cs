@@ -14,6 +14,6 @@ public class MSE : Cost
 
     public override Tensor CalculatePerSampleCost(Tensor predictions, Tensor target)
     {
-        return Tensor.Pow(target - predictions, 2.0); // MSE function -> (y - y_hat)^2
+        return Tensor.MSE(predictions, target);
     }
 }

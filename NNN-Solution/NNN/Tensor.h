@@ -195,8 +195,8 @@ private:
 	std::vector<double> _grad;
 	std::vector<int> _dimensions;
 	std::vector<int> _strides;
-	static constexpr int VECTOR_SIZE = 256 / 64; // AVX2 register width / bits per double
-	static constexpr long PARALLEL_THRESHOLD = 50000;
+	static constexpr long MATMUL_PARALLEL_THRESHOLD = 100'000;
+	static constexpr long CONV_PARALLEL_THRESHOLD = 2'000'000;
 	std::vector<std::shared_ptr<Tensor>> _parents;
 	std::vector<std::shared_ptr<Tensor>> _results;
 	int _op_index = 0;

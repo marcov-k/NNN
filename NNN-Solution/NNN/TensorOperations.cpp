@@ -557,7 +557,7 @@ std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const s
 	const auto& owner = a->requires_grad ? a : b;
 	auto result = get_result_tensor(owner, result_dims, a->requires_grad || b->requires_grad);
 
-	const bool use_parallel = total_rows > 16 && (long)m * n * p > PARALLEL_THRESHOLD;
+	const bool use_parallel = total_rows > 16 && (long)m * n * p > MATMUL_PARALLEL_THRESHOLD;
 	std::vector<double> b_t(b_mat_size * batch_size);
 	int b_src_off = 0;
 	for (int batch = 0; batch < batch_size; ++batch)
@@ -586,7 +586,7 @@ std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const s
 			{
 				if (!a->requires_grad && !b->requires_grad) return;
 
-				const bool par = (long)m * n * p > PARALLEL_THRESHOLD;
+				const bool par = (long)m * n * p > MATMUL_PARALLEL_THRESHOLD;
 
 				std::vector<double> a_t;
 				std::vector<double> d_out_t;
@@ -854,7 +854,7 @@ std::shared_ptr<Tensor> Tensor::convolve(const std::shared_ptr<Tensor>& input, c
 	const auto& owner = input->requires_grad ? input : (kernels->requires_grad ? kernels : biases);
 	auto result = get_result_tensor(owner, result_dims, input->requires_grad || kernels->requires_grad || biases->requires_grad);
 
-	const bool use_parallel = (long)batches * out_spatial_size * filter_count * kernel_volume_size > PARALLEL_THRESHOLD;
+	const bool use_parallel = (long)batches * out_spatial_size * filter_count * kernel_volume_size > CONV_PARALLEL_THRESHOLD;
 
 	#pragma omp parallel for if(use_parallel)
 	for (int i = 0; i < batches * out_spatial_size; ++i)
@@ -875,7 +875,7 @@ std::shared_ptr<Tensor> Tensor::convolve(const std::shared_ptr<Tensor>& input, c
 			kernels, kernel_spatial_size, kernel_spatial_strides, kernel_volume_size, biases, result, out_spatial_size,
 			out_spatial_dims, out_spatial_strides]()
 			{
-				const bool par = (long)batches * out_spatial_size * filter_count * kernel_volume_size > PARALLEL_THRESHOLD;
+				const bool par = (long)batches * out_spatial_size * filter_count * kernel_volume_size > CONV_PARALLEL_THRESHOLD;
 
 				if (biases->requires_grad)
 				{

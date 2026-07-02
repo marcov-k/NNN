@@ -20,11 +20,6 @@ public class Huber(double delta = 1.0) : Cost
 
     public override Tensor CalculatePerSampleCost(Tensor predictions, Tensor target)
     {
-        var diff = target - predictions; // calculate per-prediction error
-
-        // Apply pseudo-Huber function -> delta^2 * (sqrt(1 + (diff/delta)^2) - 1)
-        var scaled = diff / Delta;
-        var inner = Tensor.Pow(scaled, 2.0) + 1.0;
-        return (Tensor.Pow(inner, 0.5) - 1.0) * (Delta * Delta);
+        return Tensor.Huber(predictions, target, Delta);
     }
 }
