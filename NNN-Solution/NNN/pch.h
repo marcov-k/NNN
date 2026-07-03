@@ -17,6 +17,7 @@
 #include <immintrin.h>
 #include <limits>
 #include <memory>
+#include <omp.h>
 #include <optional>
 #include <random>
 #include <span>

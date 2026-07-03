@@ -574,18 +574,16 @@ public sealed class Tensor : IDisposable
     }
 
     /// <summary>
-    /// Performs a convolution of the given input, kernels, and bias tensors -> (convolve(input, kernels) + biases)
+    /// Performs a convolution of the given input and kernels tensors -> convolve(input, kernels)
     /// </summary>
     /// <param name="input">Tensor input to convolve.</param>
     /// <param name="kernels">Tensor kernels to convolve with.</param>
-    /// <param name="biases">Tensor bias to add.</param>
     /// <returns>Result tensor.</returns>
-    public static Tensor Convolve(Tensor input, Tensor kernels, Tensor biases)
+    public static Tensor Convolve(Tensor input, Tensor kernels)
     {
-        IntPtr h = NativeMethods.tensor_convolve(input.Handle, kernels.Handle, biases.Handle);
+        IntPtr h = NativeMethods.tensor_convolve(input.Handle, kernels.Handle);
         GC.KeepAlive(input);
         GC.KeepAlive(kernels);
-        GC.KeepAlive(biases);
         return new(h);
     }
 

@@ -161,8 +161,8 @@ extern "C"
 	// Computes the matrix multiplication between the given tensors -> (a @ b)
 	__declspec(dllexport) void* tensor_matmul(void* handle_a, void* handle_b);
 
-	// Performs a convolution of the given input, kernels, and bias tensors -> (convolve(input, kernels) + biases)
-	__declspec(dllexport) void* tensor_convolve(void* handle_input, void* handle_kernels, void* handle_biases);
+	// Performs a convolution of the given input and kernels tensors -> convolve(input, kernels)
+	__declspec(dllexport) void* tensor_convolve(void* handle_input, void* handle_kernels);
 
 	/* Tensor utilities */
 

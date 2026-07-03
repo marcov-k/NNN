@@ -2,8 +2,11 @@
 
 #include <immintrin.h>
 #include <limits>
+#include <omp.h>
 #include <random>
 #include <span>
+
+#include "DataContainers.h"
 
 // Collection of various math and vectorization utility functions.
 class MathUtils
@@ -703,4 +706,33 @@ public:
 	{
 		vector_tanh(a.data(), a.size());
 	}
+
+	/* Matrix operations */
+
+	// Computes the matrix multiplication of two vectors and writes the result into the provided vector -> r = a @ b_t
+	static void matmul_raw(const double* __restrict a, const double* __restrict b_t, double* __restrict r, int m, int n, int p,
+		int a_off, int b_t_off, int r_off, bool transpose_a, bool use_parallel, bool accumulate = false);
+
+	// Transposes the given matrix data vector and writes the result into the given vector.
+	static void transpose_matrix(const double* __restrict src, double* __restrict dst, int src_off, int dst_off,
+		int rows, int cols);
+
+	// Computes a single row of a matrix multiplication (for standard forward matmul in autograd graph)
+	static void compute_row(int i, int n, int p, const double* __restrict a, const double* __restrict b_t,
+		double* __restrict r, int a_off, int b_t_off, int r_off);
+
+	// Computes the base_input position for im2col and col2im functions.
+	static int compute_output_position(int b, int op, const ConvGeometry& g);
+
+	// Performs the im2col transformation on a matrix vector and writes the result into the provided vector.
+	static void im2col(const double* __restrict input, const ConvGeometry& g, double* __restrict input_col, bool use_parallel);
+
+	// Performs the col2im transformation on a matrix vector and writes the result into the provided vector.
+	static void col2im(const double* __restrict d_input_col, const ConvGeometry& g, double* __restrict d_input, bool use_parallel);
+
+	// Transforms a kernels tensor vector into the layout required for matmul in convolution and writes the result into the provided vector.
+	static void kernels2matmul(const double* __restrict kernels, const ConvGeometry& g, double* __restrict kernels_mat);
+
+	// Inverts the kernels2matmul transformation of a kernels tensor vector and writes the result into the provided vector.
+	static void matmul2kernels(const double* __restrict kernels_mat, const ConvGeometry& g, double* __restrict kernels, bool accumulate);
 };

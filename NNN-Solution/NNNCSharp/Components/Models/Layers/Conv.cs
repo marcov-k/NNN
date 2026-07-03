@@ -84,7 +84,8 @@ public class Conv : Layer
     public override Tensor Forward(Tensor input)
     {
         // Apply convolution to the input
-        var output = Tensor.Convolve(input, Kernels, Biases);
+        var output = Tensor.Convolve(input, Kernels);
+        output += Tensor.Broadcast(Biases, output.Dimensions.ToArray());
         output = Activation.Forward(output);
 
         if (Dropout > 0.0) output *= Tensor.GetSpatialDropoutMask(output, Dropout);

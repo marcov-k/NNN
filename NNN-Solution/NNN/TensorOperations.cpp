@@ -1,7 +1,6 @@
 #include "pch.h"
 #include "Tensor.h"
 #include "MathUtils.h"
-#include <Windows.h>
 
 std::shared_ptr<Tensor> Tensor::add(const std::shared_ptr<Tensor>& a, const std::shared_ptr<Tensor>& b)
 {
@@ -513,27 +512,6 @@ std::shared_ptr<Tensor> Tensor::ln(const std::shared_ptr<Tensor>& t)
 	return result;
 }
 
-void Tensor::transpose_matrix(const double* __restrict src, double* __restrict dst, int src_off, int dst_off,
-	int rows, int cols)
-{
-	for (int r = 0; r < rows; ++r)
-	{
-		for (int c = 0; c < cols; ++c)
-		{
-			dst[dst_off + c * rows + r] = src[src_off + r * cols + c]; // switch row and column indices of data
-		}
-	}
-}
-
-void Tensor::compute_row(int i, int n, int p, const double* __restrict a, const double* __restrict b_t,
-	double* __restrict r, int a_off, int b_t_off, int r_off)
-{
-	for (int j = 0; j < p; ++j)
-	{
-		r[r_off + i * p + j] = MathUtils::vector_dot(a, b_t, a_off + i * n, b_t_off + j * n, n);
-	}
-}
-
 std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const std::shared_ptr<Tensor>& b)
 {
 	const int rank = a->rank();
@@ -563,7 +541,7 @@ std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const s
 	for (int batch = 0; batch < batch_size; ++batch)
 	{
 		if (b_batched) b_src_off = batch * b_mat_size;
-		transpose_matrix(b->_data.data(), b_t.data(), b_src_off, batch * b_mat_size, n, p);
+		MathUtils::transpose_matrix(b->_data.data(), b_t.data(), b_src_off, batch * b_mat_size, n, p);
 	}
 
 	#pragma warning(suppress: 6993)
@@ -573,7 +551,8 @@ std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const s
 		const int batch = row / m;
 		const int i = row % m;
 
-		compute_row(i, n, p, a->_data.data(), b_t.data(), result->_data.data(), batch * a_mat_size, batch * b_mat_size, batch * r_mat_size);
+		MathUtils::compute_row(i, n, p, a->_data.data(), b_t.data(), result->_data.data(), batch * a_mat_size,
+			batch * b_mat_size, batch * r_mat_size);
 	}
 
 	if (!inference)
@@ -603,8 +582,8 @@ std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const s
 						a_t.resize(a_mat_size);
 						d_out_t.resize(r_mat_size);
 
-						transpose_matrix(a->_data.data(), a_t.data(), a_off, 0, m, n);
-						transpose_matrix(result->_grad.data(), d_out_t.data(), r_off, 0, m, p);
+						MathUtils::transpose_matrix(a->_data.data(), a_t.data(), a_off, 0, m, n);
+						MathUtils::transpose_matrix(result->_grad.data(), d_out_t.data(), r_off, 0, m, p);
 
 						#pragma omp parallel for if(par)
 						for (int i = 0; i < m; ++i)
@@ -643,8 +622,8 @@ std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const s
 						a_t.resize(a_mat_size);
 						d_out_t.resize(r_mat_size);
 
-						transpose_matrix(a->_data.data(), a_t.data(), a_off, 0, m, n);
-						transpose_matrix(result->_grad.data(), d_out_t.data(), r_off, 0, m, p);
+						MathUtils::transpose_matrix(a->_data.data(), a_t.data(), a_off, 0, m, n);
+						MathUtils::transpose_matrix(result->_grad.data(), d_out_t.data(), r_off, 0, m, p);
 
 						#pragma omp parallel for if(par && b_batched)
 						for (int k = 0; k < n; ++k)
@@ -663,258 +642,121 @@ std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const s
 	return result;
 }
 
-void Tensor::compute_output_position(int batch_out_pos, int spatial_rank, int out_spatial_size, int filter_count,
-	int kernel_spatial_size, int input_channels, const int* __restrict out_spatial_strides,
-	const int* __restrict kernel_spatial_strides, const int* __restrict input_strides,
-	const int* __restrict kernel_strides, const int* __restrict result_strides, const double* __restrict input_data,
-	const double* __restrict kernel_data, const double* __restrict bias_data, double* __restrict result_data)
+std::shared_ptr<Tensor> Tensor::convolve(const std::shared_ptr<Tensor>& input, const std::shared_ptr<Tensor>& kernels)
 {
-	const int b = batch_out_pos / out_spatial_size;
 
-	std::vector<int> out_coords(spatial_rank);
-	std::vector<int> kernel_coords(spatial_rank);
-	std::vector<double> sums(filter_count);
+	ConvGeometry g;
+	g.batches = input->_dimensions[0];
+	g.spatial_rank = kernels->rank() - 2;
+	g.input_channels = kernels->_dimensions.back();
+	g.filter_count = kernels->_dimensions[0];
 
-	int result_offset = b * result_strides[0];
-	int rem = batch_out_pos % out_spatial_size;
-	for (int i = 0; i < spatial_rank; ++i)
+	g.input_dims = input->_dimensions;
+	g.input_strides = input->_strides;
+	g.kernel_dims = kernels->_dimensions;
+	g.out_dims.resize(g.spatial_rank);
+
+	g.out_spatial_size = 1;
+	g.kernel_spatial_size = 1;
+	for (int i = 0; i < g.spatial_rank; ++i)
 	{
-		out_coords[i] = rem / out_spatial_strides[i];
-		result_offset += out_coords[i] * result_strides[i + 1];
-		rem %= out_spatial_strides[i];
+		g.out_dims[i] = input->_dimensions[i + 1] - kernels->_dimensions[i + 1] + 1;
+		g.out_spatial_size *= g.out_dims[i];
+		g.kernel_spatial_size *= kernels->_dimensions[i + 1];
 	}
 
-	const int input_offset_base = b * input_strides[0];
-	const int kernel_offset_base_coeff = kernel_spatial_size * input_channels;
-
-	std::copy_n(bias_data, filter_count, sums.data());
-
-	for (int kp = 0; kp < kernel_spatial_size; ++kp)
+	g.out_spatial_strides.resize(g.spatial_rank);
+	g.out_spatial_strides.back() = 1;
+	g.kernel_spatial_strides.resize(g.spatial_rank);
+	g.kernel_spatial_strides.back() = 1;
+	for (int i = g.spatial_rank - 2; i >= 0; --i)
 	{
-		int kernel_offset_base = 0;
-		int input_offset = input_offset_base;
-		rem = kp;
-		for (int i = 0; i < spatial_rank; ++i)
+		g.out_spatial_strides[i] = g.out_spatial_strides[i + 1] * g.out_dims[i + 1];
+		g.kernel_spatial_strides[i] = g.kernel_spatial_strides[i + 1] * g.kernel_dims[i + 1];
+	}
+
+	g.kernel_volume_size = g.kernel_spatial_size * g.input_channels;
+
+	g.im2col_rows = g.batches * g.out_spatial_size;
+	g.im2col_cols = g.kernel_volume_size;
+
+	g.input_kernel_offset.resize(g.kernel_volume_size);
+	g.kernel_kernel_offset.resize(g.kernel_volume_size);
+	for (int k = 0; k < g.kernel_volume_size; ++k)
+	{
+		const int spatial_k = k / g.input_channels;
+		const int c = k % g.input_channels;
+
+		int input_offset = 0;
+		int kernel_offset = 0;
+		for (int d = 0; d < g.spatial_rank; ++d)
 		{
-			kernel_coords[i] = rem / kernel_spatial_strides[i];
-			kernel_offset_base += kernel_coords[i] * kernel_strides[i + 1];
-			input_offset += (out_coords[i] + kernel_coords[i]) * input_strides[i + 1];
-			rem %= kernel_spatial_strides[i];
+			int coord = (spatial_k / g.kernel_spatial_strides[d]) % g.kernel_dims[d + 1];
+			input_offset += coord * g.input_strides[d + 1];
+			kernel_offset += coord * kernels->_strides[d + 1];
 		}
 
-		for (int f = 0; f < filter_count; ++f)
-		{
-			const int kernel_offset = kernel_offset_base_coeff * f + kernel_offset_base;
-			sums[f] += MathUtils::vector_dot(input_data, kernel_data, input_offset, kernel_offset, input_channels);
-		}
+		g.input_kernel_offset[k] = input_offset + c;
+		g.kernel_kernel_offset[k] = kernel_offset + c;
 	}
 
-	std::copy_n(sums.data(), filter_count, result_data + result_offset);
-}
+	std::vector<int> result_dims;
+	result_dims.reserve(g.spatial_rank + 2);
+	result_dims.push_back(g.batches);
+	for (int d : g.out_dims) result_dims.push_back(d);
+	result_dims.push_back(g.filter_count);
 
-void Tensor::compute_kernel_grad(int fkp, int spatial_rank, int batches, int out_spatial_size,
-	int kernel_spatial_size, int input_channels, const int* __restrict out_spatial_strides,
-	const int* __restrict kernel_spatial_strides, const int* __restrict input_strides,
-	const int* __restrict kernel_strides, const int* __restrict result_strides, const double* __restrict input_data,
-	double* __restrict kernel_grad, const double* __restrict result_grad)
-{
-	const int f = fkp / kernel_spatial_size;
+	const auto& owner = input->requires_grad ? input : kernels;
+	auto result = get_result_tensor(owner, result_dims, input->requires_grad || kernels->requires_grad);
 
-	std::vector<int> kernel_coords(spatial_rank);
-	std::vector<int> out_coords(spatial_rank);
+	auto kernels_mat = std::make_shared<std::vector<double>>(kernels->element_count());
+	auto input_col = std::make_shared<std::vector<double>>(g.im2col_rows * g.im2col_cols);
 
-	int rem = fkp % kernel_spatial_size;
-	const int kernel_offset = f * kernel_strides[0] + rem * input_channels;
-	for (int i = 0; i < spatial_rank; ++i)
-	{
-		kernel_coords[i] = rem / kernel_spatial_strides[i];
-		rem %= kernel_spatial_strides[i];
-	}
+	const bool use_parallel = (long)g.batches * g.out_spatial_size * g.filter_count * g.kernel_volume_size > CONV_PARALLEL_THRESHOLD;
 
-	for (int b = 0; b < batches; ++b)
-	{
-		const int input_offset_base = b * input_strides[0];
-		const int result_offset_base = b * result_strides[0] + f;
+	MathUtils::kernels2matmul(kernels->_data.data(), g, kernels_mat->data());
+	MathUtils::im2col(input->_data.data(), g, input_col->data(), use_parallel);
 
-		for (int op = 0; op < out_spatial_size; ++op)
-		{
-			int input_offset = input_offset_base;
-			int result_offset = result_offset_base;
-			rem = op;
-			for (int i = 0; i < spatial_rank; ++i)
-			{
-				out_coords[i] = rem / out_spatial_strides[i];
-				input_offset += (out_coords[i] + kernel_coords[i]) * input_strides[i + 1];
-				result_offset += out_coords[i] * result_strides[i + 1];
-				rem %= out_spatial_strides[i];
-			}
-			const double d_out = result_grad[result_offset];
-
-			MathUtils::vector_fnmadd(kernel_grad + kernel_offset, input_data + input_offset, d_out, input_channels);
-		}
-	}
-}
-
-void Tensor::compute_input_grad(int batch_in_pos, int spatial_rank, int in_spatial_size, int filter_count,
-	int kernel_spatial_size, int input_channels, const int* __restrict in_spatial_strides,
-	const int* __restrict kernel_spatial_strides, const int* __restrict out_spatial_dims,
-	const int* __restrict input_strides, const int* __restrict kernel_strides, const int* __restrict result_strides,
-	double* __restrict input_grad, const double* __restrict kernel_data, const double* __restrict result_grad)
-{
-	const int b = batch_in_pos / in_spatial_size;
-
-	std::vector<int> in_coords(spatial_rank);
-	std::vector<int> kernel_coords(spatial_rank);
-
-	int input_offset = b * input_strides[0];
-	int rem = batch_in_pos % in_spatial_size;
-	for (int i = 0; i < spatial_rank; ++i)
-	{
-		in_coords[i] = rem / in_spatial_strides[i];
-		input_offset += in_coords[i] * input_strides[i + 1];
-		rem %= in_spatial_strides[i];
-	}
-
-	const int result_offset_base = b * result_strides[0];
-	const int kernel_offset_base_coeff = kernel_spatial_size * input_channels;
-
-	for (int f = 0; f < filter_count; ++f)
-	{
-		const int kernel_offset_base = f * kernel_offset_base_coeff;
-		const int result_offset_filter = result_offset_base + f;
-
-		for (int kp = 0; kp < kernel_spatial_size; ++kp)
-		{
-			int result_offset = result_offset_filter;
-			int kernel_offset = kernel_offset_base;
-			bool valid = true;
-			rem = kp;
-			for (int i = 0; i < spatial_rank; ++i)
-			{
-				kernel_coords[i] = rem / kernel_spatial_strides[i];
-				const int out_coord = in_coords[i] - kernel_coords[i];
-				if (out_coord < 0 || out_coord >= out_spatial_dims[i])
-				{
-					valid = false;
-					break;
-				}
-				result_offset += out_coord * result_strides[i + 1];
-				kernel_offset += kernel_coords[i] * kernel_strides[i + 1];
-				rem %= kernel_spatial_strides[i];
-			}
-			if (!valid) continue;
-
-			const double d_out = result_grad[result_offset];
-
-			MathUtils::vector_fmadd(input_grad + input_offset, kernel_data + kernel_offset, d_out, input_channels);
-		}
-	}
-}
-
-std::shared_ptr<Tensor> Tensor::convolve(const std::shared_ptr<Tensor>& input, const std::shared_ptr<Tensor>& kernels,
-	const std::shared_ptr<Tensor>& biases)
-{
-	const int batches = input->_dimensions[0];
-	const int spatial_rank = kernels->rank() - 2;
-	const int filter_count = kernels->_dimensions[0];
-	const int input_channels = kernels->_dimensions.back();
-
-	std::vector<int> out_spatial_dims(spatial_rank);
-	std::vector<int> in_spatial_strides(spatial_rank);
-	std::vector<int> out_spatial_strides(spatial_rank);
-	std::vector<int> kernel_spatial_strides(spatial_rank);
-	std::vector<int> result_dims(input->rank());
-
-	result_dims[0] = batches;
-	result_dims.back() = filter_count;
-	int out_spatial_size = 1;
-	int in_spatial_size = 1;
-	int kernel_spatial_size = 1;
-	for (int i = 0; i < spatial_rank; ++i)
-	{
-		out_spatial_dims[i] = input->_dimensions[i + 1] - kernels->_dimensions[i + 1] + 1;
-		out_spatial_size *= out_spatial_dims[i];
-		in_spatial_size *= input->_dimensions[i + 1];
-		kernel_spatial_size *= kernels->_dimensions[i + 1];
-		result_dims[i + 1] = out_spatial_dims[i];
-	}
-
-	const int kernel_volume_size = kernel_spatial_size * input_channels;
-
-	in_spatial_strides.back() = 1;
-	out_spatial_strides.back() = 1;
-	kernel_spatial_strides.back() = 1;
-	for (int i = spatial_rank - 2; i >= 0; --i)
-	{
-		in_spatial_strides[i] = in_spatial_strides[i + 1] * input->_dimensions[i + 2];
-		out_spatial_strides[i] = out_spatial_strides[i + 1] * out_spatial_dims[i + 1];
-		kernel_spatial_strides[i] = kernel_spatial_strides[i + 1] * kernels->_dimensions[i + 2];
-	}
-
-	const auto& owner = input->requires_grad ? input : (kernels->requires_grad ? kernels : biases);
-	auto result = get_result_tensor(owner, result_dims, input->requires_grad || kernels->requires_grad || biases->requires_grad);
-
-	const bool use_parallel = (long)batches * out_spatial_size * filter_count * kernel_volume_size > CONV_PARALLEL_THRESHOLD;
-
-	#pragma omp parallel for if(use_parallel)
-	for (int i = 0; i < batches * out_spatial_size; ++i)
-	{
-		compute_output_position(i, spatial_rank, out_spatial_size, filter_count, kernel_spatial_size, input_channels,
-			out_spatial_strides.data(), kernel_spatial_strides.data(), input->_strides.data(), kernels->_strides.data(),
-			result->_strides.data(), input->_data.data(), kernels->_data.data(), biases->_data.data(), result->_data.data());
-	}
+	MathUtils::matmul_raw(input_col->data(), kernels_mat->data(), result->_data.data(),
+		g.batches * g.out_spatial_size, g.kernel_volume_size, g.filter_count, 0, 0, 0, false, use_parallel);
 
 	if (!inference)
 	{
-		result->_parents.reserve(result->_parents.size() + 3);
+		result->_parents.reserve(result->_parents.size() + 2);
 		result->_parents.push_back(input);
 		result->_parents.push_back(kernels);
-		result->_parents.push_back(biases);
 
-		result->_backward = [batches, spatial_rank, filter_count, input_channels, input, in_spatial_size, in_spatial_strides,
-			kernels, kernel_spatial_size, kernel_spatial_strides, kernel_volume_size, biases, result, out_spatial_size,
-			out_spatial_dims, out_spatial_strides]()
+		result->_backward = [input, input_col, kernels, kernels_mat, result, g, use_parallel]()
 			{
-				const bool par = (long)batches * out_spatial_size * filter_count * kernel_volume_size > CONV_PARALLEL_THRESHOLD;
+				thread_local std::vector<double> d_col;
+				thread_local std::vector<double> d_kernels_mat;
+				thread_local std::vector<double> d_out_t;
+				thread_local std::vector<double> tmp;
 
-				if (biases->requires_grad)
+				if (input->requires_grad)
 				{
-					double* const __restrict b_grad_ptr = biases->_grad.data();
-					const double* const __restrict r_grad_ptr = result->_grad.data();
+					d_col.assign(g.im2col_rows * g.im2col_cols, 0.0);
 
-					for (int b = 0; b < batches; ++b)
-					{
-						const int r_off_coeff = b * out_spatial_size;
-						for (int s = 0; s < out_spatial_size; ++s)
-						{
-							const int r_off = (r_off_coeff + s) * filter_count;
-							MathUtils::vector_add(b_grad_ptr, r_grad_ptr + r_off, filter_count);
-						}
-					}
+					MathUtils::matmul_raw(result->_grad.data(), kernels_mat->data(), d_col.data(),
+						g.im2col_rows, g.filter_count, g.im2col_cols, 0, 0, 0, false, use_parallel);
+					MathUtils::col2im(d_col.data(), g, input->_grad.data(), use_parallel);
 				}
 
 				if (kernels->requires_grad)
 				{
-					#pragma omp parallel for if(par)
-					for (int fkp = 0; fkp < filter_count * kernel_spatial_size; ++fkp)
-					{
-						compute_kernel_grad(fkp, spatial_rank, batches, out_spatial_size,
-							kernel_spatial_size, input_channels, out_spatial_strides.data(), kernel_spatial_strides.data(),
-							input->_strides.data(), kernels->_strides.data(), result->_strides.data(), input->_data.data(),
-							kernels->_grad.data(), result->_grad.data());
-					}
-				}
+					d_kernels_mat.resize(kernels->element_count());
+					
+					d_out_t.resize(g.im2col_rows * g.filter_count);
+					MathUtils::transpose_matrix(result->_grad.data(), d_out_t.data(), 0, 0,
+						g.im2col_rows, g.filter_count);
+					
+					MathUtils::matmul_raw(input_col->data(), d_out_t.data(), d_kernels_mat.data(),
+						g.kernel_volume_size, g.im2col_rows, g.filter_count, 0, 0, 0, true, use_parallel);
 
-				if (input->requires_grad)
-				{
-					#pragma omp parallel for if(par)
-					for (int batch_in_pos = 0; batch_in_pos < batches * in_spatial_size; ++batch_in_pos)
-					{
-						compute_input_grad(batch_in_pos, spatial_rank, in_spatial_size, filter_count, kernel_spatial_size,
-							input_channels, in_spatial_strides.data(), kernel_spatial_strides.data(), out_spatial_dims.data(),
-							input->_strides.data(), kernels->_strides.data(), result->_strides.data(),
-							input->_grad.data(), kernels->_data.data(), result->_grad.data());
-					}
+					tmp.resize(kernels->element_count());
+					MathUtils::transpose_matrix(d_kernels_mat.data(), tmp.data(), 0, 0, g.kernel_volume_size, g.filter_count);
+
+					MathUtils::matmul2kernels(tmp.data(), g, kernels->_grad.data(), true);
 				}
 			};
 	}

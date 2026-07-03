@@ -2351,3 +2351,147 @@ void MathUtils::vector_tanh(double* const __restrict a, size_t n)
 		a[i] = std::tanh(a[i]);
 	}
 }
+
+/* Matrix operations */
+
+// Computes the matrix multiplication of two vectors and writes the result into the provided vector -> r = a @ b_t
+void MathUtils::matmul_raw(const double* __restrict a, const double* __restrict b_t, double* __restrict r, int m, int n, int p,
+	int a_off, int b_t_off, int r_off, bool transpose_a, bool use_parallel, bool accumulate)
+{
+	#pragma warning(disable : 6993)
+	if (!transpose_a)
+	{
+		#pragma omp parallel for if(use_parallel)
+		for (int i = 0; i < m; ++i)
+		{
+			for (int j = 0; j < p; ++j)
+			{
+				double val = vector_dot(a, b_t, a_off + i * n, b_t_off + j * n, n);
+				if (accumulate) r[r_off + i * p + j] += val;
+				else r[r_off + i * p + j] = val;
+			}
+		}
+	}
+	else
+	{
+		if (!accumulate)
+		{
+			for (int i = 0; i < m * p; ++i)
+			{
+				r[r_off + i] = 0.0;
+			}
+		}
+
+		#pragma omp parallel for if(use_parallel)
+		for (int i = 0; i < m; ++i)
+		{
+			for (int k = 0; k < n; ++k)
+			{
+				const double a_val = a[a_off + k * m + i];
+				for (int j = 0; j < p; ++j)
+				{
+					r[r_off + i * p + j] += a_val * b_t[b_t_off + j * n + k];
+				}
+			}
+		}
+	}
+}
+
+void MathUtils::transpose_matrix(const double* __restrict src, double* __restrict dst, int src_off, int dst_off,
+	int rows, int cols)
+{
+	for (int r = 0; r < rows; ++r)
+	{
+		for (int c = 0; c < cols; ++c)
+		{
+			dst[dst_off + c * rows + r] = src[src_off + r * cols + c]; // switch row and column indices of data
+		}
+	}
+}
+
+void MathUtils::compute_row(int i, int n, int p, const double* __restrict a, const double* __restrict b_t,
+	double* __restrict r, int a_off, int b_t_off, int r_off)
+{
+	for (int j = 0; j < p; ++j)
+	{
+		r[r_off + i * p + j] = vector_dot(a, b_t, a_off + i * n, b_t_off + j * n, n);
+	}
+}
+
+int MathUtils::compute_output_position(int b, int op, const ConvGeometry& g)
+{
+	int offset = b * g.input_strides[0];
+	for (int i = 0; i < g.spatial_rank; ++i)
+	{
+		int coord = (op / g.out_spatial_strides[i]) % g.out_dims[i];
+		offset += coord * g.input_strides[i + 1];
+	}
+	return offset;
+}
+
+void MathUtils::im2col(const double* __restrict input, const ConvGeometry& g, double* __restrict input_col, bool use_parallel)
+{
+	#pragma omp parallel for if(use_parallel)
+	for (int b = 0; b < g.batches; ++b)
+	{
+		const int row_base = b * g.out_spatial_size * g.kernel_volume_size;
+
+		for (int op = 0; op < g.out_spatial_size; ++op)
+		{
+			const int row = row_base + op * g.kernel_volume_size;
+			const int base_input = compute_output_position(b, op, g);
+
+			for (int k = 0; k < g.kernel_volume_size; ++k)
+			{
+				input_col[row + k] = input[base_input + g.input_kernel_offset[k]];
+			}
+		}
+	}
+}
+
+void MathUtils::col2im(const double* __restrict d_input_col, const ConvGeometry& g, double* __restrict d_input, bool use_parallel)
+{
+	#pragma omp parallel for if(use_parallel)
+	for (int b = 0; b < g.batches; ++b)
+	{
+		const int row_base = b * g.out_spatial_size * g.kernel_volume_size;
+
+		for (int op = 0; op < g.out_spatial_size; ++op)
+		{
+			const int row = row_base + op * g.kernel_volume_size;
+			const int base_input = compute_output_position(b, op, g);
+
+			for (int k = 0; k < g.kernel_volume_size; ++k)
+			{
+				d_input[base_input + g.input_kernel_offset[k]] += d_input_col[row + k];
+			}
+		}
+	}
+}
+
+void MathUtils::kernels2matmul(const double* __restrict kernels, const ConvGeometry& g, double* __restrict kernels_mat)
+{
+	for (int f = 0; f < g.filter_count; ++f)
+	{
+		const int filter_offset = f * g.kernel_volume_size;
+
+		for (int k = 0; k < g.kernel_volume_size; ++k)
+		{
+			kernels_mat[filter_offset + k] = kernels[filter_offset + g.kernel_kernel_offset[k]];
+		}
+	}
+}
+
+void MathUtils::matmul2kernels(const double* __restrict kernels_mat, const ConvGeometry& g, double* __restrict kernels, bool accumulate)
+{
+	for (int f = 0; f < g.filter_count; ++f)
+	{
+		const int filter_offset = f * g.kernel_volume_size;
+
+		for (int k = 0; k < g.kernel_volume_size; ++k)
+		{
+			if (accumulate) kernels[filter_offset + g.kernel_kernel_offset[k]] += kernels_mat[filter_offset + k];
+			else kernels[filter_offset + g.kernel_kernel_offset[k]] = kernels_mat[filter_offset + k];
+		}
+	}
+}

@@ -76,34 +76,36 @@ std::shared_ptr<Tensor> Tensor::softmax_cross_entropy(const std::shared_ptr<Tens
 	const size_t element_count = t->element_count();
 	const size_t batches = element_count / classes;
 
-	std::shared_ptr<Tensor> result = get_result_tensor(t, std::vector<int>{(int)batches, 1}, t->requires_grad);
+	std::shared_ptr<Tensor> result = get_result_tensor(t, {(int)batches, 1}, t->requires_grad);
 
-	std::vector<double> probs(element_count);
+	auto probs = std::make_shared<std::vector<double>>(element_count);
+
+	const double* __restrict t_data = t->_data.data();
+	double* __restrict p_data = probs->data();
+	const double* __restrict y_data = target->_data.data();
+	double* __restrict r_data = result->_data.data();
 
 	for (size_t b = 0; b < batches; ++b)
 	{
 		const size_t offset = b * classes;
 
-		std::span<const double> t_slice(t->_data.begin() + offset, classes);
+		const double* __restrict logits = t_data + offset;
+		double* __restrict p = p_data + offset;
 
-		const double max = MathUtils::vector_max(t_slice);
+		const double max_logit = MathUtils::vector_max(logits, classes);
 
-		std::span<double> p_slice(probs.begin() + offset, classes);
-
-		const __m256d reg_max = _mm256_set1_pd(max);
+		const __m256d reg_max_logit = _mm256_set1_pd(max_logit);
 		__m256d acc0 = _mm256_setzero_pd();
 		__m256d acc1 = _mm256_setzero_pd();
-		const double* const __restrict p_t = t_slice.data();
-		double* const __restrict p_p = p_slice.data();
 
 		size_t i = 0;
 		for (; i + 8 <= classes; i += 8)
 		{
-			__m256d exp0 = _mm256_exp_pd(_mm256_sub_pd(_mm256_loadu_pd(&p_t[i]), reg_max));
-			__m256d exp1 = _mm256_exp_pd(_mm256_sub_pd(_mm256_loadu_pd(&p_t[i + 4]), reg_max));
+			__m256d exp0 = _mm256_exp_pd(_mm256_sub_pd(_mm256_loadu_pd(&logits[i]), reg_max_logit));
+			__m256d exp1 = _mm256_exp_pd(_mm256_sub_pd(_mm256_loadu_pd(&logits[i + 4]), reg_max_logit));
 
-			_mm256_storeu_pd(&p_p[i], exp0);
-			_mm256_storeu_pd(&p_p[i + 4], exp1);
+			_mm256_storeu_pd(&p[i], exp0);
+			_mm256_storeu_pd(&p[i + 4], exp1);
 
 			acc0 = _mm256_add_pd(acc0, exp0);
 			acc1 = _mm256_add_pd(acc1, exp1);
@@ -113,8 +115,8 @@ std::shared_ptr<Tensor> Tensor::softmax_cross_entropy(const std::shared_ptr<Tens
 
 		for (; i + 4 <= classes; i += 4)
 		{
-			__m256d exp = _mm256_exp_pd(_mm256_sub_pd(_mm256_loadu_pd(&p_t[i]), reg_max));
-			_mm256_storeu_pd(&p_p[i], exp);
+			__m256d exp = _mm256_exp_pd(_mm256_sub_pd(_mm256_loadu_pd(&logits[i]), reg_max_logit));
+			_mm256_storeu_pd(&p[i], exp);
 			acc = _mm256_add_pd(acc, exp);
 		}
 
@@ -122,20 +124,28 @@ std::shared_ptr<Tensor> Tensor::softmax_cross_entropy(const std::shared_ptr<Tens
 
 		for (; i < classes; ++i)
 		{
-			double exp = std::exp(p_t[i] - max);
-			p_p[i] = exp;
+			double exp = std::exp(logits[i] - max_logit);
+			p[i] = exp;
 			sum_exp += exp;
 		}
 
-		const double log_sum_exp = std::log(sum_exp) + max;
+		MathUtils::vector_div(p, sum_exp, classes);
 
-		MathUtils::vector_div(p_slice, sum_exp);
+		const double* __restrict y = y_data + offset;
 
-		std::span<const double> g_slice(target->_data.begin() + offset, classes);
+		size_t label = 0;
+		for (size_t j = 0; j < classes; ++j)
+		{
+			if (y[j] > 0.5)
+			{
+				label = j;
+				break;
+			}
+		}
 
-		const double dot = MathUtils::vector_dot(g_slice, t_slice);
+		double loss = -std::log(p[label] + 1e-12);
 
-		result->_data[b] = log_sum_exp - dot;
+		r_data[b] = loss;
 	}
 
 	if (!inference)
@@ -146,57 +156,25 @@ std::shared_ptr<Tensor> Tensor::softmax_cross_entropy(const std::shared_ptr<Tens
 			{
 				if (!t->requires_grad) return;
 
+				thread_local std::vector<double> scratch1;
+				scratch1.resize(classes);
+
+				const double* __restrict p_data = probs->data();
+				const double* __restrict y_data = target->_data.data();
+				const double* __restrict r_grad = result->_grad.data();
+				double* __restrict t_grad = t->_grad.data();
+
 				for (size_t b = 0; b < batches; ++b)
 				{
 					const size_t offset = b * classes;
+					
+					const double rg = r_grad[b];
+					const double* __restrict p = p_data + offset;
+					const double* __restrict y = y_data + offset;
+					double* __restrict tg = t_grad + offset;
 
-					const double r_grad = result->_grad[b];
-
-					std::span<const double> p_slice(probs.begin() + offset, classes);
-					std::span<const double> g_slice(target->_data.begin() + offset, classes);
-					std::span<double> tg_slice(t->_grad.begin() + offset, classes);
-
-					const double* const __restrict p_p = p_slice.data();
-					const double* const __restrict p_g = g_slice.data();
-					double* const __restrict p_tg = tg_slice.data();
-					const __m256d reg_r_grad = _mm256_set1_pd(r_grad);
-
-					size_t i = 0;
-					for (; i + 8 <= classes; i += 8)
-					{
-						__m256d reg_p0 = _mm256_loadu_pd(&p_p[i]);
-						__m256d reg_p1 = _mm256_loadu_pd(&p_p[i + 4]);
-
-						__m256d reg_g0 = _mm256_loadu_pd(&p_g[i]);
-						__m256d reg_g1 = _mm256_loadu_pd(&p_g[i + 4]);
-
-						__m256d reg_tg0 = _mm256_loadu_pd(&p_tg[i]);
-						__m256d reg_tg1 = _mm256_loadu_pd(&p_tg[i + 4]);
-
-						__m256d diff0 = _mm256_sub_pd(reg_p0, reg_g0);
-						__m256d diff1 = _mm256_sub_pd(reg_p1, reg_g1);
-
-						__m256d res0 = _mm256_fmadd_pd(diff0, reg_r_grad, reg_tg0);
-						__m256d res1 = _mm256_fmadd_pd(diff1, reg_r_grad, reg_tg1);
-
-						_mm256_storeu_pd(&p_tg[i], res0);
-						_mm256_storeu_pd(&p_tg[i + 4], res1);
-					}
-
-					for (; i + 4 <= classes; i += 4)
-					{
-						__m256d reg_p = _mm256_loadu_pd(&p_p[i]);
-						__m256d reg_g = _mm256_loadu_pd(&p_g[i]);
-						__m256d reg_tg = _mm256_loadu_pd(&p_tg[i]);
-						__m256d diff = _mm256_sub_pd(reg_p, reg_g);
-						__m256d res = _mm256_fmadd_pd(diff, reg_r_grad, reg_tg);
-						_mm256_storeu_pd(&p_tg[i], res);
-					}
-
-					for (; i < classes; ++i)
-					{
-						tg_slice[i] += (p_slice[i] - g_slice[i]) * r_grad;
-					}
+					MathUtils::vector_sub(p, y, scratch1.data(), classes);
+					MathUtils::vector_fmadd(tg, scratch1.data(), rg, classes);
 				}
 			};
 	}

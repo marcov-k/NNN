@@ -318,12 +318,11 @@ extern "C"
 		return wrap_handle(Tensor::matmul(*tensor_handle_a, *tensor_handle_b));
 	}
 
-	void* tensor_convolve(void* handle_input, void* handle_kernels, void* handle_biases)
+	void* tensor_convolve(void* handle_input, void* handle_kernels)
 	{
 		auto* tensor_handle_input = static_cast<std::shared_ptr<Tensor>*>(handle_input);
 		auto* tensor_handle_kernels = static_cast<std::shared_ptr<Tensor>*>(handle_kernels);
-		auto* tensor_handle_biases = static_cast<std::shared_ptr<Tensor>*>(handle_biases);
-		return wrap_handle(Tensor::convolve(*tensor_handle_input, *tensor_handle_kernels, *tensor_handle_biases));
+		return wrap_handle(Tensor::convolve(*tensor_handle_input, *tensor_handle_kernels));
 	}
 
 	/* Tensor utilities */

@@ -11,6 +11,8 @@
 #include <unordered_set>
 #include <vector>
 
+#include "DataContainers.h"
+
 class Tensor; // forward declaration
 
 struct TensorPtrHash
@@ -145,8 +147,7 @@ public:
 
 	static std::shared_ptr<Tensor> matmul(const std::shared_ptr<Tensor>& a, const std::shared_ptr<Tensor>& b);
 
-	static std::shared_ptr<Tensor> convolve(const std::shared_ptr<Tensor>& input, const std::shared_ptr<Tensor>& kernels,
-		const std::shared_ptr<Tensor>& biases);
+	static std::shared_ptr<Tensor> convolve(const std::shared_ptr<Tensor>& input, const std::shared_ptr<Tensor>& kernels);
 
 	static std::shared_ptr<Tensor> mask_actions(const std::shared_ptr<Tensor>& q_values, const std::vector<int>& actions);
 
@@ -218,30 +219,6 @@ private:
 		std::unordered_set<std::shared_ptr<Tensor>, TensorPtrHash, TensorPtrEqual>& visited);
 
 	static std::shared_ptr<Tensor> get_result_tensor(const std::shared_ptr<Tensor>& owner, const std::vector<int>& dims, bool requires_grad);
-
-	static void transpose_matrix(const double* __restrict src, double* __restrict dst, int src_off, int dst_off,
-		int rows, int cols);
-
-	static void compute_row(int i, int n, int p, const double* __restrict a, const double* __restrict b_t,
-		double* __restrict r, int a_off, int b_t_off, int r_off);
-
-	static void compute_output_position(int batch_out_pos, int spatial_rank, int out_spatial_size, int filter_count,
-		int kernel_spatial_size, int input_channels, const int* __restrict out_spatial_strides,
-		const int* __restrict kernel_spatial_strides, const int* __restrict input_strides,
-		const int* __restrict kernel_strides, const int* __restrict result_strides, const double* __restrict input_data,
-		const double* __restrict kernel_data, const double* __restrict bias_data, double* __restrict result_data);
-
-	static void compute_kernel_grad(int fkp, int spatial_rank, int batches, int out_spatial_size,
-		int kernel_spatial_size, int input_channels, const int* __restrict out_spatial_strides,
-		const int* __restrict kernel_spatial_strides, const int* __restrict input_strides,
-		const int* __restrict kernel_strides, const int* __restrict result_strides, const double* __restrict input_data,
-		double* __restrict kernel_grad, const double* __restrict result_grad);
-
-	static void compute_input_grad(int batch_in_pos, int spatial_rank, int in_spatial_size, int filter_count,
-		int kernel_spatial_size, int input_channels, const int* __restrict in_spatial_strides,
-		const int* __restrict kernel_spatial_strides, const int* __restrict out_spatial_dims,
-		const int* __restrict input_strides, const int* __restrict kernel_strides, const int* __restrict result_strides,
-		double* __restrict input_grad, const double* __restrict kernel_data, const double* __restrict result_grad);
 };
 
 // Free function operators

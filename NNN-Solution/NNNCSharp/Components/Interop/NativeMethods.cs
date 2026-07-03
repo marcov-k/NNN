@@ -442,7 +442,7 @@ internal static class NativeMethods
     /// <param name="handle_biases">void* handle of the bias C++ tensor.</param>
     /// <returns>void* handle of the result C++ tensor.</returns>
     [DllImport(DllName)]
-    internal static extern IntPtr tensor_convolve(IntPtr handle_input, IntPtr handle_kernels, IntPtr handle_biases);
+    internal static extern IntPtr tensor_convolve(IntPtr handle_input, IntPtr handle_kernels);
 
     // Tensor utilities
 
