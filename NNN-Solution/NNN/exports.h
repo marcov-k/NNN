@@ -235,9 +235,6 @@ extern "C"
 
 	/* Optimizers */
 
-	// Clips the gradients of the given parameter tensors using the given max norm.
-	__declspec(dllexport) void optimizers_clip_gradients(void** handles, int para_count, double max_norm);
-
 	// Performs a Stochastic Gradient Descent optimizer step on the given parameter tensor.
 	__declspec(dllexport) void optimizers_sgd(void* handle_para, double lr);
 
@@ -246,6 +243,9 @@ extern "C"
 		double beta1, double one_minus_beta1, double beta2, double one_minus_beta2, double epsilon, double weight_decay);
 
 	/* Models */
+
+	// Clips the gradients of the given parameter tensors using the given max norm.
+	__declspec(dllexport) void models_clip_gradients(void** handles, int para_count, double max_norm);
 
 	// Applies a soft update to the given target model's parameters based on the given agent model's parameters.
 	__declspec(dllexport) void models_soft_update(void** handles_agent, void** handles_target, int para_count, double tau,

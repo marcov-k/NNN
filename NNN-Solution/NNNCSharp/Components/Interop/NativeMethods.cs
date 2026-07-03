@@ -641,15 +641,6 @@ internal static class NativeMethods
     // Optimizers
 
     /// <summary>
-    /// Clips the gradients of the given parameter C++ tensors using the given max norm.
-    /// </summary>
-    /// <param name="handles">Array of void* handles of parameter C++ tensors.</param>
-    /// <param name="para_count">Length of the parameter handles array.</param>
-    /// <param name="max_norm">Max norm parameter to use.</param>
-    [DllImport(DllName)]
-    internal static extern void optimizers_clip_gradients(IntPtr[] handles, int para_count, double max_norm);
-
-    /// <summary>
     /// Performs a Stochastic Gradient Descent optimizer step on the given parameter C++ tensor.
     /// </summary>
     /// <param name="handle_para">void* handle of the parameter C++ tensor.</param>
@@ -677,6 +668,15 @@ internal static class NativeMethods
         double beta1, double one_minus_beta1, double beta2, double one_minus_beta2, double epsilon, double weight_decay);
 
     // Models
+
+    /// <summary>
+    /// Clips the gradients of the given parameter C++ tensors using the given max norm.
+    /// </summary>
+    /// <param name="handles">Array of void* handles of parameter C++ tensors.</param>
+    /// <param name="para_count">Length of the parameter handles array.</param>
+    /// <param name="max_norm">Max norm parameter to use.</param>
+    [DllImport(DllName)]
+    internal static extern void models_clip_gradients(IntPtr[] handles, int para_count, double max_norm);
 
     /// <summary>
     /// Applies a soft update to the given target model's parameters based on the given agent model's parameters.

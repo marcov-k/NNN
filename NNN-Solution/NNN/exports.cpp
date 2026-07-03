@@ -469,17 +469,7 @@ extern "C"
 
 	/* Optimizers */
 
-	// Clips the gradients of the given parameter tensors using the given max norm.
-	void optimizers_clip_gradients(void** handles, int para_count, double max_norm)
-	{
-		std::vector<std::shared_ptr<Tensor>*> paras(para_count);
-		for (int i = 0; i < para_count; ++i)
-		{
-			paras[i] = static_cast<std::shared_ptr<Tensor>*>(handles[i]);
-		}
-		Optimizers::clip_gradients(paras, max_norm);
-	}
-
+	// Performs a Stochastic Gradient Descent optimizer step on the given parameter tensor.
 	void optimizers_sgd(void* handle_para, double lr)
 	{
 		auto* tensor_handle_para = static_cast<std::shared_ptr<Tensor>*>(handle_para);
@@ -498,7 +488,17 @@ extern "C"
 
 	/* Models */
 
-	// Applies a soft update to the given target model's parameters based on the given agent model's parameters.
+	// Clips the gradients of the given parameter tensors using the given max norm.
+	void models_clip_gradients(void** handles, int para_count, double max_norm)
+	{
+		std::vector<std::shared_ptr<Tensor>*> paras(para_count);
+		for (int i = 0; i < para_count; ++i)
+		{
+			paras[i] = static_cast<std::shared_ptr<Tensor>*>(handles[i]);
+		}
+		Models::clip_gradients(paras, max_norm);
+	}
+
 	void models_soft_update(void** handles_agent, void** handles_target, int para_count, double tau, double one_minus_tau)
 	{
 		std::vector<std::shared_ptr<Tensor>*> agent_paras(para_count);
