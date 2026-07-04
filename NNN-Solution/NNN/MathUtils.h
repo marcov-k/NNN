@@ -711,7 +711,7 @@ public:
 
 	// Computes the matrix multiplication of two vectors and writes the result into the provided vector -> r = a @ b_t
 	static void matmul_raw(const double* __restrict a, const double* __restrict b_t, double* __restrict r, int m, int n, int p,
-		int a_off, int b_t_off, int r_off, bool transpose_a, bool use_parallel, bool accumulate = false);
+		int a_off, int b_t_off, int r_off, bool use_parallel, bool accumulate = false);
 
 	// Transposes the given matrix data vector and writes the result into the given vector.
 	static void transpose_matrix(const double* __restrict src, double* __restrict dst, int src_off, int dst_off,

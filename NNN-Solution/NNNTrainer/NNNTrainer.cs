@@ -148,6 +148,7 @@ public class NNNTrainer
         double maxGradNorm = 0.5;
         Cost cost = new SoftmaxCrossEntropy();
         Trainer trainer = new(model, optimizer, cost, maxGradNorm);
+        double minLRFraction = 0.5;
 
         var wrappedImages = new Tensor[testImages.Length];
         for (int i = 0; i < testImages.Length; i++)
@@ -165,7 +166,7 @@ public class NNNTrainer
         int batchSize = 128;
         int testLength = testLabels.Length;
 
-        StandardTrainingLoop(trainer, batchBuffer, batchSize, testFunc, testLength);
+        StandardTrainingLoop(trainer, batchBuffer, batchSize, testFunc, true, minLRFraction, testLength);
 
         if (GetInput("Save model to a file? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
         {
@@ -220,7 +221,7 @@ public class NNNTrainer
     /// <param name="testFunc">Function to use to evaluate model performance.</param>
     /// <param name="testLength">Number of times to run the test function per performance test.</param>
     static void StandardTrainingLoop(Trainer trainer, BatchBuffer batchBuffer, int batchSize,
-        Func<Model, int, bool> testFunc, int testLength)
+        Func<Model, int, bool> testFunc, bool decayLR, double minLRFraction, int testLength)
     {
         // Train model until user indicates to stop
         while (true)
@@ -230,7 +231,8 @@ public class NNNTrainer
                 int epochs = GetInteger("Enter number of epochs to train");
                 int testEvery = GetInteger("Enter epochs per training progress test");
                 Console.WriteLine($"\n\nTraining for {epochs} epochs...");
-                trainer.Train(batchBuffer, batchSize, epochs, batchAllInputs: true, testFunc, testEvery: testEvery, testLength: testLength);
+                trainer.Train(batchBuffer, batchSize, epochs, batchAllInputs: true, testFunc, decayLR,
+                    minLRFraction, testEvery: testEvery, testLength: testLength);
             }
             else break;
         }

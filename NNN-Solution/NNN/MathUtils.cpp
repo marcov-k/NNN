@@ -2356,43 +2356,17 @@ void MathUtils::vector_tanh(double* const __restrict a, size_t n)
 
 // Computes the matrix multiplication of two vectors and writes the result into the provided vector -> r = a @ b_t
 void MathUtils::matmul_raw(const double* __restrict a, const double* __restrict b_t, double* __restrict r, int m, int n, int p,
-	int a_off, int b_t_off, int r_off, bool transpose_a, bool use_parallel, bool accumulate)
+	int a_off, int b_t_off, int r_off, bool use_parallel, bool accumulate)
 {
 	#pragma warning(disable : 6993)
-	if (!transpose_a)
+	#pragma omp parallel for if(use_parallel)
+	for (int i = 0; i < m; ++i)
 	{
-		#pragma omp parallel for if(use_parallel)
-		for (int i = 0; i < m; ++i)
+		for (int j = 0; j < p; ++j)
 		{
-			for (int j = 0; j < p; ++j)
-			{
-				double val = vector_dot(a, b_t, a_off + i * n, b_t_off + j * n, n);
-				if (accumulate) r[r_off + i * p + j] += val;
-				else r[r_off + i * p + j] = val;
-			}
-		}
-	}
-	else
-	{
-		if (!accumulate)
-		{
-			for (int i = 0; i < m * p; ++i)
-			{
-				r[r_off + i] = 0.0;
-			}
-		}
-
-		#pragma omp parallel for if(use_parallel)
-		for (int i = 0; i < m; ++i)
-		{
-			for (int k = 0; k < n; ++k)
-			{
-				const double a_val = a[a_off + k * m + i];
-				for (int j = 0; j < p; ++j)
-				{
-					r[r_off + i * p + j] += a_val * b_t[b_t_off + j * n + k];
-				}
-			}
+			double val = vector_dot(a, b_t, a_off + i * n, b_t_off + j * n, n);
+			if (accumulate) r[r_off + i * p + j] += val;
+			else r[r_off + i * p + j] = val;
 		}
 	}
 }

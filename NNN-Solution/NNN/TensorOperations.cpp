@@ -789,7 +789,7 @@ std::shared_ptr<Tensor> Tensor::convolve(const std::shared_ptr<Tensor>& input, c
 	MathUtils::im2col(input->_data.data(), g, input_col->data(), use_parallel);
 
 	MathUtils::matmul_raw(input_col->data(), kernels_mat->data(), result->_data.data(),
-		g.batches * g.out_spatial_size, g.kernel_volume_size, g.filter_count, 0, 0, 0, false, use_parallel);
+		g.batches * g.out_spatial_size, g.kernel_volume_size, g.filter_count, 0, 0, 0, use_parallel);
 
 	// Connect result tensor to autograd graph if needed
 	if (!inference)
@@ -801,37 +801,33 @@ std::shared_ptr<Tensor> Tensor::convolve(const std::shared_ptr<Tensor>& input, c
 		// Gradient calculation function -> grad_input = convolve(grad_r, rotated kernels); grad_kernels = convolve(input, rotated grad_r)
 		result->_backward = [input, input_col, kernels, kernels_mat, result, g, use_parallel]()
 			{
-				thread_local std::vector<double> d_col;
-				thread_local std::vector<double> d_kernels_mat;
-				thread_local std::vector<double> d_out_t;
-				thread_local std::vector<double> kernels_grad_mat;
-
 				// Compute grad_input = convolve(grad_r, rotated kernels)
 				if (input->requires_grad)
 				{
+					thread_local std::vector<double> d_col;
 					d_col.assign(g.im2col_rows * g.im2col_cols, 0.0);
 
 					MathUtils::matmul_raw(result->_grad.data(), kernels_mat->data(), d_col.data(),
-						g.im2col_rows, g.filter_count, g.im2col_cols, 0, 0, 0, false, use_parallel);
+						g.im2col_rows, g.filter_count, g.im2col_cols, 0, 0, 0, use_parallel);
 					MathUtils::col2im(d_col.data(), g, input->_grad.data(), use_parallel);
 				}
 
 				// Compute grad_kernels = convolve(input, rotated grad_r)
 				if (kernels->requires_grad)
 				{
-					d_kernels_mat.resize(kernels->element_count());
-					
-					d_out_t.resize(g.im2col_rows * g.filter_count);
+					thread_local std::vector<double> d_out_t;
+					thread_local std::vector<double> d_kernels_ft;
+
+					d_out_t.resize(g.filter_count * g.im2col_rows);
+					d_kernels_ft.resize(kernels->element_count());
+
 					MathUtils::transpose_matrix(result->_grad.data(), d_out_t.data(), 0, 0,
 						g.im2col_rows, g.filter_count);
 					
-					MathUtils::matmul_raw(input_col->data(), d_out_t.data(), d_kernels_mat.data(),
-						g.kernel_volume_size, g.im2col_rows, g.filter_count, 0, 0, 0, true, use_parallel);
+					MathUtils::matmul_raw(d_out_t.data(), input_col->data(), d_kernels_ft.data(), g.filter_count,
+						g.im2col_rows, g.im2col_cols, 0, 0, 0, use_parallel);
 
-					kernels_grad_mat.resize(kernels->element_count());
-					MathUtils::transpose_matrix(d_kernels_mat.data(), kernels_grad_mat.data(), 0, 0, g.kernel_volume_size, g.filter_count);
-
-					MathUtils::matmul2kernels(kernels_grad_mat.data(), g, kernels->_grad.data(), true);
+					MathUtils::matmul2kernels(d_kernels_ft.data(), g, kernels->_grad.data(), true);
 				}
 			};
 	}
