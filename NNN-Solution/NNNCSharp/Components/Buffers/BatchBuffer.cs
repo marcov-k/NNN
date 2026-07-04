@@ -1,4 +1,4 @@
-﻿using NNNCSharp.Components.Interop;
+﻿using NNNCSharp.Components.Autodiff;
 using NNNCSharp.Components.Utilities;
 
 namespace NNNCSharp.Components.Buffers;

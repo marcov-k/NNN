@@ -1,5 +1,5 @@
 ﻿using NNNCSharp.Components.Activations;
-using NNNCSharp.Components.Interop;
+using NNNCSharp.Components.Autodiff;
 using NNNCSharp.Components.Utilities.SaveSystem;
 
 namespace NNNCSharp.Components.Models.Layers;

@@ -1,6 +1,7 @@
 ﻿using NNNCSharp.Components.Episodes;
+using NNNCSharp.Components.Interop;
 
-namespace NNNCSharp.Components.Interop;
+namespace NNNCSharp.Components.Autodiff;
 
 /// <summary>
 /// C# wrapper class for C++ tensors.

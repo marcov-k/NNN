@@ -1,4 +1,4 @@
-﻿using NNNCSharp.Components.Interop;
+﻿using NNNCSharp.Components.Autodiff;
 
 namespace NNNCSharp.Components.Optimizers;
 
