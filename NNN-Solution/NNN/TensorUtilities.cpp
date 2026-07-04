@@ -312,7 +312,7 @@ std::shared_ptr<Tensor> Tensor::wrap_batch(const std::shared_ptr<Tensor>& t)
 	thread_local std::vector<int> batch_dims;
 	batch_dims.resize(t->rank() + 1);
 	batch_dims[0] = 1;
-	batch_dims.insert(batch_dims.end(), t->_dimensions.begin(), t->_dimensions.end());
+	for (size_t i = 0; i < t->_dimensions.size(); ++i) batch_dims[i + 1] = t->_dimensions[i];
 
 	std::shared_ptr<Tensor> batch = get_result_tensor(t, batch_dims, t->requires_grad);
 
