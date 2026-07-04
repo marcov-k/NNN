@@ -61,7 +61,7 @@ public:
 	// Creates a copy instance of the tensor - detached from autograd graph.
 	std::shared_ptr<Tensor> copy() const;
 
-	/* Data access */
+	/* Indexing/data access */
 
 	// Returns a constant reference to the tensor's data vector.
 	const std::vector<double>& data() const

@@ -1,8 +1,11 @@
 #include "pch.h"
 #include "Tensor.h"
 
+/* Indexing/data access */
+
 double& Tensor::operator[](int index)
 {
+	// Ensure valid index
 	if (index < 0 || index >= element_count())
 	{
 		throw std::out_of_range("Index out of bounds.");
@@ -13,6 +16,7 @@ double& Tensor::operator[](int index)
 
 const double& Tensor::operator[](int index) const
 {
+	// Ensure valid index
 	if (index < 0 || index >= element_count())
 	{
 		throw std::out_of_range("Index out of bounds.");
@@ -23,24 +27,12 @@ const double& Tensor::operator[](int index) const
 
 double& Tensor::at(const std::vector<int>& indices)
 {
-	int linear = linear_index(indices);
-	if (linear < 0 || linear >= element_count())
-	{
-		throw std::out_of_range("Indices out of bounds.");
-	}
-
-	return _data[linear];
+	return _data[linear_index(indices)];
 }
 
 const double& Tensor::at(const std::vector<int>& indices) const
 {
-	int linear = linear_index(indices);
-	if (linear < 0 || linear >= element_count())
-	{
-		throw std::out_of_range("Indices out of bounds.");
-	}
-
-	return _data[linear];
+	return _data[linear_index(indices)];
 }
 
 int Tensor::linear_index(const std::vector<int>& indices) const
@@ -52,11 +44,23 @@ int Tensor::linear_index(const std::vector<int>& indices) const
 		offset += indices[i] * _strides[i];
 	}
 
+	// Ensure valid index
+	if (offset < 0 || offset >= element_count())
+	{
+		throw std::out_of_range("Indices out of bounds.");
+	}
+
 	return offset;
 }
 
 const std::vector<int> Tensor::get_full_indices(int index) const
 {
+	// Ensure valid index
+	if (index < 0 || index >= element_count())
+	{
+		throw std::out_of_range("Index out of bounds.");
+	}
+
 	int dimCount = rank();
 
 	std::vector<int> indices(dimCount);
@@ -71,6 +75,12 @@ const std::vector<int> Tensor::get_full_indices(int index) const
 
 void Tensor::get_full_indices(int index, int* __restrict indices) const
 {
+	// Ensure valid index
+	if (index < 0 || index >= element_count())
+	{
+		throw std::out_of_range("Index out of bounds.");
+	}
+
 	int dimCount = rank();
 
 	for (int i = dimCount - 1; i >= 0; i--)
