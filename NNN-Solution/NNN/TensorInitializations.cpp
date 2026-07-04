@@ -2,6 +2,9 @@
 #include "Tensor.h"
 #include "MathUtils.h"
 
+/* Initialization */
+
+// Computes the strides of the tensor using the given dimensions.
 std::vector<int> Tensor::compute_strides(const std::vector<int>& dims)
 {
 	int n = (int)dims.size();
@@ -22,6 +25,8 @@ Tensor::Tensor(const std::vector<int> dims, bool req_grad) : _dimensions(dims), 
 {
 	_strides = compute_strides(dims);
 
+	// Compute linear size and initialize data and gradient vectors
+
 	int size = 1;
 	for (int dim : dims)
 	{
@@ -39,6 +44,8 @@ Tensor::Tensor(const std::vector<int> dims, bool req_grad) : _dimensions(dims), 
 Tensor::Tensor(double value, const std::vector<int> dims, bool req_grad) : _dimensions(dims), requires_grad(req_grad)
 {
 	_strides = compute_strides(dims);
+
+	// Compute linear size and initialize data and gradient vectors
 
 	int size = 1;
 	for (int dim : dims)
@@ -58,6 +65,7 @@ std::shared_ptr<Tensor> Tensor::init_weights(int input_count, int neuron_count)
 {
 	auto weights = std::make_shared<Tensor>(std::vector<int>{input_count, neuron_count}, true);
 
+	// Initialize weight values using He initialization
 	double std_dev = std::sqrt(2.0 / input_count);
 	const int element_count = weights->element_count();
 	for (int i = 0; i < element_count; ++i)
@@ -75,6 +83,7 @@ std::shared_ptr<Tensor> Tensor::init_biases(int neuron_count)
 
 std::shared_ptr<Tensor> Tensor::init_kernels(int filter_count, const std::vector<int>& kernel_dims, int input_channels)
 {
+	// Compute kernels tensor dimensions
 	std::vector<int> dims;
 	dims.reserve(kernel_dims.size() + 2);
 	dims.push_back(filter_count);
@@ -88,6 +97,7 @@ std::shared_ptr<Tensor> Tensor::init_kernels(int filter_count, const std::vector
 
 	auto kernels = std::make_shared<Tensor>(dims, true);
 
+	// Initialize kernel values using He initialization
 	double std_dev = std::sqrt(2.0 / fan_in);
 	const int element_count = kernels->element_count();
 	for (int i = 0; i < element_count; ++i)

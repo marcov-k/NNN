@@ -2,6 +2,9 @@
 #include "Tensor.h"
 #include "MathUtils.h"
 
+/* Utilities */
+
+// Returns the tensor instance to write the result of the current autograd graph operation into.
 std::shared_ptr<Tensor> Tensor::get_result_tensor(const std::shared_ptr<Tensor>& owner, const std::vector<int>& dims, bool requires_grad)
 {
 	owner->prepare_forward();
@@ -9,7 +12,7 @@ std::shared_ptr<Tensor> Tensor::get_result_tensor(const std::shared_ptr<Tensor>&
 	const bool new_op = (int)owner->_results.size() <= owner->_op_index;
 
 	std::shared_ptr<Tensor> result;
-	if (new_op)
+	if (new_op) // create new result tensor allocation
 	{
 		result = std::make_shared<Tensor>(dims, requires_grad);
 		owner->_results.push_back(result);
@@ -18,6 +21,7 @@ std::shared_ptr<Tensor> Tensor::get_result_tensor(const std::shared_ptr<Tensor>&
 	{
 		result = owner->_results[owner->_op_index];
 
+		// Ensure existing result tensor allocation dimensions match required dimensions
 		bool shape_mismatch = result->rank() != (int)dims.size();
 		if (!shape_mismatch)
 		{
@@ -32,14 +36,14 @@ std::shared_ptr<Tensor> Tensor::get_result_tensor(const std::shared_ptr<Tensor>&
 			}
 		}
 
-		if (shape_mismatch)
+		if (shape_mismatch) // create new result tensor allocation
 		{
 			result = std::make_shared<Tensor>(dims, requires_grad);
 			owner->_results[owner->_op_index] = result;
 		}
-		else
+		else // reuse existing result tensor allocation
 		{
-			result->clear_graph();
+			result->clear_graph(); // clear previous autograd graph connections
 		}
 	}
 
@@ -55,15 +59,18 @@ std::shared_ptr<Tensor> Tensor::mask_actions(const std::shared_ptr<Tensor>& q_va
 
 	std::shared_ptr<Tensor> result = get_result_tensor(q_values, std::vector<int>{batch_size, 1}, q_values->requires_grad);
 
+	// Extract Q Value at action index per batch
 	for (int i = 0; i < batch_size; ++i)
 	{
 		result->_data[i] = q_values->_data[i * action_count + actions[i]];
 	}
 
+	// Connect result tensor to autograd graph if needed
 	if (!inference)
 	{
 		result->_parents.push_back(q_values);
 
+		// Gradient calculation -> map result gradient to corresponding index in Q Values tensor
 		result->_backward = [q_values, actions, result, batch_size, action_count]()
 			{
 				if (!q_values->requires_grad) return;
@@ -100,12 +107,15 @@ std::shared_ptr<Tensor> Tensor::sum(const std::shared_ptr<Tensor>& t)
 {
 	std::shared_ptr<Tensor> result = get_result_tensor(t, std::vector<int>(1, 1), t->requires_grad); // dims: {1} — scalar result
 
+	// Compute sum of data vector
 	result->_data[0] = MathUtils::vector_sum(t->_data);
 
+	// Connect result tensor to autograd graph if needed
 	if (!inference)
 	{
 		result->_parents.push_back(t);
 
+		// Gradient calculation function -> dr/dt = 1
 		result->_backward = [t, result]()
 			{
 				if (!t->requires_grad) return;
@@ -121,17 +131,20 @@ std::shared_ptr<Tensor> Tensor::mean(const std::shared_ptr<Tensor>& t)
 {
 	std::shared_ptr<Tensor> result = get_result_tensor(t, std::vector<int>(1, 1), t->requires_grad); // dims: {1} - scalar result
 
+	// Compute mean of data vector
 	result->_data[0] = MathUtils::vector_sum(t->_data) / t->element_count();
 
+	// Connect result tensor to autograd graph if needed
 	if (!inference)
 	{
 		result->_parents.push_back(t);
 
+		// Gradient calculation function -> dr/dt = 1 / n
 		result->_backward = [t, result]()
 			{
 				if (!t->requires_grad) return;
 
-				double rg = result->_grad[0] / (double)t->element_count();
+				const double rg = result->_grad[0] / (double)t->element_count();
 				MathUtils::vector_add(t->_grad, rg);
 			};
 	}
@@ -141,6 +154,7 @@ std::shared_ptr<Tensor> Tensor::mean(const std::shared_ptr<Tensor>& t)
 
 std::shared_ptr<Tensor> Tensor::transpose(const std::shared_ptr<Tensor>& t, const std::vector<int>& axes)
 {
+	// Compute result dimensions
 	std::vector<int> result_dims(t->rank());
 	const int axes_length = (int)axes.size();
 	for (int i = 0; i < axes_length; ++i)
@@ -150,11 +164,14 @@ std::shared_ptr<Tensor> Tensor::transpose(const std::shared_ptr<Tensor>& t, cons
 
 	std::shared_ptr<Tensor> result = get_result_tensor(t, result_dims, t->requires_grad);
 
-	std::vector<int> src_indices(axes_length);
-	std::vector<int> dst_indices(axes_length);
+	thread_local std::vector<int> src_indices;
+	thread_local std::vector<int> dst_indices;
+	src_indices.resize(axes_length);
+	dst_indices.resize(axes_length);
 
 	const int element_count = t->element_count();
 
+	// Remap source indices to destination indices and copy data
 	for (int i = 0; i < element_count; ++i)
 	{
 		t->get_full_indices(i, src_indices.data());
@@ -167,29 +184,35 @@ std::shared_ptr<Tensor> Tensor::transpose(const std::shared_ptr<Tensor>& t, cons
 		result->_data[result->linear_index(dst_indices)] = t->_data[i];
 	}
 
+	// Connect result to autograd graph if needed
 	if (!inference)
 	{
 		result->_parents.push_back(t);
 
-		std::vector<int> inv_axes(axes_length);
+		// Precompute inverse permutation order
+		auto inv_axes = std::make_shared<std::vector<int>>(axes_length);
 		for (int i = 0; i < axes_length; ++i)
 		{
-			inv_axes[axes[i]] = i;
+			inv_axes->operator[](axes[i]) = i;
 		}
 
+		// Gradient calculation -> map result gradient to input gradient using inverse permutation order
 		result->_backward = [t, result, inv_axes, axes_length, element_count]()
 			{
 				if (!t->requires_grad) return;
 
-				std::vector<int> src_indices(axes_length);
-				std::vector<int> dst_indices(axes_length);
+				thread_local std::vector<int> src_indices;
+				thread_local std::vector<int> dst_indices;
+				src_indices.resize(axes_length);
+				dst_indices.resize(axes_length);
 
+				// Map result gradient to input gradient
 				for (int i = 0; i < element_count; ++i)
 				{
 					result->get_full_indices(i, src_indices.data());
 					for (int j = 0; j < axes_length; ++j)
 					{
-						dst_indices[j] = src_indices[inv_axes[j]];
+						dst_indices[j] = src_indices[inv_axes->operator[](j)];
 					}
 					t->_grad[t->linear_index(dst_indices)] += result->_grad[i];
 				}
@@ -221,22 +244,25 @@ std::shared_ptr<Tensor> Tensor::broadcast(const std::shared_ptr<Tensor>& t, cons
 	const int stride = t->element_count();
 	const int blocks = result->element_count() / stride;
 
+	// Block-copy input data into result
 	for (int b = 0; b < blocks; ++b)
 	{
 		std::copy(t->_data.begin(), t->_data.end(), result->_data.begin() + (b * stride));
 	}
 
+	// Connect result tensor to autograd graph if needed
 	if (!inference)
 	{
 		result->_parents.push_back(t);
 
+		// Gradient calculation -> accumulate result gradients corresponding to same value in pre-broadcasted input
 		result->_backward = [t, result, stride, blocks]()
 			{
 				if (!t->requires_grad) return;
 
 				for (int b = 0; b < blocks; ++b)
 				{
-					MathUtils::vector_add(std::span<double>(t->_grad), std::span<const double>(result->_grad.data() + (b * stride), stride));
+					MathUtils::vector_add(t->_grad.data(), result->_grad.data() + b * stride, stride);
 				}
 			};
 	}
@@ -248,12 +274,15 @@ std::shared_ptr<Tensor> Tensor::reshape(const std::shared_ptr<Tensor>& t, const 
 {
 	std::shared_ptr<Tensor> result = get_result_tensor(t, new_dims, t->requires_grad);
 
+	// Copy linear input data into result
 	result->_data = t->_data;
 
+	// Connect result tensor to autograd graph if needed
 	if (!inference)
 	{
 		result->_parents.push_back(t);
 
+		// Gradient calculation function -> dr/dt = 1 (no remaping required - identical linear data layout)
 		result->_backward = [t, result]()
 			{
 				if (!t->requires_grad) return;
@@ -267,9 +296,11 @@ std::shared_ptr<Tensor> Tensor::reshape(const std::shared_ptr<Tensor>& t, const 
 
 std::shared_ptr<Tensor> Tensor::flatten(const std::shared_ptr<Tensor>& t, int start_axis)
 {
+	// Compute linear size of flattened dimensions
 	int flat_size = 1;
 	for (int i = start_axis; i < t->rank(); ++i) flat_size *= t->_dimensions[i];
 
+	// Compute result dimensions
 	std::vector<int> new_dims(t->_dimensions.begin(), t->_dimensions.begin() + start_axis);
 	new_dims.push_back(flat_size);
 
@@ -278,19 +309,22 @@ std::shared_ptr<Tensor> Tensor::flatten(const std::shared_ptr<Tensor>& t, int st
 
 std::shared_ptr<Tensor> Tensor::wrap_batch(const std::shared_ptr<Tensor>& t)
 {
-	std::vector<int> batch_dims;
-	batch_dims.reserve(t->rank() + 1);
-	batch_dims.push_back(1);
+	thread_local std::vector<int> batch_dims;
+	batch_dims.resize(t->rank() + 1);
+	batch_dims[0] = 1;
 	batch_dims.insert(batch_dims.end(), t->_dimensions.begin(), t->_dimensions.end());
 
 	std::shared_ptr<Tensor> batch = get_result_tensor(t, batch_dims, t->requires_grad);
 
+	// Copy linear input data into result - no change in underlying data layout
 	batch->_data = t->_data;
 
+	// Connect result tensor to autograd graph if needed
 	if (!inference)
 	{
 		batch->_parents.push_back(t);
 
+		// Gradient calculation function -> db/dt = 1 (no remaping required - identical linear data layout)
 		batch->_backward = [t, batch]()
 			{
 				if (!t->requires_grad) return;
@@ -306,12 +340,15 @@ std::shared_ptr<Tensor> Tensor::clip(const std::shared_ptr<Tensor>& t, double mi
 {
 	std::shared_ptr<Tensor> result = get_result_tensor(t, t->dimensions(), t->requires_grad);
 
+	// Clip input data into given range
 	MathUtils::vector_clamp(t->_data, min, max, result->_data);
 
+	// Connect result tensor to autograd graph if needed
 	if (!inference)
 	{
 		result->_parents.push_back(t);
 
+		// Gradient calculation function -> dr/dt = 1 (min < t < max); 0 (t < min, t > max)
 		result->_backward = [t, result, min, max]()
 			{
 				if (!t->requires_grad) return;
@@ -379,11 +416,13 @@ std::shared_ptr<Tensor> Tensor::clip(const std::shared_ptr<Tensor>& t, double mi
 
 std::shared_ptr<Tensor> Tensor::get_dense_dropout_mask(const std::vector<int>& dims, double dropout)
 {
+	// Don't apply dropout if in inference mode
 	if (inference) return std::make_shared<Tensor>(1.0, dims, false);
 
 	const double scale = 1.0 / (1.0 - dropout);
 	std::shared_ptr<Tensor> mask = std::make_shared<Tensor>(scale, dims, false);
 
+	// Randomly drop parameters based on dropout rate
 	const int element_count = mask->element_count();
 	for (int i = 0; i < element_count; ++i)
 	{
@@ -396,6 +435,7 @@ std::shared_ptr<Tensor> Tensor::get_dense_dropout_mask(const std::vector<int>& d
 
 std::shared_ptr<Tensor> Tensor::get_spatial_dropout_mask(const std::vector<int>& dims, double dropout)
 {
+	// Don't apply dropout if in inference mode
 	if (inference) return std::make_shared<Tensor>(1.0, dims, false);
 
 	const double scale = 1.0 / (1.0 - dropout);
@@ -406,11 +446,15 @@ std::shared_ptr<Tensor> Tensor::get_spatial_dropout_mask(const std::vector<int>&
 	const int channels = dims.back();
 	const int spatial_size = batch_size / channels;
 
-	std::vector<double> channel_vals(channels);
+	thread_local std::vector<double> channel_vals;
+	channel_vals.resize(channels);
+
+	// Randomly drop channels based on dropout rate
 	for (int b = 0; b < batches; ++b)
 	{
 		int batch_offset = b * batch_size;
 
+		// Randomly select channel indices to drop for the current batch based on dropout rate
 		for (int c = 0; c < channels; ++c)
 		{
 			double rand = MathUtils::get_random_double();
@@ -418,6 +462,7 @@ std::shared_ptr<Tensor> Tensor::get_spatial_dropout_mask(const std::vector<int>&
 			else channel_vals[c] = scale;
 		}
 
+		// Drop selected channel indices for each spatial position in the current batch
 		for (int s = 0; s < spatial_size; ++s)
 		{
 			int spatial_offset = batch_offset + (s * channels);

@@ -327,6 +327,8 @@ private:
 	// Topography construction visited hashset.
 	std::optional<std::unordered_set<std::shared_ptr<Tensor>, TensorPtrHash, TensorPtrEqual>> _visited = {};
 
+	/* Internal functionality */
+
 	// Computes the strides of the tensor using the given dimensions.
 	static std::vector<int> compute_strides(const std::vector<int>& dims);
 
@@ -343,7 +345,7 @@ private:
 	static void build_topo(const std::shared_ptr<Tensor>& t, std::vector<std::shared_ptr<Tensor>>& topo,
 		std::unordered_set<std::shared_ptr<Tensor>, TensorPtrHash, TensorPtrEqual>& visited);
 
-	// Returns the tensor to write the result of the current autograd graph operation into.
+	// Returns the tensor instance to write the result of the current autograd graph operation into.
 	static std::shared_ptr<Tensor> get_result_tensor(const std::shared_ptr<Tensor>& owner, const std::vector<int>& dims, bool requires_grad);
 };
 
