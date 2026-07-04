@@ -2,6 +2,8 @@
 #include "Tensor.h"
 #include "MathUtils.h"
 
+/* Tensor operations - autograd graph connected */
+
 std::shared_ptr<Tensor> Tensor::add(const std::shared_ptr<Tensor>& a, const std::shared_ptr<Tensor>& b)
 {
 	const auto& owner = a->requires_grad ? a : b;

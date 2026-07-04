@@ -201,20 +201,20 @@ std::shared_ptr<Tensor> Tensor::transpose(const std::shared_ptr<Tensor>& t, cons
 			{
 				if (!t->requires_grad) return;
 
-				thread_local std::vector<int> src_indices;
-				thread_local std::vector<int> dst_indices;
-				src_indices.resize(axes_length);
-				dst_indices.resize(axes_length);
+				thread_local std::vector<int> grad_src_indices;
+				thread_local std::vector<int> grad_dst_indices;
+				grad_src_indices.resize(axes_length);
+				grad_dst_indices.resize(axes_length);
 
 				// Map result gradient to input gradient
 				for (int i = 0; i < element_count; ++i)
 				{
-					result->get_full_indices(i, src_indices.data());
+					result->get_full_indices(i, grad_src_indices.data());
 					for (int j = 0; j < axes_length; ++j)
 					{
-						dst_indices[j] = src_indices[inv_axes->operator[](j)];
+						grad_dst_indices[j] = grad_src_indices[inv_axes->operator[](j)];
 					}
-					t->_grad[t->linear_index(dst_indices)] += result->_grad[i];
+					t->_grad[t->linear_index(grad_dst_indices)] += result->_grad[i];
 				}
 			};
 	}
