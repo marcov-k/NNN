@@ -2,16 +2,22 @@
 #include "Tensor.h"
 #include "MathUtils.h"
 
+/* Activation functions - autograd graph connected */
+
+// Applies the Rectified Linear Unit function to a tensor.
 std::shared_ptr<Tensor> Tensor::relu(const std::shared_ptr<Tensor>& t)
 {
 	auto result = get_result_tensor(t, t->_dimensions, t->requires_grad);
 
+	// Apply ReLU -> r = max(t, 0) = t (t > 0); 0 (t <= 0)
 	MathUtils::vector_max(t->_data, 0.0, result->_data);
 
+	// Connect result tensor to autograd graph if needed
 	if (!inference)
 	{
 		result->_parents.push_back(t);
 
+		// Gradient calculation function -> dr/dt = 1 (t > 0); 0 (t <= 0)
 		result->_backward = [t, result]()
 			{
 				if (!t->requires_grad) return;
@@ -79,6 +85,8 @@ std::shared_ptr<Tensor> Tensor::leaky_relu(const std::shared_ptr<Tensor>& t, dou
 
 	result->_data = t->_data;
 
+	// Apply Leaky ReLU -> r = t (t > 0); tau * t (t <= 0)
+
 	const size_t n = result->element_count();
 
 	const __m256d reg_tau = _mm256_set1_pd(tau);
@@ -117,10 +125,12 @@ std::shared_ptr<Tensor> Tensor::leaky_relu(const std::shared_ptr<Tensor>& t, dou
 		}
 	}
 
+	// Connect result tensor to autograd graph if needed
 	if (!inference)
 	{
 		result->_parents.push_back(t);
 
+		// Gradient calculation function -> dr/dt = 1 (t > 0); tau (t <= 0)
 		result->_backward = [t, tau, result, n]()
 			{
 				const double* const __restrict p_tv = t->_data.data();
@@ -181,12 +191,15 @@ std::shared_ptr<Tensor> Tensor::sigmoid(const std::shared_ptr<Tensor>& t)
 {
 	auto result = get_result_tensor(t, t->_dimensions, t->requires_grad);
 
+	// Apply Sigmoid -> r = 1 / (1 + e^(-t))
 	MathUtils::vector_sigmoid(t->_data, result->_data);
 
+	// Connect result tensor to autograd graph if needed
 	if (!inference)
 	{
 		result->_parents.push_back(t);
 
+		// Gradient calculation function -> dr/dt = Sigmoid(t) * (1 - Sigmoid(t))
 		result->_backward = [t, result]()
 			{
 				if (!t->requires_grad) return;
@@ -208,12 +221,15 @@ std::shared_ptr<Tensor> Tensor::tanh(const std::shared_ptr<Tensor>& t)
 {
 	auto result = get_result_tensor(t, t->_dimensions, t->requires_grad);
 
+	// Apply Tanh -> r = (e^(2t) - 1) / (e^(2t) + 1)
 	MathUtils::vector_tanh(t->_data, result->_data);
 
+	// Connect result tensor to autograd graph if needed
 	if (!inference)
 	{
 		result->_parents.push_back(t);
 
+		// Gradient calculation function -> dr/dt = 1 - Tanh^2(t)
 		result->_backward = [t, result]()
 			{
 				if (!t->requires_grad) return;
@@ -238,19 +254,19 @@ std::shared_ptr<Tensor> Tensor::softmax(const std::shared_ptr<Tensor>& t)
 	const size_t classes = t->_dimensions.back();
 	const size_t batches = t->element_count() / classes;
 
+	// Apply Softmax per batch -> Softmax(z_i) = e^z_i / (sum(j = 1 to n)[e^z_j])
 	for (size_t b = 0; b < batches; ++b)
 	{
 		const size_t offset = b * classes;
 
-		std::span<const double> t_slice(t->_data.begin() + offset, classes);
+		const double* const __restrict p_t = t->_data.data() + offset;
+		double* const __restrict p_r = result->_data.data() + offset;
 
-		const double max = MathUtils::vector_max(t_slice);
+		const double max = MathUtils::vector_max(p_t, classes);
 
 		const __m256d reg_max = _mm256_set1_pd(max);
 		__m256d acc0 = _mm256_setzero_pd();
 		__m256d acc1 = _mm256_setzero_pd();
-		const double* const __restrict p_t = t_slice.data();
-		double* const __restrict p_r = result->_data.data() + offset;
 
 		size_t i = 0;
 		for (; i + 8 <= classes; i += 8)
@@ -283,13 +299,16 @@ std::shared_ptr<Tensor> Tensor::softmax(const std::shared_ptr<Tensor>& t)
 			sum += exp;
 		}
 
+		// Normalize result values
 		MathUtils::vector_div(p_r, sum, classes);
 	}
 
+	// Connect result tensor to autograd graph if needed
 	if (!inference)
 	{
 		result->_parents.push_back(t);
 
+		// Gradient calculation function -> grad_t_i = r_i * (grad_r_i - sum_j(grad_r_j * r_j))
 		result->_backward = [t, result, batches, classes]()
 			{
 				if (!t->requires_grad) return;
@@ -302,6 +321,7 @@ std::shared_ptr<Tensor> Tensor::softmax(const std::shared_ptr<Tensor>& t)
 				const double* const __restrict p_rv = result->_data.data();
 				const double* const __restrict p_rg = result->_grad.data();
 
+				// Compute gradients per batch
 				for (size_t b = 0; b < batches; ++b)
 				{
 					const size_t offset = b * classes;

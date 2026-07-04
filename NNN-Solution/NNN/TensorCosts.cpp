@@ -2,17 +2,23 @@
 #include "Tensor.h"
 #include "MathUtils.h"
 
+/* Cost functions - per-element - autograd graph connected */
+
+// Computes the Mean Squared Error loss of a tensor based on the given target tensor.
 std::shared_ptr<Tensor> Tensor::mse(const std::shared_ptr<Tensor>& t, const std::shared_ptr<const Tensor>& target)
 {
 	auto result = get_result_tensor(t, t->_dimensions, t->requires_grad);
 
+	// Compute MSE loss -> L = (y_hat - y)^2
 	MathUtils::vector_sub(t->_data, target->_data, result->_data);
 	MathUtils::vector_sq(result->_data);
 
+	// Connect result tensor to autograd graph if needed
 	if (!inference)
 	{
 		result->_parents.push_back(t);
 
+		// Gradient calculation function -> dL/dy_hat = 2 * (y_hat - y)
 		result->_backward = [t, target, result]()
 			{
 				if (!t->requires_grad) return;
@@ -34,6 +40,7 @@ std::shared_ptr<Tensor> Tensor::huber(const std::shared_ptr<Tensor>& t, const st
 {
 	auto result = get_result_tensor(t, t->_dimensions, t->requires_grad);
 
+	// Compute pseudo-Huber loss -> L = d^2 * (sqrt(1 + ((y - y_hat) / d)^2) - 1)
 	MathUtils::vector_sub(target->_data, t->_data, result->_data);
 	MathUtils::vector_div(result->_data, delta);
 	MathUtils::vector_sq(result->_data);
@@ -42,10 +49,12 @@ std::shared_ptr<Tensor> Tensor::huber(const std::shared_ptr<Tensor>& t, const st
 	MathUtils::vector_sub(result->_data, 1.0);
 	MathUtils::vector_mul(result->_data, delta * delta);
 
+	// Connect result tensor to autograd graph if needed
 	if (!inference)
 	{
 		result->_parents.push_back(t);
 
+		// Gradient calculation function -> dL/dy_hat = - (y - y_hat) / sqrt(1 + ((y - y_hat) / d)^2)
 		result->_backward = [t, target, delta, result]()
 			{
 				if (!t->requires_grad) return;
@@ -78,13 +87,14 @@ std::shared_ptr<Tensor> Tensor::softmax_cross_entropy(const std::shared_ptr<Tens
 
 	std::shared_ptr<Tensor> result = get_result_tensor(t, {(int)batches, 1}, t->requires_grad);
 
-	auto probs = std::make_shared<std::vector<double>>(element_count);
+	auto probs = std::make_shared<std::vector<double>>(element_count); // allow backward lambda to capture pointer (avoids copy allocation)
 
 	const double* __restrict t_data = t->_data.data();
 	double* __restrict p_data = probs->data();
 	const double* __restrict y_data = target->_data.data();
 	double* __restrict r_data = result->_data.data();
 
+	// Compute Softmax Cross-Entropy loss per batch -> L = -sum(i = 1 to c)[y_i * ln(p_i)]; p_i = e^z_i / sum_c(e^z_c)
 	for (size_t b = 0; b < batches; ++b)
 	{
 		const size_t offset = b * classes;
@@ -148,10 +158,12 @@ std::shared_ptr<Tensor> Tensor::softmax_cross_entropy(const std::shared_ptr<Tens
 		r_data[b] = loss;
 	}
 
+	// Connect result tensor to autograd graph if needed
 	if (!inference)
 	{
 		result->_parents.push_back(t);
 
+		// Gradient calculation function -> dL/dz_i = p_i - y_i
 		result->_backward = [t, target, result, probs, batches, classes]()
 			{
 				if (!t->requires_grad) return;
@@ -164,6 +176,7 @@ std::shared_ptr<Tensor> Tensor::softmax_cross_entropy(const std::shared_ptr<Tens
 				const double* __restrict r_grad = result->_grad.data();
 				double* __restrict t_grad = t->_grad.data();
 
+				// Calculate gradient per batch
 				for (size_t b = 0; b < batches; ++b)
 				{
 					const size_t offset = b * classes;

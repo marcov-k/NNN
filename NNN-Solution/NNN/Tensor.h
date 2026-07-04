@@ -278,7 +278,7 @@ public:
 	// Applies the Softmax function to a tensor.
 	static std::shared_ptr<Tensor> softmax(const std::shared_ptr<Tensor>& t);
 
-	/* Cost functions */
+	/* Cost functions - per-element */
 
 	// Computes the Mean Squared Error loss of a tensor based on the given target tensor.
 	static std::shared_ptr<Tensor> mse(const std::shared_ptr<Tensor>& t, const std::shared_ptr<const Tensor>& target);
