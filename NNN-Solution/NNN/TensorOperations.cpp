@@ -4,19 +4,23 @@
 
 /* Tensor operations - autograd graph connected */
 
+// Adds two tensors -> r = a + b
 std::shared_ptr<Tensor> Tensor::add(const std::shared_ptr<Tensor>& a, const std::shared_ptr<Tensor>& b)
 {
 	const auto& owner = a->requires_grad ? a : b;
 	auto result = get_result_tensor(owner, owner->_dimensions, a->requires_grad || b->requires_grad);
 
+	// Compute addition result
 	MathUtils::vector_add(a->_data, b->_data, result->_data);
 
+	// Connect result tensor to autograd graph if needed
 	if (!inference)
 	{
 		result->_parents.reserve(result->_parents.size() + 2);
 		result->_parents.push_back(a);
 		result->_parents.push_back(b);
 
+		// Gradient calculation function -> dr/da = 1; dr/db = 1
 		result->_backward = [a, b, result]()
 			{
 				if (!a->requires_grad && !b->requires_grad) return;
@@ -33,12 +37,15 @@ std::shared_ptr<Tensor> Tensor::add(const std::shared_ptr<Tensor>& a, double b)
 {
 	auto result = get_result_tensor(a, a->_dimensions, a->requires_grad);
 
+	// Compute addition result
 	MathUtils::vector_add(a->_data, b, result->_data);
 
+	// Connect result tensor to autograd graph if needed
 	if (!inference)
 	{
 		result->_parents.push_back(a);
 
+		// Gradient calculation function -> dr/da = 1
 		result->_backward = [a, result]()
 			{
 				if (!a->requires_grad) return;
@@ -55,14 +62,17 @@ std::shared_ptr<Tensor> Tensor::sub(const std::shared_ptr<Tensor>& a, const std:
 	const auto& owner = a->requires_grad ? a : b;
 	auto result = get_result_tensor(owner, owner->_dimensions, a->requires_grad || b->requires_grad);
 
+	// Compute subtraction result
 	MathUtils::vector_sub(a->_data, b->_data, result->_data);
 
+	// Connect result tensor to autograd graph if needed
 	if (!inference)
 	{
 		result->_parents.reserve(result->_parents.size() + 2);
 		result->_parents.push_back(a);
 		result->_parents.push_back(b);
 
+		// Gradient calculation function -> dr/da = 1; dr/db = -1
 		result->_backward = [a, b, result]()
 			{
 				if (!a->requires_grad && !b->requires_grad) return;
@@ -79,12 +89,15 @@ std::shared_ptr<Tensor> Tensor::sub(const std::shared_ptr<Tensor>& a, double b)
 {
 	auto result = get_result_tensor(a, a->_dimensions, a->requires_grad);
 
+	// Compute subtraction result
 	MathUtils::vector_sub(a->_data, b, result->_data);
 
+	// Connect result tensor to autograd graph
 	if (!inference)
 	{
 		result->_parents.push_back(a);
 
+		// Gradient calculation function -> dr/da = 1
 		result->_backward = [a, result]()
 			{
 				if (!a->requires_grad) return;
@@ -100,12 +113,15 @@ std::shared_ptr<Tensor> Tensor::sub(double a, const std::shared_ptr<Tensor>& b)
 {
 	auto result = get_result_tensor(b, b->_dimensions, b->requires_grad);
 
+	// Compute subtraction result
 	MathUtils::vector_sub(a, b->_data, result->_data);
 
+	// Connect result tensor to autograd graph if needed
 	if (!inference)
 	{
 		result->_parents.push_back(b);
 
+		// Gradient calculation function -> dr/db = -1
 		result->_backward = [b, result]()
 			{
 				if (!b->requires_grad) return;
@@ -122,14 +138,17 @@ std::shared_ptr<Tensor> Tensor::mul(const std::shared_ptr<Tensor>& a, const std:
 	const auto& owner = a->requires_grad ? a : b;
 	auto result = get_result_tensor(owner, owner->_dimensions, a->requires_grad || b->requires_grad);
 
+	// Compute multiplication result
 	MathUtils::vector_mul(a->_data, b->_data, result->_data);
 
+	// Connect result tensor to autograd graph if needed
 	if (!inference)
 	{
 		result->_parents.reserve(result->_parents.size() + 2);
 		result->_parents.push_back(a);
 		result->_parents.push_back(b);
 
+		// Gradient calculation function -> dr/da = b; dr/db = 1
 		result->_backward = [a, b, result]()
 			{
 				if (!a->requires_grad && !b->requires_grad) return;
@@ -146,12 +165,15 @@ std::shared_ptr<Tensor> Tensor::mul(const std::shared_ptr<Tensor>& a, double b)
 {
 	auto result = get_result_tensor(a, a->_dimensions, a->requires_grad);
 
+	// Compute multiplication result
 	MathUtils::vector_mul(a->_data, b, result->_data);
 
+	// Connect result tensor to autograd graph if needed
 	if (!inference)
 	{
 		result->_parents.push_back(a);
 
+		// Gradient calculation function -> dr/da = b
 		result->_backward = [a, b, result]()
 			{
 				if (!a->requires_grad) return;
@@ -168,14 +190,17 @@ std::shared_ptr<Tensor> Tensor::div(const std::shared_ptr<Tensor>& a, const std:
 	const auto& owner = a->requires_grad ? a : b;
 	auto result = get_result_tensor(owner, owner->_dimensions, a->requires_grad || b->requires_grad);
 
+	// Compute division result
 	MathUtils::vector_div(a->_data, b->_data, result->_data);
 
+	// Connect result tensor to autograd graph if needed
 	if (!inference)
 	{
 		result->_parents.reserve(result->_parents.size() + 2);
 		result->_parents.push_back(a);
 		result->_parents.push_back(b);
 
+		// Gradient calculation function -> dr/da = 1 / b; dr/db = a / b^2
 		result->_backward = [a, b, result]()
 			{
 				if (!a->requires_grad && !b->requires_grad) return;
@@ -208,12 +233,15 @@ std::shared_ptr<Tensor> Tensor::div(const std::shared_ptr<Tensor>& a, double b)
 {
 	auto result = get_result_tensor(a, a->_dimensions, a->requires_grad);
 
+	// Compute division result
 	MathUtils::vector_div(a->_data, b, result->_data);
 
+	// Connect result tensor to autograd graph if needed
 	if (!inference)
 	{
 		result->_parents.push_back(a);
 
+		// Gradient calculation function -> dr/da = 1 / b
 		const double recip_b = 1.0 / b;
 		result->_backward = [a, recip_b, result]()
 			{
@@ -230,12 +258,15 @@ std::shared_ptr<Tensor> Tensor::div(double a, const std::shared_ptr<Tensor>& b)
 {
 	auto result = get_result_tensor(b, b->_dimensions, b->requires_grad);
 
+	// Compute division result
 	MathUtils::vector_div(a, b->_data, result->_data);
 
+	// Connect result tensor to autograd graph if needed
 	if (!inference)
 	{
 		result->_parents.push_back(b);
 
+		// Gradient calculation function -> dr/db = a / b^2
 		result->_backward = [a, b, result]()
 			{
 				if (!b->requires_grad) return;
@@ -261,14 +292,17 @@ std::shared_ptr<Tensor> Tensor::pow(const std::shared_ptr<Tensor>& a, const std:
 	const auto& owner = a->requires_grad ? a : exp;
 	auto result = get_result_tensor(owner, owner->_dimensions, a->requires_grad || exp->requires_grad);
 
+	// Compute exponentiation result
 	MathUtils::vector_pow(a->_data, exp->_data, result->_data);
 
+	// Connect result tensor to autograd graph if needed
 	if (!inference)
 	{
 		result->_parents.reserve(result->_parents.size() + 2);
 		result->_parents.push_back(a);
 		result->_parents.push_back(exp);
 
+		// Gradient calculation function -> dr/da = exp * a^(exp - 1); dr/dexp = a^exp * ln(a)
 		result->_backward = [a, exp, result]()
 			{
 				if (!a->requires_grad && !exp->requires_grad) return;
@@ -303,12 +337,15 @@ std::shared_ptr<Tensor> Tensor::pow(const std::shared_ptr<Tensor>& a, double exp
 {
 	auto result = get_result_tensor(a, a->_dimensions, a->requires_grad);
 
+	// Compute exponentiation result
 	MathUtils::vector_pow(a->_data, exp, result->_data);
 
+	// Connect result tensor to autograd graph if needed
 	if (!inference)
 	{
 		result->_parents.push_back(a);
 
+		// Gradient calculation function -> dr/da = exp * a^(exp - 1)
 		const double exp_sub = exp - 1.0;
 		result->_backward = [a, exp, exp_sub, result]()
 			{
@@ -332,12 +369,15 @@ std::shared_ptr<Tensor> Tensor::pow(double a, const std::shared_ptr<Tensor>& exp
 {
 	auto result = get_result_tensor(exp, exp->_dimensions, exp->requires_grad);
 
+	// Compute exponentiation result
 	MathUtils::vector_pow(a, exp->_data, result->_data);
 
+	// Connect result tensor to autograd graph
 	if (!inference)
 	{
 		result->_parents.push_back(exp);
 
+		// Gradient calculation function -> dr/dexp = a^exp * ln(a)
 		const double a_ln = std::log(a);
 		result->_backward = [a_ln, exp, result]()
 			{
@@ -360,12 +400,15 @@ std::shared_ptr<Tensor> Tensor::exp(const std::shared_ptr<Tensor>& t)
 {
 	auto result = get_result_tensor(t, t->_dimensions, t->requires_grad);
 
+	// Compute natural exponentiation result
 	MathUtils::vector_exp(t->_data, result->_data);
 
+	// Connect result tensor to autograd graph if needed
 	if (!inference)
 	{
 		result->_parents.push_back(t);
 
+		// Gradient calculation function -> dr/dt = e^t
 		result->_backward = [t, result]()
 			{
 				if (!t->requires_grad) return;
@@ -382,14 +425,17 @@ std::shared_ptr<Tensor> Tensor::log(const std::shared_ptr<Tensor>& arg, const st
 	const auto& owner = arg->requires_grad ? arg : log_base;
 	auto result = get_result_tensor(owner, owner->_dimensions, arg->requires_grad || log_base->requires_grad);
 
+	// Compute logarithm result
 	MathUtils::vector_log(arg->_data, log_base->_data, result->_data);
 
+	// Connect result tensor to autograd graph if needed
 	if (!inference)
 	{
 		result->_parents.reserve(result->_parents.size() + 2);
 		result->_parents.push_back(arg);
 		result->_parents.push_back(log_base);
 
+		// Gradient calculation function -> dr/darg = 1 / (arg * ln(base)); dr/dbase = ln(arg) / (base * ln^2(base))
 		result->_backward = [arg, log_base, result]()
 			{
 				if (!arg->requires_grad && !log_base->requires_grad) return;
@@ -428,12 +474,15 @@ std::shared_ptr<Tensor> Tensor::log(const std::shared_ptr<Tensor>& arg, double l
 {
 	auto result = get_result_tensor(arg, arg->_dimensions, arg->requires_grad);
 
+	// Compute logarithm result
 	MathUtils::vector_log(arg->_data, log_base, result->_data);
 
+	// Connect result tensor to autograd graph if needed
 	if (!inference)
 	{
 		result->_parents.push_back(arg);
 
+		// Gradient calculation function -> dr/darg = 1 / (arg * ln(arg))
 		const double base_ln = std::log(log_base);
 		result->_backward = [arg, base_ln, result]()
 			{
@@ -459,12 +508,15 @@ std::shared_ptr<Tensor> Tensor::log(double arg, const std::shared_ptr<Tensor>& l
 {
 	auto result = get_result_tensor(log_base, log_base->_dimensions, log_base->requires_grad);
 
+	// Compute logarithm result
 	MathUtils::vector_log(arg, log_base->_data, result->_data);
 
+	// Connect result tensor to autograd graph
 	if (!inference)
 	{
 		result->_parents.push_back(log_base);
 
+		// Gradient calculation function -> dr/dbase = ln(arg) / (base * ln^2(base))
 		const double arg_ln = std::log(arg);
 		result->_backward = [arg_ln, log_base, result]()
 			{
@@ -492,12 +544,15 @@ std::shared_ptr<Tensor> Tensor::ln(const std::shared_ptr<Tensor>& t)
 {
 	auto result = get_result_tensor(t, t->_dimensions, t->requires_grad);
 
+	// Compute natural logarithm result
 	MathUtils::vector_ln(t->_data, result->_data);
 
+	// Connect result tensor to autograd graph if needed
 	if (!inference)
 	{
 		result->_parents.push_back(t);
 
+		// Gradient calculation function -> dr/dt = 1 / t
 		result->_backward = [t, result]()
 			{
 				if (!t->requires_grad) return;
@@ -516,6 +571,8 @@ std::shared_ptr<Tensor> Tensor::ln(const std::shared_ptr<Tensor>& t)
 
 std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const std::shared_ptr<Tensor>& b)
 {
+	// Compute matrix multiplication geometry
+
 	const int rank = a->rank();
 	const int m = a->_dimensions[rank - 2];
 	const int n = a->_dimensions[rank - 1];
@@ -538,6 +595,8 @@ std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const s
 	auto result = get_result_tensor(owner, result_dims, a->requires_grad || b->requires_grad);
 
 	const bool use_parallel = total_rows > 16 && (long)m * n * p > MATMUL_PARALLEL_THRESHOLD;
+
+	// Transpose b per batch
 	std::vector<double> b_t(b_mat_size * batch_size);
 	int b_src_off = 0;
 	for (int batch = 0; batch < batch_size; ++batch)
@@ -546,6 +605,7 @@ std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const s
 		MathUtils::transpose_matrix(b->_data.data(), b_t.data(), b_src_off, batch * b_mat_size, n, p);
 	}
 
+	// Compute matrix multiplication result per batch
 	#pragma warning(suppress: 6993)
 	#pragma omp parallel for if(use_parallel)
 	for (int row = 0; row < total_rows; ++row)
@@ -557,12 +617,14 @@ std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const s
 			batch * b_mat_size, batch * r_mat_size);
 	}
 
+	// Connect result to autograd graph if needed
 	if (!inference)
 	{
 		result->_parents.reserve(result->_parents.size() + 2);
 		result->_parents.push_back(a);
 		result->_parents.push_back(b);
 
+		// Gradient calculation function -> grad_a = grad_r @ b_T; grad_b = a_T @ grad_r
 		result->_backward = [a, a_mat_size, b, b_mat_size, b_batched, batch_size, m, n, p, result, r_mat_size]()
 			{
 				if (!a->requires_grad && !b->requires_grad) return;
@@ -572,6 +634,7 @@ std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const s
 				std::vector<double> a_t;
 				std::vector<double> d_out_t;
 
+				// Compute gradients per batch
 				int b_off = 0;
 				for (int batch = 0; batch < batch_size; ++batch)
 				{
@@ -587,6 +650,7 @@ std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const s
 						MathUtils::transpose_matrix(a->_data.data(), a_t.data(), a_off, 0, m, n);
 						MathUtils::transpose_matrix(result->_grad.data(), d_out_t.data(), r_off, 0, m, p);
 
+						// Compute grad_a = grad_r @ b_T
 						#pragma omp parallel for if(par)
 						for (int i = 0; i < m; ++i)
 						{
@@ -597,6 +661,7 @@ std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const s
 							}
 						}
 
+						// Compute grad_b = a_T @ grad_r
 						#pragma omp parallel for if(par && b_batched)
 						for (int k = 0; k < n; ++k)
 						{
@@ -609,6 +674,7 @@ std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const s
 					}
 					else if (a->requires_grad)
 					{
+						// Compute grad_a = grad_r @ b_T
 						#pragma omp parallel for if(par)
 						for (int i = 0; i < m; ++i)
 						{
@@ -627,6 +693,7 @@ std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const s
 						MathUtils::transpose_matrix(a->_data.data(), a_t.data(), a_off, 0, m, n);
 						MathUtils::transpose_matrix(result->_grad.data(), d_out_t.data(), r_off, 0, m, p);
 
+						// Compute grad_b = a_T @ grad_r
 						#pragma omp parallel for if(par && b_batched)
 						for (int k = 0; k < n; ++k)
 						{
@@ -646,7 +713,7 @@ std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const s
 
 std::shared_ptr<Tensor> Tensor::convolve(const std::shared_ptr<Tensor>& input, const std::shared_ptr<Tensor>& kernels)
 {
-
+	// Compute convolution geometry
 	ConvGeometry g;
 	g.batches = input->_dimensions[0];
 	g.spatial_rank = kernels->rank() - 2;
@@ -702,11 +769,12 @@ std::shared_ptr<Tensor> Tensor::convolve(const std::shared_ptr<Tensor>& input, c
 		g.kernel_kernel_offset[k] = kernel_offset + c;
 	}
 
-	std::vector<int> result_dims;
-	result_dims.reserve(g.spatial_rank + 2);
-	result_dims.push_back(g.batches);
-	for (int d : g.out_dims) result_dims.push_back(d);
-	result_dims.push_back(g.filter_count);
+	// Compute result dimensions
+	thread_local std::vector<int> result_dims;
+	result_dims.resize(g.spatial_rank + 2);
+	result_dims[0] = g.batches;
+	for (size_t d = 0; d < g.spatial_rank; ++d) result_dims[d + 1] = g.out_dims[d];
+	result_dims.back() = g.filter_count;
 
 	const auto& owner = input->requires_grad ? input : kernels;
 	auto result = get_result_tensor(owner, result_dims, input->requires_grad || kernels->requires_grad);
@@ -716,25 +784,29 @@ std::shared_ptr<Tensor> Tensor::convolve(const std::shared_ptr<Tensor>& input, c
 
 	const bool use_parallel = (long)g.batches * g.out_spatial_size * g.filter_count * g.kernel_volume_size > CONV_PARALLEL_THRESHOLD;
 
+	// Compute convolution - rotate kernels + im2col + matmul
 	MathUtils::kernels2matmul(kernels->_data.data(), g, kernels_mat->data());
 	MathUtils::im2col(input->_data.data(), g, input_col->data(), use_parallel);
 
 	MathUtils::matmul_raw(input_col->data(), kernels_mat->data(), result->_data.data(),
 		g.batches * g.out_spatial_size, g.kernel_volume_size, g.filter_count, 0, 0, 0, false, use_parallel);
 
+	// Connect result tensor to autograd graph if needed
 	if (!inference)
 	{
 		result->_parents.reserve(result->_parents.size() + 2);
 		result->_parents.push_back(input);
 		result->_parents.push_back(kernels);
 
+		// Gradient calculation function -> grad_input = convolve(grad_r, rotated kernels); grad_kernels = convolve(input, rotated grad_r)
 		result->_backward = [input, input_col, kernels, kernels_mat, result, g, use_parallel]()
 			{
 				thread_local std::vector<double> d_col;
 				thread_local std::vector<double> d_kernels_mat;
 				thread_local std::vector<double> d_out_t;
-				thread_local std::vector<double> tmp;
+				thread_local std::vector<double> kernels_grad_mat;
 
+				// Compute grad_input = convolve(grad_r, rotated kernels)
 				if (input->requires_grad)
 				{
 					d_col.assign(g.im2col_rows * g.im2col_cols, 0.0);
@@ -744,6 +816,7 @@ std::shared_ptr<Tensor> Tensor::convolve(const std::shared_ptr<Tensor>& input, c
 					MathUtils::col2im(d_col.data(), g, input->_grad.data(), use_parallel);
 				}
 
+				// Compute grad_kernels = convolve(input, rotated grad_r)
 				if (kernels->requires_grad)
 				{
 					d_kernels_mat.resize(kernels->element_count());
@@ -755,10 +828,10 @@ std::shared_ptr<Tensor> Tensor::convolve(const std::shared_ptr<Tensor>& input, c
 					MathUtils::matmul_raw(input_col->data(), d_out_t.data(), d_kernels_mat.data(),
 						g.kernel_volume_size, g.im2col_rows, g.filter_count, 0, 0, 0, true, use_parallel);
 
-					tmp.resize(kernels->element_count());
-					MathUtils::transpose_matrix(d_kernels_mat.data(), tmp.data(), 0, 0, g.kernel_volume_size, g.filter_count);
+					kernels_grad_mat.resize(kernels->element_count());
+					MathUtils::transpose_matrix(d_kernels_mat.data(), kernels_grad_mat.data(), 0, 0, g.kernel_volume_size, g.filter_count);
 
-					MathUtils::matmul2kernels(tmp.data(), g, kernels->_grad.data(), true);
+					MathUtils::matmul2kernels(kernels_grad_mat.data(), g, kernels->_grad.data(), true);
 				}
 			};
 	}
