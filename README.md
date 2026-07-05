@@ -1,7 +1,7 @@
 <div style="font-family: monospace; list-style-type: none; padding-left: 0; line-height: 1.5;">
  
 # Neural Network Notions
-A neural network framework created from scratch in C# implementing automatic differentiation, backpropagation, and customizable architectures for neural networks.
+A neural network framework created from scratch in C# and C++ implementing automatic differentiation, backpropagation, and customizable architectures for neural networks.
 
 ## Key Features
 - Deep Q-Network (DQN) training capabilities
@@ -12,6 +12,7 @@ A neural network framework created from scratch in C# implementing automatic dif
 - Standard activation functions (Sigmoid, Tanh, ReLU, etc.)
 - Standard loss functions (MSE, pseudo-Huber Loss, Softmax Cross-Entropy)
 - Standard optimizers (SGD, Adam)
+- Powerful C++ backend with C# interop
 - Performance optimizations via SIMD vectorization and parallelization
 - Custom file type for saving trained models (.nnn)
 
@@ -301,8 +302,8 @@ I originally intended for this project to simply be my experimentation with impl
  of failed attempts using the framework I had derived from the examples in _Deep Learning from Scratch_, I came to the realization that in order to support more complex networks while also maintaining sufficiently high
  performance to train such networks on my own personal computer, I would have to completely rewrite the entire framework. At this point I discovered the automatic differentiation algorithms used by libraries such as
  PyTorch, and decided that my new framework would follow a similar approach. Additionally, in order to gain as thorough of an understanding of the mathematics and logic behind these systems, I opted to avoid using
- any features not provided in the standard C# library, which I also believed would provide me with valuable experience in designing full-scale frameworks from scratch. Now, many months after I first began experimenting
- with the Neural Network Nonsense project, I can proudly say that those initial efforts have grown into something far larger than I could have ever anticipated.
+ any features not provided in the C# and C++ standard libraries, which I also believed would provide me with valuable experience in designing full-scale frameworks from scratch. Now, many months after I first began
+ experimenting with the Neural Network Nonsense project, I can proudly say that those initial efforts have grown into something far larger than I could have ever anticipated.
 
 ## Example
 ```
@@ -368,7 +369,34 @@ The framework's equivalent of an autograd engine relies on functionality built d
 
 ## Organization
 NNN-Solution - Directory (Full project solution)\
-├── NNN - Directory (Core class library for the NNN framework)\
+├── NNN - Directory (C++ backend DLL)\
+│&emsp;&ensp;├── Header Files - Solution Directory\
+│&emsp;&ensp;│&emsp;&ensp;├── DataContainers - Header File (POD struct implementations)\
+│&emsp;&ensp;│&emsp;&ensp;├── exports - Header File (DLL export function declarations)\
+│&emsp;&ensp;│&emsp;&ensp;├── framework - Header File (Standard framework header)\
+│&emsp;&ensp;│&emsp;&ensp;├── MathUtils - Header File (Math vectorization and utility function declarations)\
+│&emsp;&ensp;│&emsp;&ensp;├── Models - Header File (Model-level function declarations)\
+│&emsp;&ensp;│&emsp;&ensp;├── Optimizers - Header File (Optimizer function declarations)\
+│&emsp;&ensp;│&emsp;&ensp;├── pch - Header File (Standard precompiled header)\
+│&emsp;&ensp;│&emsp;&ensp;└── Tensor - Header File (Tensor class header and function declarations)\
+│&emsp;&ensp;│\
+│&emsp;&ensp;└── Source Files - Solution Directory\
+│&emsp;&emsp;&emsp;&ensp;├── dllmain - C++ Script (Standard DLL boilerplate)\
+│&emsp;&emsp;&emsp;&ensp;├── exports - C++ Script (DLL export function implementations)\
+│&emsp;&emsp;&emsp;&ensp;├── MathUtils - C++ Script (Math vectorization and utility function implementations)\
+│&emsp;&emsp;&emsp;&ensp;├── Models - C++ Script (Model-level function implementations)\
+│&emsp;&emsp;&emsp;&ensp;├── Optimizers - C++ Script (Optimizer function implementations)\
+│&emsp;&emsp;&emsp;&ensp;├── pch - C++ Script (Standard procompiled header script)\
+│&emsp;&emsp;&emsp;&ensp;├── TensorActivations - C++ Script (Tensor activation function implementations)\
+│&emsp;&emsp;&emsp;&ensp;├── TensorCosts - C++ Script (Tensor cost function implementations)\
+│&emsp;&emsp;&emsp;&ensp;├── TensorGraph - C++ Script (Autograd graph function implementations)\
+│&emsp;&emsp;&emsp;&ensp;├── TensorIndexing - C++ Script (Tensor property access implementations)\
+│&emsp;&emsp;&emsp;&ensp;├── TensorInitializations - C++ Script (Tensor initialization implementations)\
+│&emsp;&emsp;&emsp;&ensp;├── TensorOperations - C++ Script (Tensor operation implementations)\
+│&emsp;&emsp;&emsp;&ensp;├── TensorProperties - C++ Script (Tensor property initializations)\
+│&emsp;&emsp;&emsp;&ensp;└── TensorUtilities - C++ Script (Tensor utility function implementations)\
+│\
+├── NNNCSharp - Directory (C# implementations for interop with C++ backend)\
 │&emsp;&ensp;└── Components - Directory\
 │&emsp;&emsp;&emsp;&ensp;├── Activations - Directory (Activation function classes)\
 │&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── Activation - C# Script (Base class)\
@@ -379,13 +407,7 @@ NNN-Solution - Directory (Full project solution)\
 │&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;└── Tanh - C# Script\
 │&emsp;&emsp;&emsp;&ensp;│\
 │&emsp;&emsp;&emsp;&ensp;├── Autodiff - Directory (Automatic differentation and tensor logic - implemented via a partial Tensor class)\
-│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── TensorActivations - C# Script (Tensor implementations of activation functions)\
-│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── TensorGraph - C# Script (Functions for handling computation graph)\
-│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── TensorIndexing - C# Script (Functions for indexing tensors)\
-│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── TensorInitializations - C# Script (Functions for initializing tensors)\
-│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── TensorOperations - C# Script (Tensor implementations of mathematical operations)\
-│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── TensorProperties - C# Script (All tensor class properties)\
-│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;└── TensorUtilities - C# Script (Various utility functions for tensors)\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;└── Tensor - C# Script (Wrapper for interop with C++ tensor logic)\
 │&emsp;&emsp;&emsp;&ensp;│\
 │&emsp;&emsp;&emsp;&ensp;├── Buffers - Directory\
 │&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── BatchBuffer - C# Script (Standard supervised training buffer)\
@@ -408,6 +430,10 @@ NNN-Solution - Directory (Full project solution)\
 │&emsp;&emsp;&emsp;&ensp;├── Episodes - Directory (Data structures for DQN experience storage)\
 │&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── Episode - C# Script (Data structure for a full DQN training episode)\
 │&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;└── Experience - C# Script (Data structure for a single DQN training experience)\
+│&emsp;&emsp;&emsp;&ensp;│\
+│&emsp;&emsp;&emsp;&ensp;├── Interop - Directory (C# interop with C++ backend)\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── NativeMethods - C# Script (DLL imports for C++ backend methods)\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;└── TensorSafeHandle - C# Script (Safe handle for C# Tensor wrapper)\
 │&emsp;&emsp;&emsp;&ensp;│\
 │&emsp;&emsp;&emsp;&ensp;├── Models - Directory (Neural network functionality)\
 │&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── Layers - Directory\
@@ -443,6 +469,9 @@ NNN-Solution - Directory (Full project solution)\
 ├── NNNExplorer - Directory (NNN file viewer - for viewing .nnn files)\
 │&emsp;&ensp;└── NNNExplorer - C# Script (NNN file viewer program script)\
 │\
+├── NNNTester - Directory (Program for testing changes made to C# and C++ implementations)\
+│&emsp;&ensp;└── NNNTester - C# Script (NNN tester program script)\
+│\
 └── NNNTrainer - Directory (Program for training neural networks using the NNN framework)\
 &emsp;&emsp;└── NNNTrainer - C# Script (NNN trainer program script)
 
@@ -473,6 +502,7 @@ NNN-Solution - Directory (Full project solution)\
 - #### Dense:
   - Neuron Count -> int32 (4 bytes) -> number of neurons in the layer
   - Weights -> tensor ([see formatting](#tensor-format)) -> weights parameter of the layer
+  - Flatten -> boolean ([see formatting](#boolean-format)) -> whether the layer flattens its input prior to applying weights
 
 - #### Conv:
   - Filter Count -> int32 (4 bytes) -> number of filters in the layer

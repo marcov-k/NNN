@@ -1,16 +1,16 @@
-﻿using NNN.Components.Activations;
-using NNN.Components.Autodiff;
-using NNN.Components.Buffers;
-using NNN.Components.Costs;
-using NNN.Components.Environments;
-using NNN.Components.Episodes;
-using NNN.Components.Models;
-using NNN.Components.Models.Layers;
-using NNN.Components.Optimizers;
-using NNN.Components.Trainers;
-using NNN.Components.Utilities.DataLoaders;
-using NNN.Components.Utilities.SaveSystem;
-using static NNN.Components.Utilities.UIUtils;
+﻿using NNNCSharp.Components.Activations;
+using NNNCSharp.Components.Autodiff;
+using NNNCSharp.Components.Buffers;
+using NNNCSharp.Components.Costs;
+using NNNCSharp.Components.Environments;
+using NNNCSharp.Components.Episodes;
+using NNNCSharp.Components.Models;
+using NNNCSharp.Components.Models.Layers;
+using NNNCSharp.Components.Optimizers;
+using NNNCSharp.Components.Trainers;
+using NNNCSharp.Components.Utilities.DataLoaders;
+using NNNCSharp.Components.Utilities.SaveSystem;
+using static NNNCSharp.Components.Utilities.UIUtils;
 
 namespace NNNTrainer;
 
@@ -41,7 +41,7 @@ public class NNNTrainer
     static void DQNTraining()
     {
         Model model;
-        NNN.Components.Environments.Environment env = new TicTacToe();
+        NNNCSharp.Components.Environments.Environment env = new TicTacToe();
         double exploration = 1.0;
         double explorationDecay = 0.9995;
         double minExploration = 0.01;
@@ -139,7 +139,7 @@ public class NNNTrainer
             model = new([
                 new Conv(8, [5, 5], new LeakyReLU(tau)),
             new Conv(16, [5, 5], new LeakyReLU(tau), convDropout),
-            new Dense(128, new LeakyReLU(tau), denseDropout),
+            new Dense(128, new LeakyReLU(tau), true, denseDropout),
             new Dense(10, new Linear())
             ], new([1, 28, 28, 1]));
         }
@@ -148,6 +148,7 @@ public class NNNTrainer
         double maxGradNorm = 0.5;
         Cost cost = new SoftmaxCrossEntropy();
         Trainer trainer = new(model, optimizer, cost, maxGradNorm);
+        double minLRFraction = 0.5;
 
         var wrappedImages = new Tensor[testImages.Length];
         for (int i = 0; i < testImages.Length; i++)
@@ -165,7 +166,7 @@ public class NNNTrainer
         int batchSize = 128;
         int testLength = testLabels.Length;
 
-        StandardTrainingLoop(trainer, batchBuffer, batchSize, testFunc, testLength);
+        StandardTrainingLoop(trainer, batchBuffer, batchSize, testFunc, true, minLRFraction, testLength);
 
         if (GetInput("Save model to a file? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
         {
@@ -181,7 +182,7 @@ public class NNNTrainer
     /// <param name="model">Model to train.</param>
     /// <param name="episodeBuffer">Buffer to store past training episodes in.</param>
     /// <param name="testEpisodes">Number of episodes to run per performance test.</param>
-    static void DQNTrainingLoop(DQNTrainer dqnTrainer, NNN.Components.Environments.Environment env, Model model,
+    static void DQNTrainingLoop(DQNTrainer dqnTrainer, NNNCSharp.Components.Environments.Environment env, Model model,
         ref FIFOBuffer<Episode> episodeBuffer, int testEpisodes)
     {
         // Train agent until user indicates to stop
@@ -220,7 +221,7 @@ public class NNNTrainer
     /// <param name="testFunc">Function to use to evaluate model performance.</param>
     /// <param name="testLength">Number of times to run the test function per performance test.</param>
     static void StandardTrainingLoop(Trainer trainer, BatchBuffer batchBuffer, int batchSize,
-        Func<Model, int, bool> testFunc, int testLength)
+        Func<Model, int, bool> testFunc, bool decayLR, double minLRFraction, int testLength)
     {
         // Train model until user indicates to stop
         while (true)
@@ -230,7 +231,8 @@ public class NNNTrainer
                 int epochs = GetInteger("Enter number of epochs to train");
                 int testEvery = GetInteger("Enter epochs per training progress test");
                 Console.WriteLine($"\n\nTraining for {epochs} epochs...");
-                trainer.Train(batchBuffer, batchSize, epochs, batchAllInputs: true, testFunc, testEvery: testEvery, testLength: testLength);
+                trainer.Train(batchBuffer, batchSize, epochs, batchAllInputs: true, testFunc, decayLR,
+                    minLRFraction, testEvery: testEvery, testLength: testLength);
             }
             else break;
         }

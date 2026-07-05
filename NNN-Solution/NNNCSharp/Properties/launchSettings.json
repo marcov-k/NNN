@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "NNNCSharp.Core": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "ASAN_WIN_CONTINUE_ON_INTERCEPTION_FAILURE": "true"
+      },
+      "debugEngines": "managed,native"
+    }
+  }
+}

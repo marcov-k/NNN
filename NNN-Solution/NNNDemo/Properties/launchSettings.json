@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "NNNDemo": {
+      "commandName": "Project",
+      "debugEngines": "managed,native"
+    }
+  }
+}

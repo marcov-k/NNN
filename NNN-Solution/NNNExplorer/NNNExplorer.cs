@@ -1,5 +1,5 @@
-﻿using NNN.Components.Utilities.SaveSystem;
-using static NNN.Components.Utilities.UIUtils;
+﻿using NNNCSharp.Components.Utilities.SaveSystem;
+using static NNNCSharp.Components.Utilities.UIUtils;
 
 namespace NNNExplorer;
 
