@@ -599,22 +599,22 @@ std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const s
 	const bool use_parallel = total_rows > 16 && (long)total_rows * n * p > MATMUL_PARALLEL_THRESHOLD;
 
 	// Transpose b
-	auto b_t = std::make_shared<std::vector<double>>(b_batched ? b_mat_size * batch_size : b_mat_size);
+	std::vector<double> b_t(b_batched ? b_mat_size * batch_size : b_mat_size);
 	if (b_batched)
 	{
 		for (size_t batch = 0; batch < batch_size; ++batch)
 		{
 			const size_t b_batch_off = batch * b_mat_size;
-			MathUtils::transpose_matrix(b->_data.data(), b_t->data(), b_batch_off, b_batch_off, n, p);
+			MathUtils::transpose_matrix(b->_data.data(), b_t.data(), b_batch_off, b_batch_off, n, p);
 		}
 	}
 	else
 	{
-		MathUtils::transpose_matrix(b->_data.data(), b_t->data(), 0, 0, n, p);
+		MathUtils::transpose_matrix(b->_data.data(), b_t.data(), 0, 0, n, p);
 	}
 
 	// Compute matrix multiplication result per batch
-	MathUtils::matmul_raw(a->_data.data(), b_t->data(), result->_data.data(), batch_size, m, n, p, a_mat_size,
+	MathUtils::matmul_raw(a->_data.data(), b_t.data(), result->_data.data(), batch_size, m, n, p, a_mat_size,
 		b_batch_stride, r_mat_size, 0, 0, 0, use_parallel, false);
 
 	// Connect result to autograd graph if needed
@@ -625,7 +625,7 @@ std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const s
 		result->_parents.push_back(b);
 
 		// Gradient calculation function -> grad_a = grad_r @ b_T; grad_b = a_T @ grad_r
-		result->_backward = [a, a_mat_size, b, b_t, b_mat_size, b_batched, b_batch_stride, total_rows,
+		result->_backward = [a, a_mat_size, b, b_mat_size, b_batched, b_batch_stride,
 			batch_size, m, n, p, result, r_mat_size, use_parallel]()
 			{
 				if (!a->requires_grad && !b->requires_grad) return;
