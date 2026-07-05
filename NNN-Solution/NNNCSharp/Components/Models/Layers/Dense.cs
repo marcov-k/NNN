@@ -17,6 +17,10 @@ public class Dense : Layer
     /// Tensor containing the weights parameters of the layer.
     /// </summary>
     public Tensor Weights { get; private set; } = new();
+    /// <summary>
+    /// Whether the layer flattens its input prior to applying weights.
+    /// </summary>
+    public bool Flatten { get; private set; }
 
     /// <summary>
     /// Creates a new dense neural network layer instance.
@@ -24,10 +28,11 @@ public class Dense : Layer
     /// <param name="neuronCount">Number of neurons in the new layer.</param>
     /// <param name="activation">Activation function of the new layer.</param>
     /// <param name="dropout">Dropout rate of the new layer.</param>
-    public Dense(int neuronCount, Activation activation, double dropout = 0.0)
+    public Dense(int neuronCount, Activation activation, bool flatten = false, double dropout = 0.0)
     {
         NeuronCount = neuronCount;
         Activation = activation;
+        Flatten = flatten;
         Dropout = dropout;
     }
 
@@ -39,12 +44,13 @@ public class Dense : Layer
     /// <param name="biases">Bias tensor of the new layer.</param>
     /// <param name="activation">Activation function of the new layer.</param>
     /// <param name="dropout">Dropout rate of the new layer.</param>
-    public Dense(int neuronCount, Tensor weights, Tensor biases, Activation activation, double dropout)
+    public Dense(int neuronCount, Tensor weights, Tensor biases, Activation activation, bool flatten, double dropout)
     {
         NeuronCount = neuronCount;
         Weights = weights;
         Biases = biases;
         Activation = activation;
+        Flatten = flatten;
         Dropout = dropout;
     }
 
@@ -64,8 +70,8 @@ public class Dense : Layer
 
     public override Tensor Forward(Tensor input)
     {
-        var flatInput = input.Rank > 2 ? Tensor.Flatten(input, 1) : input; // flatten input to a 2D (batch * state elements) tensor
-        var output = flatInput ^ Weights;
+        var output = Flatten ? Tensor.Flatten(input, 1) : input;
+        output ^= Weights;
         output += Tensor.Broadcast(Biases, output.Dimensions.ToArray());
         output = Activation.Forward(output);
 
@@ -85,25 +91,28 @@ public class Dense : Layer
 
     public override Layer Copy()
     {
-        return new Dense(NeuronCount, Weights.Copy(), Biases.Copy(), Activation.Copy(), Dropout);
+        return new Dense(NeuronCount, Weights.Copy(), Biases.Copy(), Activation.Copy(), Flatten, Dropout);
     }
 
     public override void WriteUniqueData(FileStream stream)
     {
         FileUtils.WriteInt32(stream, NeuronCount);
         FileUtils.WriteTensor(stream, Weights);
+        FileUtils.WriteBool(stream, Flatten);
     }
 
     protected override void ReadUniqueData(FileStream stream)
     {
         NeuronCount = FileUtils.ReadInt32(stream);
         Weights = FileUtils.ReadTensor(stream);
+        Flatten = FileUtils.ReadBool(stream);
     }
 
     protected override string PrintUniqueLayer(FileStream stream)
     {
         int neuronCount = FileUtils.ReadInt32(stream);
         string weights = $"Weights Tensor: {FileUtils.PrintTensor(stream)}";
-        return $"Neurons: {neuronCount}\n{weights}";
+        bool flatten = FileUtils.ReadBool(stream);
+        return $"Neurons: {neuronCount}\n{weights}\nFlatten: {flatten}";
     }
 }

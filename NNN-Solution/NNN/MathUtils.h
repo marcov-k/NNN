@@ -518,7 +518,7 @@ public:
 	}
 
 	// Vectorizes the dot product of a subrange of two vectors.
-	static double vector_dot(const double* __restrict a, const double* __restrict b, int a_off, int b_off, int n);
+	static double vector_dot(const double* __restrict a, const double* __restrict b, size_t a_off, size_t b_off, size_t n);
 
 	/* Vector limiting functions */
 
@@ -710,19 +710,21 @@ public:
 	/* Matrix operations */
 
 	// Computes the matrix multiplication of two vectors and writes the result into the provided vector -> r = a @ b_t
-	static void matmul_raw(const double* __restrict a, const double* __restrict b_t, double* __restrict r, int m, int n, int p,
-		int a_off, int b_t_off, int r_off, bool use_parallel, bool accumulate = false);
+	static void matmul_raw(const double* __restrict a, const double* __restrict b_t, double* __restrict r, size_t batch_count,
+		size_t m, size_t n, size_t p, size_t a_batch_stride, size_t b_t_batch_stride, size_t r_batch_stride, size_t a_off, size_t b_t_off,
+		size_t r_off, bool use_parallel, bool accumulate);
+
+	// Computes the matrix multiplication of two vectors and accumulates the reuslt into the provided vector.
+	static void matmul_reduce_raw(const double* __restrict a_t, const double* __restrict b_t, double* __restrict r, size_t batch_count,
+		size_t m, size_t n, size_t p, size_t a_t_batch_stride, size_t b_t_batch_stride, size_t a_t_off, size_t b_t_off, size_t r_off,
+		bool use_parallel, bool accumulate);
 
 	// Transposes the given matrix data vector and writes the result into the given vector.
-	static void transpose_matrix(const double* __restrict src, double* __restrict dst, int src_off, int dst_off,
-		int rows, int cols);
-
-	// Computes a single row of a matrix multiplication (for standard forward matmul in autograd graph)
-	static void compute_row(int i, int n, int p, const double* __restrict a, const double* __restrict b_t,
-		double* __restrict r, int a_off, int b_t_off, int r_off);
+	static void transpose_matrix(const double* __restrict src, double* __restrict dst, size_t src_off, size_t dst_off,
+		size_t rows, size_t cols);
 
 	// Computes the base_input position for im2col and col2im functions.
-	static int compute_output_position(int b, int op, const ConvGeometry& g);
+	static size_t compute_output_position(size_t b, size_t op, const ConvGeometry& g);
 
 	// Performs the im2col transformation on a matrix vector and writes the result into the provided vector.
 	static void im2col(const double* __restrict input, const ConvGeometry& g, double* __restrict input_col, bool use_parallel);

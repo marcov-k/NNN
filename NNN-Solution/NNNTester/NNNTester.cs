@@ -1,5 +1,5 @@
-﻿using NNNCSharp.Components.Costs;
-using NNNCSharp.Components.Interop;
+﻿using NNNCSharp.Components.Autodiff;
+using NNNCSharp.Components.Costs;
 
 namespace NNNTester;
 

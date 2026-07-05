@@ -1639,7 +1639,7 @@ double MathUtils::vector_dot(const double* const __restrict a, const double* con
 	return dot;
 }
 
-double MathUtils::vector_dot(const double* __restrict a, const double* __restrict b, int a_off, int b_off, int n)
+double MathUtils::vector_dot(const double* __restrict a, const double* __restrict b, size_t a_off, size_t b_off, size_t n)
 {
 	const double* const __restrict p_a = &a[a_off];
 	const double* const __restrict p_b = &b[b_off];
@@ -1647,7 +1647,7 @@ double MathUtils::vector_dot(const double* __restrict a, const double* __restric
 	__m256d acc0 = _mm256_setzero_pd();
 	__m256d acc1 = _mm256_setzero_pd();
 
-	int i = 0;
+	size_t i = 0;
 	for (; i + 8 <= n; i += 8)
 	{
 		__m256d reg_a0 = _mm256_loadu_pd(&p_a[i]);
@@ -2355,49 +2355,74 @@ void MathUtils::vector_tanh(double* const __restrict a, size_t n)
 /* Matrix operations */
 
 // Computes the matrix multiplication of two vectors and writes the result into the provided vector -> r = a @ b_t
-void MathUtils::matmul_raw(const double* __restrict a, const double* __restrict b_t, double* __restrict r, int m, int n, int p,
-	int a_off, int b_t_off, int r_off, bool use_parallel, bool accumulate)
+void MathUtils::matmul_raw(const double* __restrict a, const double* __restrict b_t, double* __restrict r, size_t batch_count,
+	size_t m, size_t n, size_t p, size_t a_batch_stride, size_t b_t_batch_stride, size_t r_batch_stride, size_t a_off,
+	size_t b_t_off, size_t r_off, bool use_parallel, bool accumulate)
 {
-	#pragma warning(disable : 6993)
-	#pragma omp parallel for if(use_parallel)
-	for (int i = 0; i < m; ++i)
+	#pragma warning (disable : 6993)
+	#pragma omp parallel for collapse(2) if(use_parallel)
+	for (size_t batch = 0; batch < batch_count; ++batch)
 	{
-		for (int j = 0; j < p; ++j)
+		for (size_t i = 0; i < m; ++i)
 		{
-			double val = vector_dot(a, b_t, a_off + i * n, b_t_off + j * n, n);
-			if (accumulate) r[r_off + i * p + j] += val;
-			else r[r_off + i * p + j] = val;
+			const size_t a_base = a_off + batch * a_batch_stride + i * n;
+			const size_t b_t_batch_off = b_t_off + batch * b_t_batch_stride;
+			const size_t r_base = r_off + batch * r_batch_stride + i * p;
+
+			for (size_t j = 0; j < p; ++j)
+			{
+				const double val = vector_dot(a, b_t, a_base, b_t_batch_off + j * n, n);
+				if (accumulate) r[r_base + j] += val;
+				else r[r_base + j] = val;
+			}
 		}
 	}
 }
 
-void MathUtils::transpose_matrix(const double* __restrict src, double* __restrict dst, int src_off, int dst_off,
-	int rows, int cols)
+void MathUtils::matmul_reduce_raw(const double* __restrict a_t, const double* __restrict b_t, double* __restrict r, size_t batch_count,
+	size_t m, size_t n, size_t p, size_t a_t_batch_stride, size_t b_t_batch_stride, size_t a_t_off, size_t b_t_off, size_t r_off,
+	bool use_parallel, bool accumulate)
 {
-	for (int r = 0; r < rows; ++r)
+	#pragma omp parallel for if(use_parallel)
+	for (size_t i = 0; i < m; ++i)
 	{
-		for (int c = 0; c < cols; ++c)
+		const size_t a_t_off_base = a_t_off + i * n;
+		const size_t r_off_base = r_off + i * p;
+		for (size_t j = 0; j < p; ++j)
+		{
+			double sum = 0.0;
+
+			const size_t b_t_off_base = b_t_off + j * n;
+			for (size_t batch = 0; batch < batch_count; ++batch)
+			{
+				sum += vector_dot(a_t, b_t, a_t_off_base + batch * a_t_batch_stride,
+					b_t_off_base + batch * b_t_batch_stride, n);
+			}
+
+			if (accumulate) r[r_off_base + j] += sum;
+			else r[r_off_base + j] = sum;
+		}
+	}
+}
+
+void MathUtils::transpose_matrix(const double* __restrict src, double* __restrict dst, size_t src_off, size_t dst_off,
+	size_t rows, size_t cols)
+{
+	for (size_t r = 0; r < rows; ++r)
+	{
+		for (size_t c = 0; c < cols; ++c)
 		{
 			dst[dst_off + c * rows + r] = src[src_off + r * cols + c]; // switch row and column indices of data
 		}
 	}
 }
 
-void MathUtils::compute_row(int i, int n, int p, const double* __restrict a, const double* __restrict b_t,
-	double* __restrict r, int a_off, int b_t_off, int r_off)
+size_t MathUtils::compute_output_position(size_t b, size_t op, const ConvGeometry& g)
 {
-	for (int j = 0; j < p; ++j)
+	size_t offset = b * g.input_strides[0];
+	for (size_t i = 0; i < g.spatial_rank; ++i)
 	{
-		r[r_off + i * p + j] = vector_dot(a, b_t, a_off + i * n, b_t_off + j * n, n);
-	}
-}
-
-int MathUtils::compute_output_position(int b, int op, const ConvGeometry& g)
-{
-	int offset = b * g.input_strides[0];
-	for (int i = 0; i < g.spatial_rank; ++i)
-	{
-		int coord = (op / g.out_spatial_strides[i]) % g.out_dims[i];
+		size_t coord = (op / g.out_spatial_strides[i]) % g.out_dims[i];
 		offset += coord * g.input_strides[i + 1];
 	}
 	return offset;
@@ -2406,16 +2431,16 @@ int MathUtils::compute_output_position(int b, int op, const ConvGeometry& g)
 void MathUtils::im2col(const double* __restrict input, const ConvGeometry& g, double* __restrict input_col, bool use_parallel)
 {
 	#pragma omp parallel for if(use_parallel)
-	for (int b = 0; b < g.batches; ++b)
+	for (size_t b = 0; b < g.batches; ++b)
 	{
-		const int row_base = b * g.out_spatial_size * g.kernel_volume_size;
+		const size_t row_base = b * g.out_spatial_size * g.kernel_volume_size;
 
-		for (int op = 0; op < g.out_spatial_size; ++op)
+		for (size_t op = 0; op < g.out_spatial_size; ++op)
 		{
-			const int row = row_base + op * g.kernel_volume_size;
-			const int base_input = compute_output_position(b, op, g);
+			const size_t row = row_base + op * g.kernel_volume_size;
+			const size_t base_input = compute_output_position(b, op, g);
 
-			for (int k = 0; k < g.kernel_volume_size; ++k)
+			for (size_t k = 0; k < g.kernel_volume_size; ++k)
 			{
 				input_col[row + k] = input[base_input + g.input_kernel_offset[k]];
 			}
@@ -2428,14 +2453,14 @@ void MathUtils::col2im(const double* __restrict d_input_col, const ConvGeometry&
 	#pragma omp parallel for if(use_parallel)
 	for (int b = 0; b < g.batches; ++b)
 	{
-		const int row_base = b * g.out_spatial_size * g.kernel_volume_size;
+		const size_t row_base = b * g.out_spatial_size * g.kernel_volume_size;
 
-		for (int op = 0; op < g.out_spatial_size; ++op)
+		for (size_t op = 0; op < g.out_spatial_size; ++op)
 		{
-			const int row = row_base + op * g.kernel_volume_size;
-			const int base_input = compute_output_position(b, op, g);
+			const size_t row = row_base + op * g.kernel_volume_size;
+			const size_t base_input = compute_output_position(b, op, g);
 
-			for (int k = 0; k < g.kernel_volume_size; ++k)
+			for (size_t k = 0; k < g.kernel_volume_size; ++k)
 			{
 				d_input[base_input + g.input_kernel_offset[k]] += d_input_col[row + k];
 			}
@@ -2445,11 +2470,11 @@ void MathUtils::col2im(const double* __restrict d_input_col, const ConvGeometry&
 
 void MathUtils::kernels2matmul(const double* __restrict kernels, const ConvGeometry& g, double* __restrict kernels_mat)
 {
-	for (int f = 0; f < g.filter_count; ++f)
+	for (size_t f = 0; f < g.filter_count; ++f)
 	{
-		const int filter_offset = f * g.kernel_volume_size;
+		const size_t filter_offset = f * g.kernel_volume_size;
 
-		for (int k = 0; k < g.kernel_volume_size; ++k)
+		for (size_t k = 0; k < g.kernel_volume_size; ++k)
 		{
 			kernels_mat[filter_offset + k] = kernels[filter_offset + g.kernel_kernel_offset[k]];
 		}
@@ -2458,11 +2483,11 @@ void MathUtils::kernels2matmul(const double* __restrict kernels, const ConvGeome
 
 void MathUtils::matmul2kernels(const double* __restrict kernels_mat, const ConvGeometry& g, double* __restrict kernels, bool accumulate)
 {
-	for (int f = 0; f < g.filter_count; ++f)
+	for (size_t f = 0; f < g.filter_count; ++f)
 	{
-		const int filter_offset = f * g.kernel_volume_size;
+		const size_t filter_offset = f * g.kernel_volume_size;
 
-		for (int k = 0; k < g.kernel_volume_size; ++k)
+		for (size_t k = 0; k < g.kernel_volume_size; ++k)
 		{
 			if (accumulate) kernels[filter_offset + g.kernel_kernel_offset[k]] += kernels_mat[filter_offset + k];
 			else kernels[filter_offset + g.kernel_kernel_offset[k]] = kernels_mat[filter_offset + k];

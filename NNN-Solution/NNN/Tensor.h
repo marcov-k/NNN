@@ -304,7 +304,7 @@ private:
 	/* Parallelization parameters */
 
 	// Threshold for parallelizing matrix multiplication.
-	static constexpr long MATMUL_PARALLEL_THRESHOLD = 100'000;
+	static constexpr long MATMUL_PARALLEL_THRESHOLD = 2'000'000;
 	// Threshold for parallelizing convolutions.
 	static constexpr long CONV_PARALLEL_THRESHOLD = 2'000'000;
 

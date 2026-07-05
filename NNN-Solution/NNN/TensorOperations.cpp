@@ -574,48 +574,48 @@ std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const s
 	// Compute matrix multiplication geometry
 
 	const int rank = a->rank();
-	const int m = a->_dimensions[rank - 2];
-	const int n = a->_dimensions[rank - 1];
-	const int p = b->_dimensions[b->_dimensions.size() - 1];
+	const size_t m = a->_dimensions[rank - 2];
+	const size_t n = a->_dimensions[rank - 1];
+	const size_t p = b->_dimensions[b->_dimensions.size() - 1];
 
-	bool b_batched = b->rank() == rank;
+	const bool b_batched = b->rank() == rank && std::equal(a->_dimensions.begin(), a->_dimensions.end() - 2, b->_dimensions.begin());
 
-	int batch_size = 1;
+	size_t batch_size = 1;
 	for (int i = 0; i < rank - 2; ++i) batch_size *= a->_dimensions[i];
-	const int a_mat_size = m * n;
-	const int b_mat_size = n * p;
-	const int r_mat_size = m * p;
+	const size_t a_mat_size = m * n;
+	const size_t b_mat_size = n * p;
+	const size_t r_mat_size = m * p;
 
-	const int total_rows = batch_size * m;
+	const size_t b_batch_stride = b_batched ? b_mat_size : 0;
+
+	const size_t total_rows = batch_size * m;
 
 	std::vector<int> result_dims(a->_dimensions);
-	result_dims[rank - 1] = p;
+	result_dims[rank - 1] = (int)p;
 
 	const auto& owner = a->requires_grad ? a : b;
 	auto result = get_result_tensor(owner, result_dims, a->requires_grad || b->requires_grad);
 
-	const bool use_parallel = total_rows > 16 && (long)m * n * p > MATMUL_PARALLEL_THRESHOLD;
+	const bool use_parallel = total_rows > 16 && (long)total_rows * n * p > MATMUL_PARALLEL_THRESHOLD;
 
-	// Transpose b per batch
-	std::vector<double> b_t(b_mat_size * batch_size);
-	int b_src_off = 0;
-	for (int batch = 0; batch < batch_size; ++batch)
+	// Transpose b
+	auto b_t = std::make_shared<std::vector<double>>(b_batched ? b_mat_size * batch_size : b_mat_size);
+	if (b_batched)
 	{
-		if (b_batched) b_src_off = batch * b_mat_size;
-		MathUtils::transpose_matrix(b->_data.data(), b_t.data(), b_src_off, batch * b_mat_size, n, p);
+		for (size_t batch = 0; batch < batch_size; ++batch)
+		{
+			const size_t b_batch_off = batch * b_mat_size;
+			MathUtils::transpose_matrix(b->_data.data(), b_t->data(), b_batch_off, b_batch_off, n, p);
+		}
+	}
+	else
+	{
+		MathUtils::transpose_matrix(b->_data.data(), b_t->data(), 0, 0, n, p);
 	}
 
 	// Compute matrix multiplication result per batch
-	#pragma warning(suppress: 6993)
-	#pragma omp parallel for if(use_parallel)
-	for (int row = 0; row < total_rows; ++row)
-	{
-		const int batch = row / m;
-		const int i = row % m;
-
-		MathUtils::compute_row(i, n, p, a->_data.data(), b_t.data(), result->_data.data(), batch * a_mat_size,
-			batch * b_mat_size, batch * r_mat_size);
-	}
+	MathUtils::matmul_raw(a->_data.data(), b_t->data(), result->_data.data(), batch_size, m, n, p, a_mat_size,
+		b_batch_stride, r_mat_size, 0, 0, 0, use_parallel, false);
 
 	// Connect result to autograd graph if needed
 	if (!inference)
@@ -625,84 +625,42 @@ std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const s
 		result->_parents.push_back(b);
 
 		// Gradient calculation function -> grad_a = grad_r @ b_T; grad_b = a_T @ grad_r
-		result->_backward = [a, a_mat_size, b, b_mat_size, b_batched, batch_size, m, n, p, result, r_mat_size]()
+		result->_backward = [a, a_mat_size, b, b_t, b_mat_size, b_batched, b_batch_stride, total_rows,
+			batch_size, m, n, p, result, r_mat_size, use_parallel]()
 			{
 				if (!a->requires_grad && !b->requires_grad) return;
 
-				const bool par = (long)m * n * p > MATMUL_PARALLEL_THRESHOLD;
+				thread_local std::vector<double> d_r_t;
+				thread_local std::vector<double> a_t;
 
-				std::vector<double> a_t;
-				std::vector<double> d_out_t;
-
-				// Compute gradients per batch
-				int b_off = 0;
-				for (int batch = 0; batch < batch_size; ++batch)
+				if (a->requires_grad)
 				{
-					const int a_off = batch * a_mat_size;
-					if (b_batched) b_off = batch * b_mat_size;
-					const int r_off = batch * r_mat_size;
+					MathUtils::matmul_raw(result->_grad.data(), b->_data.data(), a->_grad.data(), batch_size, m, p, n,
+						r_mat_size, b_batch_stride, a_mat_size, 0, 0, 0, use_parallel, true);
+				}
 
-					if (a->requires_grad && b->requires_grad)
+				if (b->requires_grad)
+				{
+					a_t.resize(a_mat_size * batch_size);
+					d_r_t.resize(r_mat_size * batch_size);
+
+					for (size_t batch = 0; batch < batch_size; ++batch)
 					{
-						a_t.resize(a_mat_size);
-						d_out_t.resize(r_mat_size);
-
-						MathUtils::transpose_matrix(a->_data.data(), a_t.data(), a_off, 0, m, n);
-						MathUtils::transpose_matrix(result->_grad.data(), d_out_t.data(), r_off, 0, m, p);
-
-						// Compute grad_a = grad_r @ b_T
-						#pragma omp parallel for if(par)
-						for (int i = 0; i < m; ++i)
-						{
-							for (int k = 0; k < n; ++k)
-							{
-								a->_grad[a_off + i * n + k] += MathUtils::vector_dot(result->_grad.data(), b->_data.data(),
-									r_off + i * p, b_off + k * p, p);
-							}
-						}
-
-						// Compute grad_b = a_T @ grad_r
-						#pragma omp parallel for if(par && b_batched)
-						for (int k = 0; k < n; ++k)
-						{
-							for (int j = 0; j < p; ++j)
-							{
-								b->_grad[b_off + k * p + j] += MathUtils::vector_dot(a_t.data(), d_out_t.data(),
-									k * m, j * m, m);
-							}
-						}
+						const size_t a_batch_off = batch * a_mat_size;
+						const size_t r_batch_off = batch * r_mat_size;
+						MathUtils::transpose_matrix(a->_data.data(), a_t.data(), a_batch_off, a_batch_off, m, n);
+						MathUtils::transpose_matrix(result->_grad.data(), d_r_t.data(), r_batch_off, r_batch_off, m, p);
 					}
-					else if (a->requires_grad)
+
+					if (b_batched)
 					{
-						// Compute grad_a = grad_r @ b_T
-						#pragma omp parallel for if(par)
-						for (int i = 0; i < m; ++i)
-						{
-							for (int k = 0; k < n; ++k)
-							{
-								a->_grad[a_off + i * n + k] += MathUtils::vector_dot(result->_grad.data(), b->_data.data(),
-									r_off + i * p, b_off + k * p, p);
-							}
-						}
+						MathUtils::matmul_raw(a_t.data(), d_r_t.data(), b->_grad.data(), batch_size, n, m, p, a_mat_size,
+							r_mat_size, b_mat_size, 0, 0, 0, use_parallel, true);
 					}
-					else if (b->requires_grad)
+					else
 					{
-						a_t.resize(a_mat_size);
-						d_out_t.resize(r_mat_size);
-
-						MathUtils::transpose_matrix(a->_data.data(), a_t.data(), a_off, 0, m, n);
-						MathUtils::transpose_matrix(result->_grad.data(), d_out_t.data(), r_off, 0, m, p);
-
-						// Compute grad_b = a_T @ grad_r
-						#pragma omp parallel for if(par && b_batched)
-						for (int k = 0; k < n; ++k)
-						{
-							for (int j = 0; j < p; ++j)
-							{
-								b->_grad[b_off + k * p + j] += MathUtils::vector_dot(a_t.data(), d_out_t.data(),
-									k * m, j * m, m);
-							}
-						}
+						MathUtils::matmul_reduce_raw(a_t.data(), d_r_t.data(), b->_grad.data(), batch_size,
+							n, m, p, a_mat_size, r_mat_size, 0, 0, 0, use_parallel, true);
 					}
 				}
 			};
@@ -727,7 +685,7 @@ std::shared_ptr<Tensor> Tensor::convolve(const std::shared_ptr<Tensor>& input, c
 
 	g.out_spatial_size = 1;
 	g.kernel_spatial_size = 1;
-	for (int i = 0; i < g.spatial_rank; ++i)
+	for (size_t i = 0; i < g.spatial_rank; ++i)
 	{
 		g.out_dims[i] = input->_dimensions[i + 1] - kernels->_dimensions[i + 1] + 1;
 		g.out_spatial_size *= g.out_dims[i];
@@ -738,7 +696,7 @@ std::shared_ptr<Tensor> Tensor::convolve(const std::shared_ptr<Tensor>& input, c
 	g.out_spatial_strides.back() = 1;
 	g.kernel_spatial_strides.resize(g.spatial_rank);
 	g.kernel_spatial_strides.back() = 1;
-	for (int i = g.spatial_rank - 2; i >= 0; --i)
+	for (int i = (int)g.spatial_rank - 2; i >= 0; --i)
 	{
 		g.out_spatial_strides[i] = g.out_spatial_strides[i + 1] * g.out_dims[i + 1];
 		g.kernel_spatial_strides[i] = g.kernel_spatial_strides[i + 1] * g.kernel_dims[i + 1];
@@ -751,16 +709,16 @@ std::shared_ptr<Tensor> Tensor::convolve(const std::shared_ptr<Tensor>& input, c
 
 	g.input_kernel_offset.resize(g.kernel_volume_size);
 	g.kernel_kernel_offset.resize(g.kernel_volume_size);
-	for (int k = 0; k < g.kernel_volume_size; ++k)
+	for (size_t k = 0; k < g.kernel_volume_size; ++k)
 	{
-		const int spatial_k = k / g.input_channels;
-		const int c = k % g.input_channels;
+		const size_t spatial_k = k / g.input_channels;
+		const size_t c = k % g.input_channels;
 
-		int input_offset = 0;
-		int kernel_offset = 0;
-		for (int d = 0; d < g.spatial_rank; ++d)
+		size_t input_offset = 0;
+		size_t kernel_offset = 0;
+		for (size_t d = 0; d < g.spatial_rank; ++d)
 		{
-			int coord = (spatial_k / g.kernel_spatial_strides[d]) % g.kernel_dims[d + 1];
+			size_t coord = (spatial_k / g.kernel_spatial_strides[d]) % g.kernel_dims[d + 1];
 			input_offset += coord * g.input_strides[d + 1];
 			kernel_offset += coord * kernels->_strides[d + 1];
 		}
@@ -772,9 +730,9 @@ std::shared_ptr<Tensor> Tensor::convolve(const std::shared_ptr<Tensor>& input, c
 	// Compute result dimensions
 	thread_local std::vector<int> result_dims;
 	result_dims.resize(g.spatial_rank + 2);
-	result_dims[0] = g.batches;
-	for (size_t d = 0; d < g.spatial_rank; ++d) result_dims[d + 1] = g.out_dims[d];
-	result_dims.back() = g.filter_count;
+	result_dims[0] = (int)g.batches;
+	for (size_t d = 0; d < g.spatial_rank; ++d) result_dims[d + 1] = (int)g.out_dims[d];
+	result_dims.back() = (int)g.filter_count;
 
 	const auto& owner = input->requires_grad ? input : kernels;
 	auto result = get_result_tensor(owner, result_dims, input->requires_grad || kernels->requires_grad);
@@ -788,8 +746,8 @@ std::shared_ptr<Tensor> Tensor::convolve(const std::shared_ptr<Tensor>& input, c
 	MathUtils::kernels2matmul(kernels->_data.data(), g, kernels_mat->data());
 	MathUtils::im2col(input->_data.data(), g, input_col->data(), use_parallel);
 
-	MathUtils::matmul_raw(input_col->data(), kernels_mat->data(), result->_data.data(),
-		g.batches * g.out_spatial_size, g.kernel_volume_size, g.filter_count, 0, 0, 0, use_parallel);
+	MathUtils::matmul_raw(input_col->data(), kernels_mat->data(), result->_data.data(), 1, g.im2col_rows, g.im2col_cols,
+		g.filter_count, 0, 0, 0, 0, 0, 0, use_parallel, false);
 
 	// Connect result tensor to autograd graph if needed
 	if (!inference)
@@ -805,10 +763,16 @@ std::shared_ptr<Tensor> Tensor::convolve(const std::shared_ptr<Tensor>& input, c
 				if (input->requires_grad)
 				{
 					thread_local std::vector<double> d_col;
-					d_col.assign(g.im2col_rows * g.im2col_cols, 0.0);
+					thread_local std::vector<double> kernels_mat_t;
 
-					MathUtils::matmul_raw(result->_grad.data(), kernels_mat->data(), d_col.data(),
-						g.im2col_rows, g.filter_count, g.im2col_cols, 0, 0, 0, use_parallel);
+					d_col.assign(g.im2col_rows * g.im2col_cols, 0.0);
+					kernels_mat_t.resize(kernels_mat->size());
+
+					MathUtils::transpose_matrix(kernels_mat->data(), kernels_mat_t.data(), 0, 0, g.filter_count, g.im2col_cols);
+
+					MathUtils::matmul_raw(result->_grad.data(), kernels_mat_t.data(), d_col.data(), 1, g.im2col_rows,
+						g.filter_count, g.im2col_cols, 0, 0, 0, 0, 0, 0, use_parallel, false);
+
 					MathUtils::col2im(d_col.data(), g, input->_grad.data(), use_parallel);
 				}
 
@@ -816,16 +780,19 @@ std::shared_ptr<Tensor> Tensor::convolve(const std::shared_ptr<Tensor>& input, c
 				if (kernels->requires_grad)
 				{
 					thread_local std::vector<double> d_out_t;
+					thread_local std::vector<double> input_col_t;
 					thread_local std::vector<double> d_kernels_ft;
 
 					d_out_t.resize(g.filter_count * g.im2col_rows);
+					input_col_t.resize(input_col->size());
 					d_kernels_ft.resize(kernels->element_count());
 
-					MathUtils::transpose_matrix(result->_grad.data(), d_out_t.data(), 0, 0,
-						g.im2col_rows, g.filter_count);
+					MathUtils::transpose_matrix(result->_grad.data(), d_out_t.data(), 0, 0, g.im2col_rows, g.filter_count);
+
+					MathUtils::transpose_matrix(input_col->data(), input_col_t.data(), 0, 0, g.im2col_rows, g.im2col_cols);
 					
-					MathUtils::matmul_raw(d_out_t.data(), input_col->data(), d_kernels_ft.data(), g.filter_count,
-						g.im2col_rows, g.im2col_cols, 0, 0, 0, use_parallel);
+					MathUtils::matmul_raw(d_out_t.data(), input_col_t.data(), d_kernels_ft.data(), 1, g.filter_count,
+						g.im2col_rows, g.im2col_cols, 0, 0, 0, 0, 0, 0, use_parallel, false);
 
 					MathUtils::matmul2kernels(d_kernels_ft.data(), g, kernels->_grad.data(), true);
 				}
