@@ -35,6 +35,7 @@ public class FIFOBuffer<T>(int maxSize)
         if (Count < MaxSize) Buffer.Add(item);
         else
         {
+            if (Buffer[FirstIndex] is IDisposable disposable) disposable.Dispose();
             Buffer[FirstIndex] = item; // replace oldest element
             FirstIndex = (FirstIndex + 1) % MaxSize; // increment index of oldest element
         }

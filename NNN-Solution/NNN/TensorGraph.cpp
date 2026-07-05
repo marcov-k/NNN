@@ -41,6 +41,8 @@ void Tensor::prepare_forward()
 
 void Tensor::finalize_forward()
 {
+	clear_graph();
+
 	// Prune any unused result tensor allocations - prevent potential memory leaks
 	if (_op_index < (int)_results.size())
 	{

@@ -515,7 +515,13 @@ public class Snake : Environment
             int stepsWithoutApple = 0;
             while (!Collided())
             {
-                int action = PickAgentAction(agent.Predict(Tensor.WrapBatch(GetNormalizedState())));
+                int action;
+                using (var normState = GetNormalizedState())
+                using (var wrapped = Tensor.WrapBatch(normState))
+                using (var predicted = agent.Predict(wrapped))
+                {
+                    action = PickAgentAction(agent.Predict(Tensor.WrapBatch(GetNormalizedState())));
+                }
                 SnakeHead.Move(MapAction(action));
 
                 if (Collided()) break;
@@ -542,8 +548,7 @@ public class Snake : Environment
     /// </summary>
     void DrawSnake()
     {
-        var state = GetBoardState(); // get the current state of the board
-
+        using var state = GetBoardState(); // get the current state of the board
         Console.WriteLine("Key: A - Apple, H - Snake Head, B - Snake Body, T - Snake Tail\n");
         Console.WriteLine($"Snake Length: {SnakeLength}");
 

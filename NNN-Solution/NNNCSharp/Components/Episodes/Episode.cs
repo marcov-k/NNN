@@ -3,7 +3,7 @@
 /// <summary>
 /// Record containing all of the experiences within a single DQN training episode.
 /// </summary>
-public record Episode
+public record Episode : IDisposable
 {
     /// <summary>
     /// List of experiences contained in the episode.
@@ -17,5 +17,10 @@ public record Episode
     public Episode(List<Experience> experiences)
     {
         Experiences = [.. experiences.Select(e => new Experience(e.State, e.Action, e.Reward, e.NextState, e.Done))]; // create a new copy of each experience
+    }
+
+    public void Dispose()
+    {
+        foreach (var exp in Experiences) exp.Dispose();
     }
 }

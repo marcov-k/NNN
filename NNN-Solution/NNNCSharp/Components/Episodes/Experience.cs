@@ -5,7 +5,7 @@ namespace NNNCSharp.Components.Episodes;
 /// <summary>
 /// Record of a single DQN training experience.
 /// </summary>
-public record Experience
+public record Experience : IDisposable
 {
     /// <summary>
     /// Initial environment state.
@@ -49,5 +49,11 @@ public record Experience
         NextState = nextState.Copy();
         Done = done;
         Priority = Math.Max(priority, 1e-8); // ensure non-zero priority
+    }
+
+    public void Dispose()
+    {
+        State.Dispose();
+        NextState.Dispose();
     }
 }

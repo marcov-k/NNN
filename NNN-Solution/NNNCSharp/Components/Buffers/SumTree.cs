@@ -40,6 +40,7 @@ public class SumTree<T>(int capacity)
     public void Add(T item, double priority)
     {
         // Add item to main data array
+        if (Data[WritePointer] is IDisposable disposable) disposable.Dispose();
         Data[WritePointer] = item;
 
         // Update sum tree with new priority

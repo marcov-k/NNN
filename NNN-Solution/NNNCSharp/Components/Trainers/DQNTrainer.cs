@@ -290,7 +290,9 @@ public class DQNTrainer(Model agent, Environments.Environment environment, Optim
         }
         else // pick action based on predicted Q-Values
         {
-            return Environment.PickAgentAction(Agent.Predict(Tensor.WrapBatch(state)));
+            using var wrapped = Tensor.WrapBatch(state);
+            using var predicted = Agent.Forward(wrapped);
+            return Environment.PickAgentAction(predicted);
         }
     }
 
@@ -338,22 +340,47 @@ public class DQNTrainer(Model agent, Environments.Environment environment, Optim
         }
 
         // Predict future values of actions
-        var nextAgentQs = Agent.Predict(_nextBatch).Copy(); // select actions for experience's next states
-        var nextTargetQs = TargetModel.Predict(_nextBatch).Copy(); // predict Q-Values of actions
-        var targetQs = MaskQValuesDouble(nextAgentQs, nextTargetQs, batch);
+        Tensor nextAgentQs, nextTargetQs, targetQs, predictedQs, loss;
+
+        using (var nextAgentQsRaw = Agent.Predict(_nextBatch)) // select actions for experience's next states
+        using (var nextTargetQsRaw = TargetModel.Predict(_nextBatch).Copy()) // predict Q-Values of actions
+        {
+            nextAgentQs = nextAgentQsRaw.Copy();
+            nextAgentQs.RequiresGrad = false;
+            nextTargetQs = nextTargetQsRaw.Copy();
+            nextTargetQs.RequiresGrad = false;
+        }
+
+        using (nextAgentQs)
+        using (nextTargetQs)
+        {
+            targetQs = MaskQValuesDouble(nextAgentQs, nextTargetQs, batch);
+        }
 
         // Predict Q-Values of actions in the batch
-        var predictions = Agent.Forward(_currentBatch); // predicted after next states to avoid overwriting autograd graph
-        var predictedQs = Tensor.MaskActions(predictions, batch);
+        using (var predictions = Agent.Forward(_currentBatch)) // predicted after next states to avoid overwriting autograd graph
+        {
+            predictedQs = Tensor.MaskActions(predictions, batch);
+        }
 
         // Calculate the agent's loss and new priorities of each experience
-        var lossResult = Cost.CalculateCostWithPriority(predictedQs, targetQs, weights);
-        ReplayBuffer.UpdatePriorities(indices, lossResult.Priorities);
-        var loss = Tensor.Mean(lossResult.Losses);
-        totalLoss += loss[0];
+        using (predictedQs)
+        {
+            var lossResult = Cost.CalculateCostWithPriority(predictedQs, targetQs, weights);
+            ReplayBuffer.UpdatePriorities(indices, lossResult.Priorities);
+
+            using (lossResult.Losses)
+            {
+                loss = Tensor.Mean(lossResult.Losses);
+            }
+        }
 
         // Calculate parameter gradients
-        loss.Backward();
+        using (loss)
+        {
+            totalLoss += loss[0];
+            loss.Backward();
+        }
         Agent.ClipGradients(MaxNorm);
 
         // Update parameters based on gradients

@@ -95,11 +95,9 @@ public class TicTacToe : Environment, ISelfPlay
         State[9] = 1.0; // set player to move to X
     }
 
-    public override int PickAgentAction(Tensor agentQValues, Tensor? state = null)
+    public override int PickAgentAction(Tensor qValues, Tensor? state = null)
     {
         state ??= State; // assume current environment state if no state is given
-
-        var qValues = agentQValues.Copy();
 
         // Find valid action with highest Q-Value
         int action = Tensor.ArgMax(qValues);
@@ -189,7 +187,9 @@ public class TicTacToe : Environment, ISelfPlay
     public int GetAgentAction(Model agent, Tensor? state = null)
     {
         state ??= State; // assume current environment state if no state is given
-        return PickAgentAction(agent.Predict(Tensor.WrapBatch(state)), state);
+        using var wrapped = Tensor.WrapBatch(state);
+        using var predicted = agent.Predict(wrapped);
+        return PickAgentAction(predicted, state);
     }
 
     // Additional environment-specific functionality
