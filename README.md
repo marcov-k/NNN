@@ -473,6 +473,7 @@ NNN-Solution - Directory (Full project solution)\
 - #### Dense:
   - Neuron Count -> int32 (4 bytes) -> number of neurons in the layer
   - Weights -> tensor ([see formatting](#tensor-format)) -> weights parameter of the layer
+  - Flatten -> boolean ([see formatting](#boolean-format)) -> whether the layer flattens its input prior to applying weights
 
 - #### Conv:
   - Filter Count -> int32 (4 bytes) -> number of filters in the layer
