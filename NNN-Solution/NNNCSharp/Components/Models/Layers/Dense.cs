@@ -77,7 +77,8 @@ public class Dense : Layer
 
         if (Dropout > 0.0)
         {
-            output *= Tensor.GetDenseDropoutMask(output, Dropout);
+            using var dropoutMask = Tensor.GetDenseDropoutMask(output, Dropout);
+            output *= dropoutMask;
         }
 
         return output;

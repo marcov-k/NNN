@@ -88,7 +88,11 @@ public class Conv : Layer
         output += Tensor.Broadcast(Biases, output.Dimensions.ToArray());
         output = Activation.Forward(output);
 
-        if (Dropout > 0.0) output *= Tensor.GetSpatialDropoutMask(output, Dropout);
+        if (Dropout > 0.0)
+        {
+            using var dropoutMask = Tensor.GetSpatialDropoutMask(output, Dropout);
+            output *= dropoutMask;
+        }
 
         return output;
     }
