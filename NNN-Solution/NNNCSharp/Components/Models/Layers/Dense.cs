@@ -115,4 +115,10 @@ public class Dense : Layer
         bool flatten = FileUtils.ReadBool(stream);
         return $"Neurons: {neuronCount}\n{weights}\nFlatten: {flatten}";
     }
+
+    public override void Dispose()
+    {
+        base.Dispose();
+        Weights.Dispose();
+    }
 }

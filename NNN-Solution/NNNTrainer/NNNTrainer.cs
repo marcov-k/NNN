@@ -41,9 +41,9 @@ public class NNNTrainer
     static void DQNTraining()
     {
         Model model;
-        NNNCSharp.Components.Environments.Environment env = new TicTacToe();
+        NNNCSharp.Components.Environments.Environment env = new MovementGrid2D(-10, 10, -10, 10);
         double exploration = 1.0;
-        double explorationDecay = 0.9995;
+        double explorationDecay = 0.9999;
         double minExploration = 0.01;
         int trainEvery = 1;
         double discount = 0.99;
@@ -58,7 +58,7 @@ public class NNNTrainer
         double maxGradNorm = 1.0;
         int minExperiences = 2000;
         int episodeMemorySize = 100;
-        int testEpisodes = 5000;
+        int testEpisodes = 20000;
         DQNTrainer dqnTrainer;
         FIFOBuffer<Episode> episodeBuffer = new(episodeMemorySize);
 
@@ -76,10 +76,8 @@ public class NNNTrainer
         {
             // Create a new model
             model = new([
-                new Dense(256, new LeakyReLU()),
-            new Dense(256, new LeakyReLU()),
-            new Dense(128, new LeakyReLU()),
-            new Dense(env.ActionCount, new Linear())
+                new Dense(64, new LeakyReLU()),
+                new Dense(env.ActionCount, new Linear())
             ], env.StateFormat);
         }
 

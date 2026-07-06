@@ -290,6 +290,11 @@ public sealed class Tensor : IDisposable
     public void ClearGraph() => NativeMethods.tensor_clear_graph(Handle);
 
     /// <summary>
+    /// Finalizes the current inference forward pass starting from this tensor.
+    /// </summary>
+    public void FinalizeInference() => NativeMethods.tensor_finalize_inference(Handle);
+
+    /// <summary>
     /// Triggers the backward gradient calculation for the autograd graph starting at the given tensor.
     /// </summary>
     public void Backward() => NativeMethods.tensor_backward(Handle);

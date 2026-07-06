@@ -1,6 +1,7 @@
 ﻿using NNNCSharp.Components.Episodes;
 using NNNCSharp.Components.Models;
 using NNNCSharp.Components.Autodiff;
+using NNNCSharp.Components.Utilities.SaveSystem;
 
 namespace NNNCSharp.Components.Environments;
 
@@ -47,6 +48,12 @@ public class MovementGrid2D : Environment
     /// Action index mapping.
     /// </summary>
     enum Action { Left, Right, Up, Down }
+
+    // Demo
+    /// <summary>
+    /// Name of the file containing the demonstration agent for the environment.
+    /// </summary>
+    const string DemoFileName = "2dmovedemo";
 
     /// <summary>
     /// Creates a new 2D movement grid environment instance.
@@ -113,23 +120,7 @@ public class MovementGrid2D : Environment
         double prevDist = Math.Sqrt(xDiff * xDiff + yDiff * yDiff);
 
         // Move the agent's position based on action mapping
-        switch (action)
-        {
-            case (int)Action.Left:
-                State[0]--;
-                break;
-            case (int)Action.Right:
-                State[0]++;
-                break;
-            case (int)Action.Up:
-                State[1]++;
-                break;
-            case (int)Action.Down:
-                State[1]--;
-                break;
-            default:
-                throw new ArgumentException("Invalid Action");
-        }
+        Move(action);
 
         // Calculate distance to target after moving
         xDiff = State[2] - State[0];
@@ -153,10 +144,17 @@ public class MovementGrid2D : Environment
         return (reward, GetNormalizedState(), done);
     }
 
-    // TODO: Impelement training progress test
-    public override void TestTrainingProgress(Model agent, int testEpisodes)
+    public override double TestTrainingProgress(Model agent, int testEpisodes)
     {
-        throw new NotImplementedException();
+        int successes = 0;
+        for (int i = 0; i < testEpisodes; i++)
+        {
+            if (Run(agent)) successes++;
+        }
+
+        double successPercent = ((double)successes / testEpisodes) * 100.0;
+        Console.WriteLine($"Agent successfully reached target in {successPercent:F2}% of test episodes");
+        return successPercent;
     }
 
     public override void Render(Episode episode, int step)
@@ -166,6 +164,26 @@ public class MovementGrid2D : Environment
         var exp = step == episode.Experiences.Count ? episode.Experiences[step - 1] : episode.Experiences[step];
         var state = exp.NextState;
         (int action, double reward) = step > 0 ? (episode.Experiences[step - 1].Action, episode.Experiences[step - 1].Reward) : (-1, 0);
+
+        DrawState(state);
+
+        Console.Write($"Step: {step}, Action: {(Enum.IsDefined(typeof(Action), action) ? ((Action)action).ToString() : "None")}, Reward: {reward:F3}");
+    }
+
+    public override void PlayDemo()
+    {
+        ShowDemoInstructions();
+        var agent = Saver.LoadModel(DemoFileName);
+        Run(agent);
+    }
+
+    /// <summary>
+    /// Draws the given state to the console.
+    /// </summary>
+    /// <param name="state">State to draw.</param>
+    void DrawState(Tensor state)
+    {
+        Console.WriteLine("Key: A - Agent, T - Target\n");
 
         // Draw the grid for the given state
         for (int y = Bounds[3] + 1; y >= Bounds[2] - 1; y--)
@@ -207,9 +225,70 @@ public class MovementGrid2D : Environment
             }
             Console.Write("\n");
         }
-
-        Console.Write($"Step: {step}, Action: {(Enum.IsDefined(typeof(Action), action) ? ((Action)action).ToString() : "None")}, Reward: {reward:F3}");
     }
 
-    public override void PlayDemo() => throw new NotImplementedException();
+    /// <summary>
+    /// Runs a single grid navigation episode.
+    /// </summary>
+    /// <param name="agent">Agent to use for episode.</param>
+    /// <returns>Whether the agent successfully reached the target.</returns>
+    public bool Run(Model agent)
+    {
+        Reset();
+
+        int steps = 0;
+        while (steps < MaxSteps)
+        {
+            int action = GetAgentAction(agent);
+            Move(action);
+
+            if (State[0] == State[2] && State[1] == State[3]) return true;
+            steps++;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Selects the next action to take using the given agent.
+    /// </summary>
+    /// <param name="agent">Agent to select action with.</param>
+    /// <returns>Selected action index.</returns>
+    int GetAgentAction(Model agent)
+    {
+        using var normState = GetNormalizedState();
+        using var wrapped = Tensor.WrapBatch(normState);
+        using var predicted = agent.Predict(wrapped);
+        return PickAgentAction(predicted);
+    }
+
+    /// <summary>
+    /// Moves the agent's position based on the given action.
+    /// </summary>
+    /// <param name="action">Action taken by the agent.</param>
+    /// <exception cref="ArgumentException">Invalid action index.</exception>
+    void Move(int action)
+    {
+        switch (action)
+        {
+            case (int)Action.Left:
+                State[0]--;
+                break;
+            case (int)Action.Right:
+                State[0]++;
+                break;
+            case (int)Action.Up:
+                State[1]++;
+                break;
+            case (int)Action.Down:
+                State[1]--;
+                break;
+            default:
+                throw new ArgumentException("Invalid Action");
+        }
+    }
+
+    static void ShowDemoInstructions()
+    {
+        Console.WriteLine("Welcome to the 2D movement agent demonstration.");
+    }
 }

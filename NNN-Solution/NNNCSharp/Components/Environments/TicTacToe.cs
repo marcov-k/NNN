@@ -144,7 +144,7 @@ public class TicTacToe : Environment, ISelfPlay
         return (reward, nextState, done);
     }
 
-    public override void TestTrainingProgress(Model agent, int testEpisodes)
+    public override double TestTrainingProgress(Model agent, int testEpisodes)
     {
         int wins = 0;
         int ties = 0;
@@ -160,6 +160,7 @@ public class TicTacToe : Environment, ISelfPlay
         Console.WriteLine($"Win percentage vs randomly-acting opponent: {winPercent:F2}");
         Console.WriteLine($"Tie percentage vs randomly-acting opponent: {tiePercent:F2}");
         Console.WriteLine($"Win + tie percentage vs randomly-acting opponent: {(winPercent + tiePercent):F2}");
+        return 2.0 * winPercent + tiePercent;
     }
 
     public override void Render(Episode episode, int step)
@@ -397,11 +398,8 @@ public class TicTacToe : Environment, ISelfPlay
         Console.WriteLine("The agent contains a total of 329 neurons.");
         Console.WriteLine("These are arranged in two layers of 128 neurons each, one layer of 64 neurons, and an output layer of 9 neurons - one for each position on the board.");
         Console.WriteLine("The agent receives a total of 10 inputs, one encoding each position on the board and a tenth encoding whether X or O is to move.");
-        Console.WriteLine("This agent was trained over the course of around 50,000 games of Tic-Tac-Toe.");
+        Console.WriteLine("This agent was trained over the course of 5,000 games of Tic-Tac-Toe.");
         Console.WriteLine("During these games, it learned to play both X and O, and trained by playing against past versions of itself.");
-        Console.WriteLine("It is by no means perfect, but it can play relatively well in most situations.");
-        Console.WriteLine("I have personally found a few board states in which it simply fails.");
-        Console.WriteLine("Can you find them as well?\n");
         Console.WriteLine("The positions on the game board are represented by the indices 0-8.");
         Console.WriteLine("The indices increase across rows and then down columns, with position 0 being in the top left and position 8 in the bottom right.");
         Console.WriteLine("When playing, simply select the position you would like to take.\n");

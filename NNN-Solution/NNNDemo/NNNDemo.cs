@@ -14,7 +14,8 @@ public class NNNDemo
     /// <summary>
     /// Array of all environments with trained and implemented demonstrations.
     /// </summary>
-    static readonly NNNCSharp.Components.Environments.Environment[] DQNDemoEnvs = [new TicTacToe(), new Snake()];
+    static readonly NNNCSharp.Components.Environments.Environment[] DQNDemoEnvs = [new MovementGrid2D(-10, 10, -10, 10),
+        new TicTacToe(), new Snake()];
     /// <summary>
     /// Array of all standard supervised training demo functions.
     /// </summary>

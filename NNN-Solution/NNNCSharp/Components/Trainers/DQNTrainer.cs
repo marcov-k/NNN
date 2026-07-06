@@ -41,7 +41,7 @@ public class DQNTrainer(Model agent, Environments.Environment environment, Optim
     /// <summary>
     /// Agent being trained.
     /// </summary>
-    readonly Model Agent = agent;
+    Model Agent = agent;
     /// <summary>
     /// Target prediction model.
     /// </summary>
@@ -167,6 +167,7 @@ public class DQNTrainer(Model agent, Environments.Environment environment, Optim
         List<Experience> episodeExperiences = [];
         Tensor state; // normalized state
         Tensor trueState; // unnormalized state
+        Tensor trueNextState; // unnormalized next state
         bool done;
         bool learnerTurn;
         int action;
@@ -182,7 +183,9 @@ public class DQNTrainer(Model agent, Environments.Environment environment, Optim
         stopwatch.Start();
 
         // Test initial agent performance
-        Environment.TestTrainingProgress(Agent, testEpisodes);
+        Console.WriteLine("\nEvaluating initial agent performance...");
+        var bestAgent = Agent.Copy();
+        double bestScore = Environment.TestTrainingProgress(Agent, testEpisodes);
 
         for (int e = 0; e < episodes; e++)
         {
@@ -208,10 +211,14 @@ public class DQNTrainer(Model agent, Environments.Environment environment, Optim
 
                 (reward, nextState, done) = Environment.Step(action, step);
                 totalReward += reward;
+                trueNextState = Environment.GetState();
 
                 // Store experience for training and episode review
                 if (learnerTurn) ReplayBuffer.Add(new(state, action, reward, nextState, done));
-                episodeExperiences.Add(new(trueState, action, reward, Environment.GetState(), done));
+                episodeExperiences.Add(new(trueState, action, reward, trueNextState, done));
+
+                trueState.Dispose();
+                trueNextState.Dispose();
 
                 if ((step - 1) % TrainEvery == 0)
                 {
@@ -219,6 +226,7 @@ public class DQNTrainer(Model agent, Environments.Environment environment, Optim
                     trainSteps++;
                 }
 
+                state.Dispose();
                 state = nextState;
             }
 
@@ -246,16 +254,24 @@ public class DQNTrainer(Model agent, Environments.Environment environment, Optim
                 }
                 Console.WriteLine($"Final state of last episode:");
                 if (episodeBuffer is not null) Environment.Render(episodeBuffer[^1], step + 1);
-                Console.WriteLine($"Ended on step: {step}");
+                Console.WriteLine($"\nEnded on step: {step}");
                 Console.WriteLine($"Episode duration: {MathUtils.RoundToMS(elapsed):g}");
                 Console.WriteLine($"\nAverage time per episode: {MathUtils.RoundToMS(avgElapsed)}");
                 Console.WriteLine($"Estimated time remaining: {MathUtils.RoundToMS(eta)}");
                 Console.WriteLine($"\nEvaluating agent performance...");
-                Environment.TestTrainingProgress(Agent, testEpisodes);
+                double score = Environment.TestTrainingProgress(Agent, testEpisodes);
+                if (score > bestScore)
+                {
+                    bestAgent.Dispose();
+                    bestAgent = Agent.Copy();
+                    bestScore = score;
+                }
             }
             stopwatch.Restart();
         }
 
+        Agent.Dispose();
+        Agent = bestAgent;
         totalStopwatch.Stop();
         Console.WriteLine($"Total Training Duration: {MathUtils.RoundToMS(totalStopwatch.Elapsed):g}");
     }

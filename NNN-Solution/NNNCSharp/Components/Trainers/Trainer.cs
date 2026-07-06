@@ -53,7 +53,7 @@ public class Trainer(Model model, Optimizer optimizer, Cost cost, double maxGrad
         Stopwatch epochTimer = new();
         TimeSpan avgElapsed = new(0);
 
-        Model bestModel = Model.Copy();
+        var bestModel = Model.Copy();
         double bestAccuracy = double.MinValue;
 
         double baseLR = Optimizer.LR;
@@ -142,6 +142,7 @@ public class Trainer(Model model, Optimizer optimizer, Cost cost, double maxGrad
                     double successPercent = ((double)successes / testLength) * 100.0;
                     if (successPercent > bestAccuracy)
                     {
+                        bestModel.Dispose();
                         bestModel = Model.Copy();
                         bestAccuracy = successPercent;
                     }
@@ -152,6 +153,7 @@ public class Trainer(Model model, Optimizer optimizer, Cost cost, double maxGrad
 
         if (decayLR) Optimizer.LR = baseLR;
 
+        Model.Dispose();
         Model = bestModel;
         totalTimer.Stop();
         Console.WriteLine($"Total training time: {MathUtils.RoundToMS(totalTimer.Elapsed)}");

@@ -8,7 +8,7 @@ namespace NNNCSharp.Components.Models.Layers;
 /// <summary>
 /// Base class for neural network layers.
 /// </summary>
-public abstract class Layer
+public abstract class Layer : IDisposable
 {
     /// <summary>
     /// Tensor containing the bias parameters of the layer.
@@ -108,4 +108,9 @@ public abstract class Layer
     /// <param name="stream">File stream to read from.</param>
     /// <returns>Readable string of the layer type-specific data.</returns>
     protected abstract string PrintUniqueLayer(FileStream stream);
+
+    public virtual void Dispose()
+    {
+        Biases.Dispose();
+    }
 }

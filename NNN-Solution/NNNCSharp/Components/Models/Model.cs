@@ -10,7 +10,7 @@ namespace NNNCSharp.Components.Models;
 /// <summary>
 /// Neural network model class.
 /// </summary>
-public class Model
+public class Model : IDisposable
 {
     // Externally accessible properties
     /// <summary>
@@ -38,9 +38,6 @@ public class Model
     /// Internal list of all player parameters.
     /// </summary>
     List<Tensor>? _parameters;
-
-    // Utilities
-    static readonly int VectorSize = Vector<double>.Count;
 
     /// <summary>
     /// Initializes a new model with the given layers.
@@ -104,6 +101,7 @@ public class Model
     {
         Tensor.Inference = true;
         var output = Forward(input);
+        output.FinalizeInference();
         Tensor.Inference = false;
         return output;
     }
@@ -162,5 +160,10 @@ public class Model
         }
 
         return new(layers);
+    }
+
+    public void Dispose()
+    {
+        foreach (var layer in Layers) layer.Dispose();
     }
 }

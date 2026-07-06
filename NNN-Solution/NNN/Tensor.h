@@ -158,6 +158,9 @@ public:
 	// Performs a backward gradient-calculation pass of the autograd graph starting at this tensor.
 	void backward();
 
+	// Finalizes the current inference forward pass.
+	void finalize_inference();
+
 	/* Tensor operations - autograd graph connected */
 
 	// Adds two tensors -> r = a + b

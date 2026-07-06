@@ -86,7 +86,8 @@ public abstract class Environment
     /// </summary>
     /// <param name="agent">Agen to test.</param>
     /// <param name="testEpisodes">Number of episodes to test for.</param>
-    public abstract void TestTrainingProgress(Model agent, int testEpisodes);
+    /// <returns>Performance score of the model.</returns>
+    public abstract double TestTrainingProgress(Model agent, int testEpisodes);
 
     /// <summary>
     /// Plays a demonstration of the model trained on the environment.

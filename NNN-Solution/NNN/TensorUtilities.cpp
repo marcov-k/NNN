@@ -7,49 +7,56 @@
 // Returns the tensor instance to write the result of the current autograd graph operation into.
 std::shared_ptr<Tensor> Tensor::get_result_tensor(const std::shared_ptr<Tensor>& owner, const std::vector<int>& dims, bool requires_grad)
 {
-	owner->prepare_forward();
-
-	const bool new_op = (int)owner->_results.size() <= owner->_op_index;
-
-	std::shared_ptr<Tensor> result;
-	if (new_op) // create new result tensor allocation
+	if (!inference)
 	{
-		result = std::make_shared<Tensor>(dims, requires_grad);
-		owner->_results.push_back(result);
-	}
-	else
-	{
-		result = owner->_results[owner->_op_index];
+		owner->prepare_forward();
 
-		// Ensure existing result tensor allocation dimensions match required dimensions
-		bool shape_mismatch = result->rank() != (int)dims.size();
-		if (!shape_mismatch)
+		const bool new_op = (int)owner->_results.size() <= owner->_op_index;
+
+		std::shared_ptr<Tensor> result;
+		if (new_op) // create new result tensor allocation
 		{
-			const int dims_length = (int)dims.size();
-			for (int i = 0; i < dims_length; ++i)
+			result = std::make_shared<Tensor>(dims, requires_grad);
+			owner->_results.push_back(result);
+		}
+		else
+		{
+			result = owner->_results[owner->_op_index];
+
+			// Ensure existing result tensor allocation dimensions match required dimensions
+			bool shape_mismatch = result->rank() != (int)dims.size();
+			if (!shape_mismatch)
 			{
-				if (result->dimensions()[i] != dims[i])
+				const int dims_length = (int)dims.size();
+				for (int i = 0; i < dims_length; ++i)
 				{
-					shape_mismatch = true;
-					break;
+					if (result->dimensions()[i] != dims[i])
+					{
+						shape_mismatch = true;
+						break;
+					}
 				}
+			}
+
+			if (shape_mismatch) // create new result tensor allocation
+			{
+				result = std::make_shared<Tensor>(dims, requires_grad);
+				owner->_results[owner->_op_index] = result;
+			}
+			else // reuse existing result tensor allocation
+			{
+				result->clear_graph(); // clear previous autograd graph connections
 			}
 		}
 
-		if (shape_mismatch) // create new result tensor allocation
-		{
-			result = std::make_shared<Tensor>(dims, requires_grad);
-			owner->_results[owner->_op_index] = result;
-		}
-		else // reuse existing result tensor allocation
-		{
-			result->clear_graph(); // clear previous autograd graph connections
-		}
+		owner->_op_index++;
+
+		return result;
 	}
-
-	owner->_op_index++;
-
-	return result;
+	else
+	{
+		return std::make_shared<Tensor>(dims, requires_grad);
+	}
 }
 
 std::shared_ptr<Tensor> Tensor::mask_actions(const std::shared_ptr<Tensor>& q_values, const std::vector<int>& actions)
@@ -313,26 +320,8 @@ std::shared_ptr<Tensor> Tensor::wrap_batch(const std::shared_ptr<Tensor>& t)
 	batch_dims.resize(t->rank() + 1);
 	batch_dims[0] = 1;
 	for (size_t i = 0; i < t->_dimensions.size(); ++i) batch_dims[i + 1] = t->_dimensions[i];
-
-	std::shared_ptr<Tensor> batch = get_result_tensor(t, batch_dims, t->requires_grad);
-
-	// Copy linear input data into result - no change in underlying data layout
+	auto batch = std::make_shared<Tensor>(batch_dims, false);
 	batch->_data = t->_data;
-
-	// Connect result tensor to autograd graph if needed
-	if (!inference)
-	{
-		batch->_parents.push_back(t);
-
-		// Gradient calculation function -> db/dt = 1 (no remaping required - identical linear data layout)
-		batch->_backward = [t, batch]()
-			{
-				if (!t->requires_grad) return;
-
-				MathUtils::vector_add(t->_grad, batch->_grad);
-			};
-	}
-
 	return batch;
 }
 

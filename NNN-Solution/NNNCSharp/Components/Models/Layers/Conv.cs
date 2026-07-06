@@ -141,4 +141,10 @@ public class Conv : Layer
 
         return $"Filters: {filterCount}\n{kernelDimsString}\n{kernelsString}";
     }
+
+    public override void Dispose()
+    {
+        base.Dispose();
+        Kernels.Dispose();
+    }
 }

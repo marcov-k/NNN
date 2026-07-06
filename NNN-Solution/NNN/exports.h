@@ -99,6 +99,9 @@ extern "C"
 	// Clears the autograd graph connections of the given tensor.
 	__declspec(dllexport) void tensor_clear_graph(void* handle);
 
+	// Finalizes the current inference forward pass.
+	__declspec(dllexport) void tensor_finalize_inference(void* handle);
+
 	// Triggers the backward gradient calculation for the autograd graph starting at the given tensor.
 	__declspec(dllexport) void tensor_backward(void* handle);
 

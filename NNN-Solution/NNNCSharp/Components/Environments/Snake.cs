@@ -89,6 +89,10 @@ public class Snake : Environment
     /// Time per frame when showing the agent playing the game.
     /// </summary>
     const int FrameTime = 100; // in milliseconds
+    /// <summary>
+    /// Whether to draw individual frames while agent is playing.
+    /// </summary>
+    static bool DrawPlaying = true;
 
     // Demo
     /// <summary>
@@ -243,10 +247,20 @@ public class Snake : Environment
         return (reward, GetNormalizedState(), false);
     }
 
-    // TODO: implement training progress test
-    public override void TestTrainingProgress(Model agent, int testEpisodes)
+    public override double TestTrainingProgress(Model agent, int testEpisodes)
     {
-        throw new NotImplementedException();
+        int totalLength = 0;
+        DrawPlaying = false;
+        for (int i = 0; i < testEpisodes; i++)
+        {
+            Play(agent);
+            totalLength += SnakeLength;
+        }
+        DrawPlaying = true;
+
+        double averageLength = (double)totalLength / testEpisodes;
+        Console.WriteLine($"Agent reached an average length of {averageLength}");
+        return averageLength;
     }
 
     public override void Render(Episode episode, int step)
@@ -520,7 +534,7 @@ public class Snake : Environment
                 using (var wrapped = Tensor.WrapBatch(normState))
                 using (var predicted = agent.Predict(wrapped))
                 {
-                    action = PickAgentAction(agent.Predict(Tensor.WrapBatch(GetNormalizedState())));
+                    action = PickAgentAction(predicted);
                 }
                 SnakeHead.Move(MapAction(action));
 
@@ -529,12 +543,15 @@ public class Snake : Environment
                 if (AteApple()) stepsWithoutApple = 0;
                 else stepsWithoutApple++;
 
-                Console.Clear();
-                DrawSnake();
+                if (DrawPlaying)
+                {
+                    Console.Clear();
+                    DrawSnake();
+                }
 
                 if (stepsWithoutApple >= MaxStepsWithoutApple) break;
 
-                Thread.Sleep(FrameTime);
+                if (DrawPlaying) Thread.Sleep(FrameTime);
             }
 
             Console.WriteLine("\nAgent collided or timed out!");
