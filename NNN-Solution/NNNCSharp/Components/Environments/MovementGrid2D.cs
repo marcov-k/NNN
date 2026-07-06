@@ -136,10 +136,10 @@ public class MovementGrid2D : Environment
         bool done = reachedTarget || outOfBounds || outOfSteps;
 
         // Calculate reward for the action
-        double reward = 5.0 * deltaDist; // shaped reward based on change in distance to target
-        reward += reachedTarget ? 100.0 : 0.0; // reward for reaching the target
-        reward -= outOfBounds ? 100.0 : 0.0; // penalty for going out of bounds
-        reward -= outOfSteps ? 5.0 : 0.0; // penalty for exceeding step limit
+        double reward = 1.0 * deltaDist; // shaped reward based on change in distance to target
+        reward += reachedTarget ? 10.0 : 0.0; // reward for reaching the target
+        reward -= outOfBounds ? 10.0 : 0.0; // penalty for going out of bounds
+        reward -= outOfSteps ? 2.0 : 0.0; // penalty for exceeding step limit
 
         return (reward, GetNormalizedState(), done);
     }

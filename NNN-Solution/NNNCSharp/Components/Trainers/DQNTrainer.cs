@@ -7,8 +7,6 @@ using NNNCSharp.Components.Models;
 using NNNCSharp.Components.Optimizers;
 using NNNCSharp.Components.Utilities;
 using System.Diagnostics;
-using System.Numerics;
-using System.Runtime.InteropServices;
 using NNNCSharp.Components.Autodiff;
 
 namespace NNNCSharp.Components.Trainers;
@@ -359,7 +357,7 @@ public class DQNTrainer(Model agent, Environments.Environment environment, Optim
         Tensor nextAgentQs, nextTargetQs, targetQs, predictedQs, loss;
 
         using (var nextAgentQsRaw = Agent.Predict(_nextBatch)) // select actions for experience's next states
-        using (var nextTargetQsRaw = TargetModel.Predict(_nextBatch).Copy()) // predict Q-Values of actions
+        using (var nextTargetQsRaw = TargetModel.Predict(_nextBatch)) // predict Q-Values of actions
         {
             nextAgentQs = nextAgentQsRaw.Copy();
             nextAgentQs.RequiresGrad = false;

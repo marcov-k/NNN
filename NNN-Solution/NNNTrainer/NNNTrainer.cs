@@ -46,10 +46,10 @@ public class NNNTrainer
         double explorationDecay = 0.9999;
         double minExploration = 0.01;
         int trainEvery = 1;
-        double discount = 0.99;
+        double discount = 0.9;
         Optimizer optimizer = new Adam(0.001);
         Cost cost = new Huber();
-        int replayBufferSize = 10000;
+        int replayBufferSize = 20000;
         int batchSize = 128;
         int agentBufferSize = 2;
         int opponentCopyRate = 600;
@@ -58,13 +58,14 @@ public class NNNTrainer
         double maxGradNorm = 1.0;
         int minExperiences = 2000;
         int episodeMemorySize = 100;
-        int testEpisodes = 20000;
+        int testEpisodes = 10000;
         DQNTrainer dqnTrainer;
         FIFOBuffer<Episode> episodeBuffer = new(episodeMemorySize);
 
         Console.Clear();
         Console.WriteLine("Welcome to the DQN Training Terminal (Enter Q to quit)");
 
+        double dropout = 0.1;
         if (GetInput("Load model from file? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
         {
             // Load model from file
@@ -76,7 +77,8 @@ public class NNNTrainer
         {
             // Create a new model
             model = new([
-                new Dense(64, new LeakyReLU()),
+                new Dense(64, new LeakyReLU(tau), dropout: dropout),
+                new Dense(64, new LeakyReLU(tau), dropout: dropout),
                 new Dense(env.ActionCount, new Linear())
             ], env.StateFormat);
         }

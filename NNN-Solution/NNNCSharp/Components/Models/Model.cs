@@ -83,7 +83,6 @@ public class Model : IDisposable
     public Tensor Forward(Tensor input)
     {
         Tensor.BeginForward();
-
         var output = input;
         foreach (var layer in Layers)
         {

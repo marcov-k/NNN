@@ -20,7 +20,7 @@ void Tensor::clear_graph()
 
 void Tensor::begin_forward()
 {
-	_forward_gen++;
+	if (!inference) _forward_gen++;
 }
 
 void Tensor::prepare_forward()

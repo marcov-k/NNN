@@ -11,13 +11,13 @@ public class LeakyReLU : Activation
     /// <summary>
     /// Coefficient for negative inputs.
     /// </summary>
-    double Tau;
+    double Tau = 0.05;
 
     /// <summary>
     /// Creates a new Leaky ReLU activation function instance.
     /// </summary>
     /// <param name="tau">Coefficient for negative inputs.</param>
-    public LeakyReLU(double tau = 0.01)
+    public LeakyReLU(double tau)
     {
         Tau = tau;
     }
