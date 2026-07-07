@@ -10,7 +10,7 @@ public static class Saver
     /// <summary>
     /// Full directory path to save to and load from.
     /// </summary>
-    static string DirectoryPath = "../../../../Models";
+    const string DirectoryPath = "../../../../Models";
     /// <summary>
     /// File extension for neural network save files.
     /// </summary>

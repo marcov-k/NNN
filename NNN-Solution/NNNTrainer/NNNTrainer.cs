@@ -104,6 +104,7 @@ public class NNNTrainer
         );
 
         DQNTrainingLoop(dqnTrainer, env, model, ref episodeBuffer, testEpisodes);
+        model = dqnTrainer.Agent;
 
         if (GetInput("Save model to a file? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
         {
@@ -167,6 +168,7 @@ public class NNNTrainer
         int testLength = testLabels.Length;
 
         StandardTrainingLoop(trainer, batchBuffer, batchSize, testFunc, true, minLRFraction, testLength);
+        model = trainer.Model;
 
         if (GetInput("Save model to a file? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
         {
@@ -195,6 +197,7 @@ public class NNNTrainer
                 int testEvery = GetInteger("Enter episodes per training progress test");
                 Console.WriteLine($"\n\nTraining for {episodes} episodes...");
                 dqnTrainer.Train(ref episodeBuffer!, episodes, testEvery, testEpisodes);
+                model = dqnTrainer.Agent;
 
                 if (env is TicTacToe ticTacToe && GetInput("Play against model? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
                 {

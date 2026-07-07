@@ -19,7 +19,7 @@ public class Trainer(Model model, Optimizer optimizer, Cost cost, double maxGrad
     /// <summary>
     /// Model being trained.
     /// </summary>
-    Model Model = model;
+    public Model Model { get; private set; } = model;
     /// <summary>
     /// Optimizer being used for parameter updates.
     /// </summary>

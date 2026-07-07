@@ -39,7 +39,7 @@ public class DQNTrainer(Model agent, Environments.Environment environment, Optim
     /// <summary>
     /// Agent being trained.
     /// </summary>
-    Model Agent = agent;
+    public Model Agent { get; private set; } = agent;
     /// <summary>
     /// Target prediction model.
     /// </summary>
