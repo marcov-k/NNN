@@ -346,7 +346,7 @@ public class Snake : Environment
     /// </summary>
     void GenerateApple()
     {
-        var state = GetBoardState(); // get the current game board
+        using var state = GetBoardState(); // get the current game board
 
         // Find all positions not occupied by the snake
         List<int> validPositions = [];
