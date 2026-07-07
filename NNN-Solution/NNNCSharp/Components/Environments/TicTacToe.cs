@@ -372,6 +372,11 @@ public class TicTacToe : Environment, ISelfPlay
         }
     }
 
+    /// <summary>
+    /// Has the given agent play a game against a randomly-acting opponent.
+    /// </summary>
+    /// <param name="agent">Agent to use.</param>
+    /// <returns>Whether the agent won or tied.</returns>
     public (bool won, bool tied) PlayRandom(Model agent)
     {
         Reset();

@@ -2,6 +2,7 @@
 using NNNCSharp.Components.Models;
 using NNNCSharp.Components.Autodiff;
 using NNNCSharp.Components.Utilities.SaveSystem;
+using static NNNCSharp.Components.Utilities.UIUtils;
 
 namespace NNNCSharp.Components.Environments;
 
@@ -44,6 +45,14 @@ public class MovementGrid2D : Environment
     /// Environment's Random instance.
     /// </summary>
     readonly Random Random = new();
+    /// <summary>
+    /// Time per frame when showing the agent navigating the grid.
+    /// </summary>
+    const int FrameTime = 150;
+    /// <summary>
+    /// Whether to draw each movement step when agent is navigating.
+    /// </summary>
+    static bool DrawRunning = false;
     /// <summary>
     /// Action index mapping.
     /// </summary>
@@ -179,7 +188,13 @@ public class MovementGrid2D : Environment
     {
         ShowDemoInstructions();
         var agent = Saver.LoadModel(DemoFileName);
-        Run(agent);
+        DrawRunning = true;
+        while (true)
+        {
+            Run(agent);
+            if (GetInput("Watch agent navigate again? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.No]) break;
+        }
+        DrawRunning = false;
     }
 
     /// <summary>
@@ -247,6 +262,13 @@ public class MovementGrid2D : Environment
             int action = GetAgentAction(agent);
             Move(action);
 
+            if (DrawRunning)
+            {
+                Console.Clear();
+                DrawState(State);
+                Thread.Sleep(FrameTime);
+            }
+
             if (State[0] == State[2] && State[1] == State[3]) return true;
             steps++;
         }
@@ -295,5 +317,12 @@ public class MovementGrid2D : Environment
     static void ShowDemoInstructions()
     {
         Console.WriteLine("Welcome to the 2D movement agent demonstration.");
+        Console.WriteLine("The agent contains a total of 132 neurons.");
+        Console.WriteLine("These are arranged in two layers of 64 neurons each, and an output layer of 4 neurons - one for each cardinal direction.");
+        Console.WriteLine("This agent was trained over the course of 15,000 episodes using randomly generated 21x21 grids.");
+        Console.WriteLine("By the end of this training, it was achieving a 100% success rate in test sessions, each of which used 10,000 episodes.");
+        Console.WriteLine("For this demonstration, a 21x21 grid is used, with the agent's starting and target positions being generated randomly.");
+        Console.WriteLine("Press any key to continue...");
+        Console.ReadKey();
     }
 }

@@ -65,6 +65,7 @@ public class NNNTrainer
         Console.Clear();
         Console.WriteLine("Welcome to the DQN Training Terminal (Enter Q to quit)");
 
+        double activTau = 0.01;
         double dropout = 0.1;
         if (GetInput("Load model from file? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
         {
@@ -77,8 +78,8 @@ public class NNNTrainer
         {
             // Create a new model
             model = new([
-                new Dense(64, new LeakyReLU(tau), dropout: dropout),
-                new Dense(64, new LeakyReLU(tau), dropout: dropout),
+                new Dense(64, new LeakyReLU(activTau), dropout: dropout),
+                new Dense(64, new LeakyReLU(activTau), dropout: dropout),
                 new Dense(env.ActionCount, new Linear())
             ], env.StateFormat);
         }
