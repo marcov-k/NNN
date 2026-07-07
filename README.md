@@ -396,7 +396,7 @@ NNN-Solution - Directory (Full project solution)\
 │&emsp;&emsp;&emsp;&ensp;├── TensorProperties - C++ Script (Tensor property initializations)\
 │&emsp;&emsp;&emsp;&ensp;└── TensorUtilities - C++ Script (Tensor utility function implementations)\
 │\
-├── NNNCSharp - Directory (C# implementations for interop with C++ backend)\
+├── NNNCSharp - Directory (C# implementations and interop with C++ backend)\
 │&emsp;&ensp;└── Components - Directory\
 │&emsp;&emsp;&emsp;&ensp;├── Activations - Directory (Activation function classes)\
 │&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── Activation - C# Script (Base class)\
@@ -455,6 +455,7 @@ NNN-Solution - Directory (Full project solution)\
 │&emsp;&emsp;&emsp;&ensp;└── Utilities - Directory\
 │&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;├── DataLoaders - Directory\
 │&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;└── MNISTLoader - C# Script\
+│&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;│\
 │&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;├── SaveSystem - Directory\
 │&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── FileUtils - C# Script (Static class for reading and writing .nnn files)\
 │&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;└── Saver - C# Script (Static class for handling model saving/loading)\
