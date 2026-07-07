@@ -16,7 +16,7 @@ public record Episode : IDisposable
     /// <param name="experiences">List of experiences within the episode.</param>
     public Episode(List<Experience> experiences)
     {
-        Experiences = [.. experiences.Select(e => new Experience(e.State, e.Action, e.Reward, e.NextState, e.Done))]; // create a new copy of each experience
+        Experiences = [..experiences]; // create a new copy of each experience
     }
 
     public void Dispose()
