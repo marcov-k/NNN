@@ -1,9 +1,6 @@
 ﻿using NNNCSharp.Components.Autodiff;
 using NNNCSharp.Components.Interop;
 using NNNCSharp.Components.Models.Layers;
-using NNNCSharp.Components.Utilities.SaveSystem;
-using System.Numerics;
-using System.Runtime.InteropServices;
 
 namespace NNNCSharp.Components.Models;
 
@@ -100,7 +97,6 @@ public class Model : IDisposable
     {
         Tensor.Inference = true;
         var output = Forward(input);
-        output.FinalizeInference();
         Tensor.Inference = false;
         return output;
     }

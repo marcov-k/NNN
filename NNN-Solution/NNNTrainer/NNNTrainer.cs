@@ -158,7 +158,7 @@ public class NNNTrainer
 
         Func<Model, int, bool> testFunc = (model, i) =>
         {
-            var predicts = model.Predict(wrappedImages[i]);
+            using var predicts = model.Predict(wrappedImages[i]);
             return Tensor.ArgMax(predicts) == Tensor.ArgMax(testLabels[i]);
         };
 

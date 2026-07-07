@@ -5,7 +5,7 @@
 /* Cost functions - per-element - autograd graph connected */
 
 // Computes the Mean Squared Error loss of a tensor based on the given target tensor.
-std::shared_ptr<Tensor> Tensor::mse(const std::shared_ptr<Tensor>& t, const std::shared_ptr<const Tensor>& target)
+std::shared_ptr<Tensor> Tensor::mse(const std::shared_ptr<Tensor>& t, const std::shared_ptr<Tensor>& target)
 {
 	auto result = get_result_tensor(t, t->_dimensions, t->requires_grad);
 
@@ -36,7 +36,7 @@ std::shared_ptr<Tensor> Tensor::mse(const std::shared_ptr<Tensor>& t, const std:
 	return result;
 }
 
-std::shared_ptr<Tensor> Tensor::huber(const std::shared_ptr<Tensor>& t, const std::shared_ptr<const Tensor>& target, double delta)
+std::shared_ptr<Tensor> Tensor::huber(const std::shared_ptr<Tensor>& t, const std::shared_ptr<Tensor>& target, double delta)
 {
 	auto result = get_result_tensor(t, t->_dimensions, t->requires_grad);
 
@@ -79,7 +79,7 @@ std::shared_ptr<Tensor> Tensor::huber(const std::shared_ptr<Tensor>& t, const st
 	return result;
 }
 
-std::shared_ptr<Tensor> Tensor::softmax_cross_entropy(const std::shared_ptr<Tensor>& t, const std::shared_ptr<const Tensor>& target)
+std::shared_ptr<Tensor> Tensor::softmax_cross_entropy(const std::shared_ptr<Tensor>& t, const std::shared_ptr<Tensor>& target)
 {
 	const size_t classes = t->_dimensions.back();
 	const size_t element_count = t->element_count();

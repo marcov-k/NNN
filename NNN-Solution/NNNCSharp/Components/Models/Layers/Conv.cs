@@ -1,6 +1,5 @@
 ﻿using NNNCSharp.Components.Activations;
 using NNNCSharp.Components.Autodiff;
-using NNNCSharp.Components.Utilities;
 using NNNCSharp.Components.Utilities.SaveSystem;
 
 namespace NNNCSharp.Components.Models.Layers;
@@ -83,15 +82,17 @@ public class Conv : Layer
 
     public override Tensor Forward(Tensor input)
     {
-        // Apply convolution to the input
-        var output = Tensor.Convolve(input, Kernels);
-        output += Tensor.Broadcast(Biases, output.Dimensions.ToArray());
-        output = Activation.Forward(output);
+        using var conv = Tensor.Convolve(input, Kernels);
+        using var biasBroadcast = Tensor.Broadcast(Biases, conv.Dimensions.ToArray());
+        using var biasAdd = conv + biasBroadcast;
+        var output = Activation.Forward(biasAdd);
 
         if (Dropout > 0.0)
         {
             using var dropoutMask = Tensor.GetSpatialDropoutMask(output, Dropout);
-            output *= dropoutMask;
+            var dropoutOutput = output * dropoutMask;
+            output.Dispose();
+            output = dropoutOutput;
         }
 
         return output;

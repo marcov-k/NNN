@@ -257,13 +257,6 @@ internal static class NativeMethods
     internal static extern void tensor_clear_graph(IntPtr handle);
 
     /// <summary>
-    /// Finalizes the current inference forward pass.
-    /// </summary>
-    /// <param name="handle">void* handle of the C++ tensor to finalize from.</param>
-    [DllImport(DllName)]
-    internal static extern void tensor_finalize_inference(IntPtr handle);
-
-    /// <summary>
     /// Triggers the backward gradient calculation for the autograd graph starting at the given C++ tensor.
     /// </summary>
     /// <param name="handle">viod* handle of the C++ tensor.</param>
@@ -614,6 +607,14 @@ internal static class NativeMethods
     /// <returns>void* handle of the result C++ tensor.</returns>
     [DllImport(DllName)]
     internal static extern IntPtr tensor_softmax(IntPtr handle);
+
+    /// <summary>
+    /// Applies a linear activation function to the given C++ tensor.
+    /// </summary>
+    /// <param name="handle">void* handle of the C++ tensor.</param>
+    /// <returns>void* handle of the result C++ tensor.</returns>
+    [DllImport(DllName)]
+    internal static extern IntPtr tensor_linear(IntPtr handle);
 
     // Cost functions
 

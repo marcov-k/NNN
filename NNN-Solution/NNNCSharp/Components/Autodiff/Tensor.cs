@@ -290,11 +290,6 @@ public sealed class Tensor : IDisposable
     public void ClearGraph() => NativeMethods.tensor_clear_graph(Handle);
 
     /// <summary>
-    /// Finalizes the current inference forward pass starting from this tensor.
-    /// </summary>
-    public void FinalizeInference() => NativeMethods.tensor_finalize_inference(Handle);
-
-    /// <summary>
     /// Triggers the backward gradient calculation for the autograd graph starting at the given tensor.
     /// </summary>
     public void Backward() => NativeMethods.tensor_backward(Handle);
@@ -843,6 +838,18 @@ public sealed class Tensor : IDisposable
     public static Tensor Softmax(Tensor t)
     {
         IntPtr h = NativeMethods.tensor_softmax(t.Handle);
+        GC.KeepAlive(t);
+        return new(h);
+    }
+
+    /// <summary>
+    /// Applies a linear activation function to the given tensor.
+    /// </summary>
+    /// <param name="t">Tensor to apply linear function to.</param>
+    /// <returns>Result tensor.</returns>
+    public static Tensor Linear(Tensor t)
+    {
+        IntPtr h = NativeMethods.tensor_linear(t.Handle);
         GC.KeepAlive(t);
         return new(h);
     }

@@ -188,12 +188,6 @@ extern "C"
 		(*tensor_handle)->clear_graph();
 	}
 
-	void tensor_finalize_inference(void* handle)
-	{
-		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
-		(*tensor_handle)->finalize_inference();
-	}
-
 	void tensor_backward(void* handle)
 	{
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
@@ -447,6 +441,12 @@ extern "C"
 	{
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		return wrap_handle(Tensor::softmax(*tensor_handle));
+	}
+
+	void* tensor_linear(void* handle)
+	{
+		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
+		return wrap_handle(Tensor::linear(*tensor_handle));
 	}
 
 	/* Cost functions */

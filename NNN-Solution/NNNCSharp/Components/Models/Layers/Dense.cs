@@ -70,17 +70,21 @@ public class Dense : Layer
 
     public override Tensor Forward(Tensor input)
     {
-        var output = Flatten ? Tensor.Flatten(input, 1) : input;
-        output ^= Weights;
-        output += Tensor.Broadcast(Biases, output.Dimensions.ToArray());
-        output = Activation.Forward(output);
+        var flatInput = Flatten ? Tensor.Flatten(input, 1) : input;
+        using var matmul = flatInput ^ Weights;
+        if (Flatten) flatInput.Dispose();
+        using var biasBroadcast = Tensor.Broadcast(Biases, matmul.Dimensions.ToArray());
+        using var biasAdd = matmul + biasBroadcast;
+        var output = Activation.Forward(biasAdd);
 
         if (Dropout > 0.0)
         {
             using var dropoutMask = Tensor.GetDenseDropoutMask(output, Dropout);
-            output *= dropoutMask;
+            var dropoutOutput = output * dropoutMask;
+            output.Dispose();
+            output = dropoutOutput;
         }
-
+        
         return output;
     }
 

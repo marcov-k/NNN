@@ -158,9 +158,6 @@ public:
 	// Performs a backward gradient-calculation pass of the autograd graph starting at this tensor.
 	void backward();
 
-	// Finalizes the current inference forward pass.
-	void finalize_inference();
-
 	/* Tensor operations - autograd graph connected */
 
 	// Adds two tensors -> r = a + b
@@ -229,7 +226,7 @@ public:
 	static std::shared_ptr<Tensor> mask_actions(const std::shared_ptr<Tensor>& q_values, const std::vector<int>& actions);
 
 	// Returns the index of the largest value in a tensor.
-	static int arg_max(const std::shared_ptr<const Tensor>& t);
+	static int arg_max(const std::shared_ptr<Tensor>& t);
 
 	// Computes the sum of a tensor.
 	static std::shared_ptr<Tensor> sum(const std::shared_ptr<Tensor>& t);
@@ -281,16 +278,19 @@ public:
 	// Applies the Softmax function to a tensor.
 	static std::shared_ptr<Tensor> softmax(const std::shared_ptr<Tensor>& t);
 
+	// Applies a linear activation function to a tensor.
+	static std::shared_ptr<Tensor> linear(const std::shared_ptr<Tensor>& t);
+
 	/* Cost functions - per-element */
 
 	// Computes the Mean Squared Error loss of a tensor based on the given target tensor.
-	static std::shared_ptr<Tensor> mse(const std::shared_ptr<Tensor>& t, const std::shared_ptr<const Tensor>& target);
+	static std::shared_ptr<Tensor> mse(const std::shared_ptr<Tensor>& t, const std::shared_ptr<Tensor>& target);
 
 	// Computes the pseudo-Huber loss of a tensor based on the given target tensor.
-	static std::shared_ptr<Tensor> huber(const std::shared_ptr<Tensor>& t, const std::shared_ptr<const Tensor>& target, double delta);
+	static std::shared_ptr<Tensor> huber(const std::shared_ptr<Tensor>& t, const std::shared_ptr<Tensor>& target, double delta);
 
 	// Computes the Softmax Cross-Entropy loss of a tensor based on the given target tensor (one-hot encoded).
-	static std::shared_ptr<Tensor> softmax_cross_entropy(const std::shared_ptr<Tensor>& t, const std::shared_ptr<const Tensor>& target);
+	static std::shared_ptr<Tensor> softmax_cross_entropy(const std::shared_ptr<Tensor>& t, const std::shared_ptr<Tensor>& target);
 
 private:
 	/* Internal data */

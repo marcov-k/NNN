@@ -335,3 +335,25 @@ std::shared_ptr<Tensor> Tensor::softmax(const std::shared_ptr<Tensor>& t)
 
 	return result;
 }
+
+std::shared_ptr<Tensor> Tensor::linear(const std::shared_ptr<Tensor>& t)
+{
+	auto result = get_result_tensor(t, t->_dimensions, t->requires_grad);
+
+	// Copy exact data - linear function
+	std::copy(t->_data.begin(), t->_data.end(), result->_data.begin());
+
+	// Connect result tensor to autograd graph if needed
+	if (!inference)
+	{
+		result->_parents.push_back(t);
+
+		// Gradient calculation function -> dr/dt = 1
+		result->_backward = [t, result]()
+			{
+				MathUtils::vector_add(t->_grad, result->_grad);
+			};
+	}
+
+	return result;
+}

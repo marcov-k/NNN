@@ -106,7 +106,12 @@ public class MovementGrid2D : Environment
         State[3] = Random.Next(Bounds[2], Bounds[3] + 1);
     }
 
-    public override int PickAgentAction(Tensor qValues, Tensor? state = null) => Tensor.ArgMax(qValues); // no invalid actions - return highest Q-Value
+    public override int PickAgentAction(Tensor qValues, Tensor? state = null)
+    {
+        int action = Tensor.ArgMax(qValues); // no invalid actions - return highest Q-Value
+        GC.KeepAlive(qValues);
+        return action;
+    }
 
     public override int PickRandomAction() => Random.Next(ActionCount); // no invalid actions - return random action index
 

@@ -39,23 +39,6 @@ void Tensor::prepare_forward()
 	_last_gen = _forward_gen;
 }
 
-void Tensor::finalize_inference()
-{
-	// Recursively finalize forward pass on all tensors in the current graph
-	for (auto& par : _parents)
-	{
-		par->finalize_inference();
-	}
-
-	clear_graph();
-
-	// Prune any unused result tensor allocations - prevent potential memory leaks
-	if (_op_index < (int)_results.size())
-	{
-		_results.resize(_op_index);
-	}
-}
-
 void Tensor::finalize_forward()
 {
 	clear_graph();

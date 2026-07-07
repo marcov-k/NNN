@@ -12,7 +12,7 @@ public class Linear : Activation
     /// </summary>
     /// <param name="input">Tensor to apply the linear activation function to.</param>
     /// <returns>Tensor containing the result of applying the linear activation function to the input tensor.</returns>
-    public override Tensor Forward(Tensor input) => input; // does not modify input -> linear function
+    public override Tensor Forward(Tensor input) => Tensor.Linear(input);
 
     /// <summary>
     /// Creates a new linear activation function instance.

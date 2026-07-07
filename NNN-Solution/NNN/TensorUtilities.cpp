@@ -92,7 +92,7 @@ std::shared_ptr<Tensor> Tensor::mask_actions(const std::shared_ptr<Tensor>& q_va
 	return result;
 }
 
-int Tensor::arg_max(const std::shared_ptr<const Tensor>& t)
+int Tensor::arg_max(const std::shared_ptr<Tensor>& t)
 {
 	int index = 0;
 	double max = t->_data[0];
@@ -282,7 +282,7 @@ std::shared_ptr<Tensor> Tensor::reshape(const std::shared_ptr<Tensor>& t, const 
 	std::shared_ptr<Tensor> result = get_result_tensor(t, new_dims, t->requires_grad);
 
 	// Copy linear input data into result
-	result->_data = t->_data;
+	std::copy(t->_data.begin(), t->_data.end(), result->_data.begin());
 
 	// Connect result tensor to autograd graph if needed
 	if (!inference)
@@ -321,7 +321,7 @@ std::shared_ptr<Tensor> Tensor::wrap_batch(const std::shared_ptr<Tensor>& t)
 	batch_dims[0] = 1;
 	for (size_t i = 0; i < t->_dimensions.size(); ++i) batch_dims[i + 1] = t->_dimensions[i];
 	auto batch = std::make_shared<Tensor>(batch_dims, false);
-	batch->_data = t->_data;
+	std::copy(t->_data.begin(), t->_data.end(), batch->_data.begin());
 	return batch;
 }
 
