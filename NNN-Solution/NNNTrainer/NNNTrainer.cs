@@ -41,31 +41,31 @@ public class NNNTrainer
     static void DQNTraining()
     {
         Model model;
-        NNNCSharp.Components.Environments.Environment env = new MovementGrid2D(-10, 10, -10, 10);
+        NNNCSharp.Components.Environments.Environment env = new Snake();
         double exploration = 1.0;
         double explorationDecay = 0.9999;
         double minExploration = 0.01;
-        int trainEvery = 1;
-        double discount = 0.9;
+        int trainEvery = 4;
+        double discount = 0.99;
         Optimizer optimizer = new Adam(0.001);
         Cost cost = new Huber();
-        int replayBufferSize = 20000;
+        int replayBufferSize = 50000;
         int batchSize = 128;
         int agentBufferSize = 2;
         int opponentCopyRate = 600;
         int minRandomOpponentEpisodes = 600;
-        double tau = 0.01;
+        double tau = 0.001;
         double maxGradNorm = 1.0;
         int minExperiences = 2000;
         int episodeMemorySize = 100;
-        int testEpisodes = 10000;
+        int testEpisodes = 1;
         DQNTrainer dqnTrainer;
         FIFOBuffer<Episode> episodeBuffer = new(episodeMemorySize);
 
         Console.Clear();
         Console.WriteLine("Welcome to the DQN Training Terminal (Enter Q to quit)");
 
-        double activTau = 0.01;
+        double activTau = 0.05;
         double dropout = 0.1;
         if (GetInput("Load model from file? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
         {
@@ -78,8 +78,9 @@ public class NNNTrainer
         {
             // Create a new model
             model = new([
-                new Dense(64, new LeakyReLU(activTau), dropout: dropout),
-                new Dense(64, new LeakyReLU(activTau), dropout: dropout),
+                new Conv(32, [3, 3], new LeakyReLU(activTau)),
+                new Conv(64, [3, 3], new LeakyReLU(activTau)),
+                new Dense(256, new LeakyReLU(activTau), dropout: dropout, flatten: true),
                 new Dense(env.ActionCount, new Linear())
             ], env.StateFormat);
         }

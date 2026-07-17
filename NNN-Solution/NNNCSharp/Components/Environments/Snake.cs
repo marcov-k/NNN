@@ -554,6 +554,8 @@ public class Snake : Environment
                 if (DrawPlaying) Thread.Sleep(FrameTime);
             }
 
+            if (!DrawPlaying) break;
+
             Console.WriteLine("\nAgent collided or timed out!");
 
             playing = GetInput("Watch agent play again? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes];
