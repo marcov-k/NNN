@@ -44,6 +44,7 @@ jobs:
           echo "TAG=${{ github.ref_name }}" >> $env:GITHUB_OUTPUT
 
       - name: Locate build outputs
+        id: outputs
         shell: pwsh
         run: |
           $NNNCSharp = (Get-ChildItem "NNN-Solution/NNNCSharp" -Recurse -Filter NNNCSharp.dll |
