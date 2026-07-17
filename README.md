@@ -72,7 +72,29 @@ WIP
 WIP
 
 ### Saving/Loading Models
-WIP
+#### Specify the directory to save/load models from:
+```
+using NNNCSharp.Components.Utilities.SaveSystem;
+
+Saver.DirectoryPath = "[your target directory]";
+```
+*The framework will automatically create a directory with the given path if none exists.
+   
+#### Save a model to a file:
+```
+using NNNCSharp.Components.Models;
+using NNNCSharp.Components.Utilities.SaveSystem;
+
+Saver.SaveModel(yourModel, "yourfilename", "optional short description");
+```
+
+#### Load a model from a file:
+```
+using NNNCSharp.Components.Models;
+using NNNCSharp.Components.Utilities.SaveSystem;
+
+Model yourModel = Saver.LoadModel("yourfilename");
+```
 
 ## Results
 ### Gradient Correctness Tests (Autograd Verification)
