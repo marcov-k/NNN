@@ -29,10 +29,27 @@ jobs:
             /p:Configuration=ReleasePackage ^
             /p:Platform=x64
 
+      - name: Prepare release package
+        shell: pwsh
+        run: |
+          $Version = "${{ github.ref_name }}"
+          
+          New-Item -ItemType Directory -Force release/Runtime | Out-Null
+      
+          Copy-Item "**/bin/x64/ReleasePackage/NNN.dll" release/Runtime
+          Copy-Item "**/bin/x64/ReleasePackage/NNNCSharp.dll" release/Runtime
+      
+          Copy-Item LICENSE release
+          Copy-Item README.md release
+      
+          Compress-Archive `
+            -Path release/* `
+            -DestinationPath "NNN-$Version.zip"
+
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            **/bin/x64/ReleasePackage/**/*.dll
+            NNN-${{ github.ref_name }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
