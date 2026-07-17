@@ -128,7 +128,7 @@ jobs:
           git push origin upm-deploy:upm --force
           git push origin "upm-$Tag"
 
-          git checkout -
+          git checkout ${{ github.sha }}
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
