@@ -10,6 +10,7 @@
     <AssemblyName>NNNCSharp</AssemblyName>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
     <PlatformTarget>x64</PlatformTarget>
+    <Configurations>Debug;Release;ReleasePackage</Configurations>
   </PropertyGroup>
 
 	<ItemGroup>
