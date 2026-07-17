@@ -48,7 +48,7 @@ jobs:
 
           $RepoRoot = $env:GITHUB_WORKSPACE
       
-          Copy-Item $RepoRoot/LICENSE release
+          Copy-Item $RepoRoot/LICENSE.txt release
           Copy-Item $RepoRoot/README.md release
       
           Compress-Archive `
