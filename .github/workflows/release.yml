@@ -45,9 +45,11 @@ jobs:
             Select-Object -First 1
           
           Copy-Item $Native.FullName "release/NNN/Runtime/"
+
+          $RepoRoot = $env:GITHUB_WORKSPACE
       
-          Copy-Item ../LICENSE release
-          Copy-Item ../README.md release
+          Copy-Item $RepoRoot/LICENSE release
+          Copy-Item $RepoRoot/README.md release
       
           Compress-Archive `
             -Path release/* `
