@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package>
+  <metadata>
+    <id>NNN</id>
+    <version>$version$</version>
+    <authors>Marco Vasko-Klima</authors>
+    <description>Neural Network Notions - a C++ accelerated neural network framework with C# API</description>
+    <repository type="git" url="https://github.com/marcov-k/NNN" />
+    <license type="file">LICENSE.txt</license>
+    <readme>README.md</readme>
+    <tags>neural-network machine-learning deep-learning</tags>
+  </metadata>
+  <files>
+    <!-- Managed assembly -->
+    <file src="bin/x64/ReleasePackage/NNNCSharp.dll" target="lib/netstandard2.1/NNN.dll" />
+    
+    <!-- Native DLL for Windows x64 -->
+    <file src="bin/x64/ReleasePackage/NNN.dll" 
+          target="runtimes/win-x64/native/NNN.dll" />
+    
+    <!-- MSBuild props to copy native DLL on build -->
+    <file src="NNN.props" target="build/NNN.props" />
+    
+    <file src="../../LICENSE.txt" target="" />
+    <file src="../../README.md" target="" />
+  </files>
+</package>
