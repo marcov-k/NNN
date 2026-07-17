@@ -5,6 +5,9 @@ on:
     tags:
       - "v*"
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-2025-vs2026
@@ -25,3 +28,11 @@ jobs:
           msbuild NNN-Solution/NNN-Solution.sln ^
             /p:Configuration=ReleasePackage ^
             /p:Platform=x64
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            **/bin/x64/ReleasePackage/**/*.dll
+        env:
+          GITHUB_TOKEN: **/bin/x64/ReleasePackage/**/*.dll
