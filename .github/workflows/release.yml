@@ -34,13 +34,13 @@ jobs:
         run: |
           $Version = "${{ github.ref_name }}"
           
-          New-Item -ItemType Directory -Force release/Runtime | Out-Null
+          New-Item -ItemType Directory -Force release/NNN/Runtime | Out-Null
       
-          Get-ChildItem -Recurse -Filter NNN.dll |
-              Copy-Item -Destination release/Runtime
-          
-          Get-ChildItem -Recurse -Filter NNNCSharp.dll |
-              Copy-Item -Destination release/Runtime
+          Copy-Item "NNN-Solution/NNNCSharp/bin/ReleasePackage/netstandard2.1/NNNCSharp.dll" `
+            "release/NNN/runtime/"
+
+          Copy-Item "NNN-Solution/NNNCSharp/bin/ReleasePackage/netstandard2.1/NNN.dll" `
+            "release/NNN/runtime/"
       
           Copy-Item ../LICENSE release
           Copy-Item ../README.md release
