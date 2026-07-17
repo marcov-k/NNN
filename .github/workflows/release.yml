@@ -35,4 +35,4 @@ jobs:
           files: |
             **/bin/x64/ReleasePackage/**/*.dll
         env:
-          GITHUB_TOKEN: **/bin/x64/ReleasePackage/**/*.dll
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
