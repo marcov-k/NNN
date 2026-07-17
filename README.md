@@ -85,7 +85,7 @@ Saver.DirectoryPath = "[your target directory]";
 using NNNCSharp.Components.Models;
 using NNNCSharp.Components.Utilities.SaveSystem;
 
-Saver.SaveModel(yourModel, "[yourfilename]", "[optional short description]");
+Saver.SaveModel(yourModel, "[yourfilename]", "[optional short description]"); // file name without any extension
 ```
 
 #### Load a model from a file:
@@ -93,7 +93,7 @@ Saver.SaveModel(yourModel, "[yourfilename]", "[optional short description]");
 using NNNCSharp.Components.Models;
 using NNNCSharp.Components.Utilities.SaveSystem;
 
-Model yourModel = Saver.LoadModel("[yourfilename]");
+Model yourModel = Saver.LoadModel("[yourfilename]"); // file name without any extension
 ```
 
 ## Results
