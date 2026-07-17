@@ -6,6 +6,7 @@ on:
       - "v*"
 
 permissions:
+  id-token: write
   contents: write
 
 jobs:
@@ -19,6 +20,11 @@ jobs:
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
+      - name: Setup NuGet
+        uses: nuget/setup-nuget@v2
+        with:
+          nuget-version: 'latest'
+
       - name: Restore NuGet packages
         run: nuget restore NNN-Solution/NNN-Solution.sln
 
@@ -29,36 +35,70 @@ jobs:
             /p:Configuration=ReleasePackage ^
             /p:Platform=x64
 
-      - name: Prepare release package
+      - name: Get version from tag
+        id: version
         shell: pwsh
         run: |
-          $Version = "${{ github.ref_name }}"
-          
+          $Version = "${{ github.ref_name }}" -replace '^v', ''
+          echo "VERSION=$Version" >> $env:GITHUB_OUTPUT
+          echo "TAG=${{ github.ref_name }}" >> $env:GITHUB_OUTPUT
+
+      - name: Locate build outputs
+        shell: pwsh
+        run: |
+          $NNNCSharp = (Get-ChildItem "NNN-Solution/NNNCSharp" -Recurse -Filter NNNCSharp.dll |
+            Select-Object -First 1).FullName
+          $Native = (Get-ChildItem "NNN-Solution/NNNCSharp" -Recurse -Filter NNN.dll |
+            Select-Object -First 1).FullName
+          echo "MANAGED=$NNNCSharp" >> $env:GITHUB_OUTPUT
+          echo "NATIVE=$Native" >> $env:GITHUB_OUTPUT
+
+      - name: Prepare zip release
+        shell: pwsh
+        run: |
+          $Version = "${{ steps.version.outputs.TAG }}"
           New-Item -ItemType Directory -Force release/NNN/Runtime | Out-Null
-      
-          $NNNCSharp = Get-ChildItem "NNN-Solution/NNNCSharp" -Recurse -Filter NNNCSharp.dll |
-            Select-Object -First 1
-          
-          Copy-Item $NNNCSharp.FullName "release/NNN/Runtime/"
+          Copy-Item "${{ steps.outputs.outputs.MANAGED }}" release/NNN/Runtime/
+          Copy-Item "${{ steps.outputs.outputs.NATIVE }}" release/NNN/Runtime/
+          Copy-Item $env:GITHUB_WORKSPACE/LICENSE.txt release/
+          Copy-Item $env:GITHUB_WORKSPACE/README.md release/
+          Compress-Archive -Path release/* -DestinationPath "NNN-$Version.zip"
 
-          $Native = Get-ChildItem "NNN-Solution/NNNCSharp" -Recurse -Filter NNN.dll |
-            Select-Object -First 1
-          
-          Copy-Item $Native.FullName "release/NNN/Runtime/"
+      - name: Prepare NuGet package
+        shell: pwsh
+        run: |
+          $Version = "${{ steps.version.outputs.VERSION }}"
 
-          $RepoRoot = $env:GITHUB_WORKSPACE
-      
-          Copy-Item $RepoRoot/LICENSE.txt release
-          Copy-Item $RepoRoot/README.md release
-      
-          Compress-Archive `
-            -Path release/* `
-            -DestinationPath "NNN-$Version.zip"
+          # Copy outputs to where .nuspec expects them
+          $NuspecDir = "NNN-Solution/NNNCSharp"
+          New-Item -ItemType Directory -Force "$NuspecDir/bin/x64/ReleasePackage" | Out-Null
+          Copy-Item "${{ steps.outputs.outputs.MANAGED }}" "$NuspecDir/bin/x64/ReleasePackage/"
+          Copy-Item "${{ steps.outputs.outputs.NATIVE }}" "$NuspecDir/bin/x64/ReleasePackage/"
+
+          nuget pack "$NuspecDir/NNNCSharp.nuspec" `
+            -Version $Version `
+            -OutputDirectory nuget-output `
+            -Properties "version=$Version"
+
+      - name: NuGet login
+        uses: NuGet/login@v1
+        id: nuget-login
+        with:
+          user: FlyingArthur
+
+      - name: Push NuGet package
+        shell: pwsh
+        run: |
+            nuget push nuget-output/*.nupkg `
+            -Source https://api.nuget.org/v3/index.json `
+            -ApiKey ${{ steps.nuget-login.outputs.NUGET_API_KEY }} `
+            -SkipDuplicate
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             NNN-${{ github.ref_name }}.zip
+            nuget-output/*.nupkg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
