@@ -84,7 +84,9 @@ using NNNCSharp.Components.Trainers;
 
 Tensor[] trainData; // array containing all of your individual training inputs
 Tensor[] trainTargets; // array containing all of your individual training targets
-BatchBuffer yourBatchBuffer = new(trainData, trainTargets); // will automatically create batch tensors from your trainData and trainTargets arrays
+
+// BatchBuffer will automatically create batch tensors from your trainData and trainTargets arrays
+BatchBuffer yourBatchBuffer = new(trainData, trainTargets);
 
 Tensor inputFormat = new(new int[] { 1, [your training data dimensions] }); // specifies input shape the model should expect
 
