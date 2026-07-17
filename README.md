@@ -27,9 +27,10 @@ I originally intended for this project to simply be my experimentation with impl
 
 ## How to Use - Compatible with .NET Standard 2.1 and Newer
 ### Raw DLL Download (WIP)
-1. Download the NNN.dll and NNNCSharp.dll files from the most recent release.
-2. Add the DLL files into anywhere in your project's directory.
-3. Add the following to your .csproj file:
+1. Download the NNNv{version number}.zip file from the GitHub release.
+2. Extract the .zip file, you will see a "runtime" directory, along with the LICENSE and README files.
+4. Add the DLL files in the extracted "runtime" directory into anywhere in your project's directory.
+5. Add the following to your .csproj file:
    ```
    <ItemGroup>
      <Reference Include="NNNCSharp">
@@ -37,7 +38,7 @@ I originally intended for this project to simply be my experimentation with impl
      </Reference>
    </ItemGroup>
    ```
-4. Follow the [Creating a Custom Training Environment](#creating-a-custom-training-environment), [Training a Model](#training-a-model), and/or [Saving/Loading Models](#savingloading-models) guides to implement Neural Network Notions in your code.
+6. Follow the [Creating a Custom Training Environment](#creating-a-custom-training-environment), [Training a Model](#training-a-model), and/or [Saving/Loading Models](#savingloading-models) guides to implement Neural Network Notions in your code.
 
 ### NuGet Package Install
 WIP
