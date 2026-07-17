@@ -16,6 +16,35 @@ A neural network framework created from scratch in C# and C++ implementing autom
 - Performance optimizations via SIMD vectorization and parallelization
 - Custom file type for saving trained models (.nnn)
 
+## Motivation
+I originally intended for this project to simply be my experimentation with implementing the systems described in Seth Weidman's _Deep Learning from Scratch_. However, after seeing my basic neural networks successfully
+ train using the Boston housing dataset highlighted in Weidman's book, I became increasingly interested in creating a framework which could support Deep Q-Network training (DQN) for complex environments. After a number
+ of failed attempts using the framework I had derived from the examples in _Deep Learning from Scratch_, I came to the realization that in order to support more complex networks while also maintaining sufficiently high
+ performance to train such networks on my own personal computer, I would have to completely rewrite the entire framework. At this point I discovered the automatic differentiation algorithms used by libraries such as
+ PyTorch, and decided that my new framework would follow a similar approach. Additionally, in order to gain as thorough of an understanding of the mathematics and logic behind these systems, I opted to avoid using
+ any features not provided in the C# and C++ standard libraries, which I also believed would provide me with valuable experience in designing full-scale frameworks from scratch. Now, many months after I first began
+ experimenting with the Neural Network Nonsense project, I can proudly say that those initial efforts have grown into something far larger than I could have ever anticipated.
+
+## How to Use
+### Raw DLL Download (WIP)
+1. Download the NNN.dll and NNNCSharp.dll files from the most recent release.
+2. 
+
+### NuGet Package Install
+WIP
+
+### Unity Package Install
+WIP
+
+### Creating a Custom Training Environment
+WIP
+
+### Training a Model
+WIP
+
+### Saving/Loading Models
+WIP
+
 ## Results
 ### Gradient Correctness Tests (Autograd Verification)
 | Operation | Max Relative Error |
@@ -294,29 +323,6 @@ public (bool won, bool tied) PlayRandom(Model agent)
 
     return (false, !CheckWin() && BoardFilled());
 }
-```
-
-## Motivation
-I originally intended for this project to simply be my experimentation with implementing the systems described in Seth Weidman's _Deep Learning from Scratch_. However, after seeing my basic neural networks successfully
- train using the Boston housing dataset highlighted in Weidman's book, I became increasingly interested in creating a framework which could support Deep Q-Network training (DQN) for complex environments. After a number
- of failed attempts using the framework I had derived from the examples in _Deep Learning from Scratch_, I came to the realization that in order to support more complex networks while also maintaining sufficiently high
- performance to train such networks on my own personal computer, I would have to completely rewrite the entire framework. At this point I discovered the automatic differentiation algorithms used by libraries such as
- PyTorch, and decided that my new framework would follow a similar approach. Additionally, in order to gain as thorough of an understanding of the mathematics and logic behind these systems, I opted to avoid using
- any features not provided in the C# and C++ standard libraries, which I also believed would provide me with valuable experience in designing full-scale frameworks from scratch. Now, many months after I first began
- experimenting with the Neural Network Nonsense project, I can proudly say that those initial efforts have grown into something far larger than I could have ever anticipated.
-
-## Example
-```
-Model network = new Model([
-  new Dense(16, new ReLU()),
-  new Dense(1, new Linear())
-  ], InputFormat);
-
-Optimizer optimizer = new Adam(0.001);
-Cost cost = new Huber();
-
-Trainer trainer = new Trainer(network, optimizer, cost);
-trainer.Train(x, y, epochs: 1000);
 ```
 
 ## Architecture
