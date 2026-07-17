@@ -1,17 +1,21 @@
 ﻿using NNNCSharp.Components.Autodiff;
 using NNNCSharp.Components.Interop;
+using System;
 
-namespace NNNCSharp.Components.Optimizers;
-
-/// <summary>
-/// Stochastic Gradient Descent optimizer.
-/// </summary>
-/// <param name="learningRate">Gradient scaling factor for parameter updates.</param>
-public class SGD(double learningRate) : Optimizer(learningRate)
+namespace NNNCSharp.Components.Optimizers
 {
-    public override void Step(Tensor parameter, int iterations)
+    /// <summary>
+    /// Stochastic Gradient Descent optimizer.
+    /// </summary>
+    /// <param name="learningRate">Gradient scaling factor for parameter updates.</param>
+    public class SGD: Optimizer
     {
-        NativeMethods.optimizers_sgd(parameter.Handle, LR);
-        GC.KeepAlive(parameter);
+        public SGD(double learningRate) : base(learningRate) { }
+
+        public override void Step(Tensor parameter, int iterations)
+        {
+            NativeMethods.optimizers_sgd(parameter.Handle, LR);
+            GC.KeepAlive(parameter);
+        }
     }
 }

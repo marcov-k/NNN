@@ -1,19 +1,20 @@
 ﻿using NNNCSharp.Components.Autodiff;
 
-namespace NNNCSharp.Components.Costs;
-
-/// <summary>
-/// Mean Squared Error cost function.
-/// </summary>
-public class MSE : Cost
+namespace NNNCSharp.Components.Costs
 {
-    public override Tensor CalculateCost(Tensor predictions, Tensor target)
+    /// <summary>
+    /// Mean Squared Error cost function.
+    /// </summary>
+    public class MSE : Cost
     {
-        return Tensor.Mean(CalculatePerSampleCost(predictions, target));
-    }
+        public override Tensor CalculateCost(Tensor predictions, Tensor target)
+        {
+            return Tensor.Mean(CalculatePerSampleCost(predictions, target));
+        }
 
-    public override Tensor CalculatePerSampleCost(Tensor predictions, Tensor target)
-    {
-        return Tensor.MSE(predictions, target);
+        public override Tensor CalculatePerSampleCost(Tensor predictions, Tensor target)
+        {
+            return Tensor.MSE(predictions, target);
+        }
     }
 }
