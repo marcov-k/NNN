@@ -116,19 +116,24 @@ jobs:
 
           Compress-Archive -Path upm/* -DestinationPath "NNN-UPM-$Tag.zip"
 
+          $TmpDir = New-Item -ItemType Directory -Path "$env:RUNNER_TEMP/upm-git-deployment" -Force
+          Copy-Item -Recurse upm/* $TmpDir.FullName -Force
+          Push-Location $TmpDir.FullName
+
+          git init
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
 
-          git checkout --orphan upm-deploy
-          git rm -rf . --quiet
-          Copy-Item -Recurse upm/* . -Force
+          git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+
           git add -A
           git commit -m "UPM release $Tag"
           git tag "upm-$Tag"
-          git push origin upm-deploy:upm --force
+
+          git push origin HEAD:upm --force
           git push origin "upm-$Tag"
 
-          git checkout ${{ github.sha }}
+          Pop-Location
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
