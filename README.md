@@ -25,7 +25,7 @@ I originally intended for this project to simply be my experimentation with impl
  any features not provided in the C# and C++ standard libraries, which I also believed would provide me with valuable experience in designing full-scale frameworks from scratch. Now, many months after I first began
  experimenting with the Neural Network Nonsense project, I can proudly say that those initial efforts have grown into something far larger than I could have ever anticipated.
 
-## How to Use
+## How to Use - Compatible with .NET Standard 2.1 and Newer
 ### Raw DLL Download (WIP)
 1. Download the NNN.dll and NNNCSharp.dll files from the most recent release.
 2. 
@@ -420,6 +420,9 @@ NNN-Solution - Directory (Full project solution)\
 │&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── FIFOBuffer - C# Script (Standard First-In First-Out buffer)\
 │&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── ReplayBuffer - C# Script (PER buffer for DQN experience replay)\
 │&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;└── SumTree - C# Script (Standard sum tree data structure)\
+│&emsp;&emsp;&emsp;&ensp;│\
+│&emsp;&emsp;&emsp;&ensp;├── CompilerAttributes - Directory\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;└── CompilerAttributes - C# Script (Applies necessary compiler attributes)\
 │&emsp;&emsp;&emsp;&ensp;│\
 │&emsp;&emsp;&emsp;&ensp;├── Costs - Directory\
 │&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── Cost - C# Script (Base class)\
