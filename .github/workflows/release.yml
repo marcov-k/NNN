@@ -36,11 +36,14 @@ jobs:
           
           New-Item -ItemType Directory -Force release/Runtime | Out-Null
       
-          Copy-Item "**/bin/x64/ReleasePackage/NNN.dll" release/Runtime
-          Copy-Item "**/bin/x64/ReleasePackage/NNNCSharp.dll" release/Runtime
+          Get-ChildItem -Recurse -Filter NNN.dll |
+              Copy-Item -Destination release/Runtime
+          
+          Get-ChildItem -Recurse -Filter NNNCSharp.dll |
+              Copy-Item -Destination release/Runtime
       
-          Copy-Item LICENSE release
-          Copy-Item README.md release
+          Copy-Item ../LICENSE release
+          Copy-Item ../README.md release
       
           Compress-Archive `
             -Path release/* `
