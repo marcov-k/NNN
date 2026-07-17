@@ -1,0 +1,29 @@
+name: Build Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: windows-2025-vs2026
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Restore NuGet packages
+        run: nuget restore NNN-Solution.sln
+
+      - name: Build ReleasePackage
+        run: |
+          msbuild NNN-Solution.sln ^
+            /p:Configuration=ReleasePackage ^
+            /p:Platform=x64
+
+      - name: Show build output
+        run: dir /s *.dll
