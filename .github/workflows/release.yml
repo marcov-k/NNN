@@ -36,11 +36,15 @@ jobs:
           
           New-Item -ItemType Directory -Force release/NNN/Runtime | Out-Null
       
-          Copy-Item "NNN-Solution/NNNCSharp/bin/ReleasePackage/netstandard2.1/NNNCSharp.dll" `
-            "release/NNN/runtime/"
+          $NNNCSharp = Get-ChildItem "NNN-Solution/NNNCSharp" -Recurse -Filter NNNCSharp.dll |
+            Select-Object -First 1
+          
+          Copy-Item $NNNCSharp.FullName "release/NNN/Runtime/"
 
-          Copy-Item "NNN-Solution/NNNCSharp/bin/ReleasePackage/netstandard2.1/NNN.dll" `
-            "release/NNN/runtime/"
+          $Native = Get-ChildItem "NNN-Solution/NNNCSharp" -Recurse -Filter NNN.dll |
+            Select-Object -First 1
+          
+          Copy-Item $Native.FullName "release/NNN/Runtime/"
       
           Copy-Item ../LICENSE release
           Copy-Item ../README.md release
