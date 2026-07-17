@@ -31,7 +31,7 @@ I originally intended for this project to simply be my experimentation with impl
 - Requires 64-bit Windows with the Microsoft Visual C++ Redistributable installed
 
 ### Raw DLL Download
-1. Download the NNNv{version number}.zip file from the GitHub release.
+1. Download the NNN-vX.X.X.zip file from the GitHub release.
 2. Extract the .zip file, you will see an "NNN" directory - which contains the "runtime" directory, along with the LICENSE and README files.
 4. Add the DLL files (NNN.dll and NNNCSharp.dll) in the extracted "runtime" directory into anywhere in your project's directory.
 5. Add the following to your .csproj file:
