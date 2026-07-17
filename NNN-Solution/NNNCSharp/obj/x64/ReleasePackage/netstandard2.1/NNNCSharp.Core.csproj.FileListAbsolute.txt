@@ -1,0 +1,11 @@
+D:\a\NNN\NNN\NNN-Solution\NNNCSharp\bin\x64\ReleasePackage\netstandard2.1\NNN.dll
+D:\a\NNN\NNN\NNN-Solution\NNNCSharp\bin\x64\ReleasePackage\netstandard2.1\NNNCSharp.deps.json
+D:\a\NNN\NNN\NNN-Solution\NNNCSharp\bin\x64\ReleasePackage\netstandard2.1\NNNCSharp.dll
+D:\a\NNN\NNN\NNN-Solution\NNNCSharp\bin\x64\ReleasePackage\netstandard2.1\NNNCSharp.pdb
+D:\a\NNN\NNN\NNN-Solution\NNNCSharp\obj\x64\ReleasePackage\netstandard2.1\NNNCSharp.Core.GeneratedMSBuildEditorConfig.editorconfig
+D:\a\NNN\NNN\NNN-Solution\NNNCSharp\obj\x64\ReleasePackage\netstandard2.1\NNNCSharp.Core.AssemblyInfoInputs.cache
+D:\a\NNN\NNN\NNN-Solution\NNNCSharp\obj\x64\ReleasePackage\netstandard2.1\NNNCSharp.Core.AssemblyInfo.cs
+D:\a\NNN\NNN\NNN-Solution\NNNCSharp\obj\x64\ReleasePackage\netstandard2.1\NNNCSharp.Core.csproj.CoreCompileInputs.cache
+D:\a\NNN\NNN\NNN-Solution\NNNCSharp\obj\x64\ReleasePackage\netstandard2.1\NNNCSharp.Core.sourcelink.json
+D:\a\NNN\NNN\NNN-Solution\NNNCSharp\obj\x64\ReleasePackage\netstandard2.1\NNNCSharp.dll
+D:\a\NNN\NNN\NNN-Solution\NNNCSharp\obj\x64\ReleasePackage\netstandard2.1\NNNCSharp.pdb
