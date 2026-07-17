@@ -28,8 +28,8 @@ I originally intended for this project to simply be my experimentation with impl
 ## How to Use - Compatible with .NET Standard 2.1 and Newer
 ### Raw DLL Download (WIP)
 1. Download the NNNv{version number}.zip file from the GitHub release.
-2. Extract the .zip file, you will see a "runtime" directory, along with the LICENSE and README files.
-4. Add the DLL files in the extracted "runtime" directory into anywhere in your project's directory.
+2. Extract the .zip file, you will see an "NNN" directory - which contains the "runtime" directory, along with the LICENSE and README files.
+4. Add the DLL files (NNN.dll and NNNCSharp.dll) in the extracted "runtime" directory into anywhere in your project's directory.
 5. Add the following to your .csproj file:
    ```
    <ItemGroup>
