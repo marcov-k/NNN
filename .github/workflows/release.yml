@@ -66,6 +66,7 @@ jobs:
           Compress-Archive -Path release/* -DestinationPath "NNN-$Version.zip"
 
       - name: Prepare NuGet package
+        id: pack
         shell: pwsh
         run: |
           $Version = "${{ steps.version.outputs.VERSION }}"
@@ -81,6 +82,9 @@ jobs:
             -OutputDirectory nuget-output `
             -Properties "version=$Version"
 
+          $PackagePath = (Get-ChildItem "nuget-output/*.nupkg" | Select-Object -First 1).FullName
+          echo "PACKAGE_PATH=$PackagePath" >> $env:GITHUB_OUTPUT
+
       - name: NuGet login
         uses: NuGet/login@v1
         id: nuget-login
@@ -90,8 +94,8 @@ jobs:
       - name: Push NuGet package
         shell: pwsh
         run: |
-            nuget push nuget-output/*.nupkg `
-            -Source https://api.nuget.org/v3/index.json `
+            nuget push "${{ steps.pack.outputs.PACKAGE_PATH }}" `
+            -Source https://nuget.org `
             -ApiKey ${{ steps.nuget-login.outputs.NUGET_API_KEY }} `
             -SkipDuplicate
 
