@@ -50,7 +50,16 @@ I originally intended for this project to simply be my experimentation with impl
 2. Follow the [Creating a Custom Training Environment](#creating-a-custom-training-environment), [Training a Model](#training-a-model), and/or [Saving/Loading Models](#savingloading-models) guides to implement Neural Network Notions in your code.
 
 ### Unity Package Install
-WIP
+#### Option 1 - via git URL
+1. Open the Unity Package Manager and click the "+" in the top left corner.
+2. Select "Add package from git URL."
+3. Enter the URL "https://github.com/marcov-k/NNN.git#upm"
+4. Follow the [Creating a Custom Training Environment](#creating-a-custom-training-environment), [Training a Model](#training-a-model), and/or [Saving/Loading Models](#savingloading-models) guides to implement Neural Network Notions in your code.
+
+#### Option 2 - via zip
+1. Download the NNN-UPM-vX.X.X.zip file from the GitHub release.
+2. Extract the .zip file and paste the full contents into your Unity project's "Packages" folder.
+3. Follow the [Creating a Custom Training Environment](#creating-a-custom-training-environment), [Training a Model](#training-a-model), and/or [Saving/Loading Models](#savingloading-models) guides to implement Neural Network Notions in your code.
 
 ### Creating a Custom Training Environment
 WIP
