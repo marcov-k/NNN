@@ -236,7 +236,7 @@ Total Time Required for Training and Evaluation: 3:15.919
 #### Code Used for Testing:
 ##### Training Hyperparameters:
 ```
-NNN.Environment env = new TicTacToe();
+DQNEnvironment env = new TicTacToe();
 double exploration = 1.0;
 double explorationDecay = 0.9995;
 double minExploration = 0.01;
@@ -421,8 +421,8 @@ NNN-Solution - Directory (Full project solution)\
 │&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── MSE - C# Script\
 │&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;└── SoftmaxCrossEntropy - C# Script\
 │&emsp;&emsp;&emsp;&ensp;│\
-│&emsp;&emsp;&emsp;&ensp;├── Environments - Directory (DQN)\
-│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── Environment - C# Script (Base class)\
+│&emsp;&emsp;&emsp;&ensp;├── DQNEnvironments - Directory\
+│&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── DQNEnvironment - C# Script (Base class)\
 │&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── MovementGrid2D - C# Script\
 │&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;├── Snake - C# Script\
 │&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;└── TicTacToe - C# Script\
