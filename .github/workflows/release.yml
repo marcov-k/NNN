@@ -25,6 +25,3 @@ jobs:
           msbuild NNN-Solution/NNN-Solution.sln ^
             /p:Configuration=ReleasePackage ^
             /p:Platform=x64
-
-      - name: Show build output
-        run: dir /s *.dll
