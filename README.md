@@ -105,10 +105,14 @@ Cost yourCost = new MSE(); // mean squared error loss
 
 Trainer yourTrainer = new(yourModel, yourOptimizer, yourCost, [desired maximum gradient norm]);
 
-yourTrainer.Train(yourBatchBuffer, [desired batch size], [desired epochs], [whether to train on all batches every epoch (true/false)],
-  [optional function for testing performance*], [optional learning rate decay rate], [optional minimum learning rate fraction],
-  [how many epochs to run between performance tests], [how many inputs to test per performance test]);
-// *The performance test function must match the declaration 'Func<Model, int, bool>' receiving the model to test and the test index as inputs, and returning a boolean based on whether the model passed the test or not.
+yourTrainer.Train(yourBatchBuffer, [desired batch size], [desired epochs],
+  [whether to train on all batches every epoch (true/false)],
+  [optional function for testing performance*], [optional learning rate decay rate],
+  [optional minimum learning rate fraction], [how many epochs to run between performance tests],
+  [how many inputs to test per performance test]);
+// *The performance test function must match the declaration 'Func<Model, int, bool>'
+// receiving the model to test and the test index as inputs, and returning a boolean
+// based on whether the model passed the test or not.
 
 yourModel = yourTrainer.Model; // get the best-performing model from the trainer
 ```
