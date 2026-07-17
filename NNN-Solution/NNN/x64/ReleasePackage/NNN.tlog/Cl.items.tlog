@@ -1,0 +1,14 @@
+D:\a\NNN\NNN\NNN-Solution\NNN\dllmain.cpp;D:\a\NNN\NNN\NNN-Solution\NNN\x64\ReleasePackage\dllmain.obj
+D:\a\NNN\NNN\NNN-Solution\NNN\exports.cpp;D:\a\NNN\NNN\NNN-Solution\NNN\x64\ReleasePackage\exports.obj
+D:\a\NNN\NNN\NNN-Solution\NNN\MathUtils.cpp;D:\a\NNN\NNN\NNN-Solution\NNN\x64\ReleasePackage\MathUtils.obj
+D:\a\NNN\NNN\NNN-Solution\NNN\Models.cpp;D:\a\NNN\NNN\NNN-Solution\NNN\x64\ReleasePackage\Models.obj
+D:\a\NNN\NNN\NNN-Solution\NNN\Optimizers.cpp;D:\a\NNN\NNN\NNN-Solution\NNN\x64\ReleasePackage\Optimizers.obj
+D:\a\NNN\NNN\NNN-Solution\NNN\pch.cpp;D:\a\NNN\NNN\NNN-Solution\NNN\x64\ReleasePackage\pch.obj
+D:\a\NNN\NNN\NNN-Solution\NNN\TensorActivations.cpp;D:\a\NNN\NNN\NNN-Solution\NNN\x64\ReleasePackage\TensorActivations.obj
+D:\a\NNN\NNN\NNN-Solution\NNN\TensorCosts.cpp;D:\a\NNN\NNN\NNN-Solution\NNN\x64\ReleasePackage\TensorCosts.obj
+D:\a\NNN\NNN\NNN-Solution\NNN\TensorGraph.cpp;D:\a\NNN\NNN\NNN-Solution\NNN\x64\ReleasePackage\TensorGraph.obj
+D:\a\NNN\NNN\NNN-Solution\NNN\TensorIndexing.cpp;D:\a\NNN\NNN\NNN-Solution\NNN\x64\ReleasePackage\TensorIndexing.obj
+D:\a\NNN\NNN\NNN-Solution\NNN\TensorInitializations.cpp;D:\a\NNN\NNN\NNN-Solution\NNN\x64\ReleasePackage\TensorInitializations.obj
+D:\a\NNN\NNN\NNN-Solution\NNN\TensorOperations.cpp;D:\a\NNN\NNN\NNN-Solution\NNN\x64\ReleasePackage\TensorOperations.obj
+D:\a\NNN\NNN\NNN-Solution\NNN\TensorProperties.cpp;D:\a\NNN\NNN\NNN-Solution\NNN\x64\ReleasePackage\TensorProperties.obj
+D:\a\NNN\NNN\NNN-Solution\NNN\TensorUtilities.cpp;D:\a\NNN\NNN\NNN-Solution\NNN\x64\ReleasePackage\TensorUtilities.obj

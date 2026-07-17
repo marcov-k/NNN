@@ -1,0 +1,52 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "NNNExplorer/1.0.0": {
+        "dependencies": {
+          "NNNCSharp": "1.0.0",
+          "NNNCSharp.Reference": "1.0.0.0"
+        },
+        "runtime": {
+          "NNNExplorer.dll": {}
+        }
+      },
+      "NNNCSharp/1.0.0": {
+        "runtime": {
+          "NNNCSharp.dll": {
+            "fileVersion": "0.0.0.0"
+          }
+        }
+      },
+      "NNNCSharp.Reference/1.0.0.0": {
+        "runtime": {
+          "NNNCSharp.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "NNNExplorer/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "NNNCSharp/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "NNNCSharp.Reference/1.0.0.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}
