@@ -25,7 +25,7 @@ I originally intended for this project to simply be my experimentation with impl
  any features not provided in the C# and C++ standard libraries, which I also believed would provide me with valuable experience in designing full-scale frameworks from scratch. Now, many months after I first began
  experimenting with the Neural Network Nonsense project, I can proudly say that those initial efforts have grown into something far larger than I could have ever anticipated.
 
-## How to Use - Compatible with .NET Standard 2.1 and Newer
+## How to Use - Compatible with .NET Standard 2.1 and Newer (Requires 64-bit Windows and the Microsoft Visual C++ Redistributable installed)
 ### Raw DLL Download (WIP)
 1. Download the NNNv{version number}.zip file from the GitHub release.
 2. Extract the .zip file, you will see an "NNN" directory - which contains the "runtime" directory, along with the LICENSE and README files.
