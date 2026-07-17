@@ -69,7 +69,54 @@ I originally intended for this project to simply be my experimentation with impl
 WIP
 
 ### Training a Model
-WIP
+#### Special Cases:
+- When using Model.Forward() or Model.Predict() with a single input instead of a batch, use Tensor.WrapBatch() on the input first to convert it into a batch of 1 input.
+- Whenever creating a new Tensor through any constructor, function or operator, ensure the instance is dispoed via Tensor.Dispose() once it is no longer being used - otherwise it may become a memory leak.
+#### Standard Supervised Training:
+```
+using NNNCSharp.Components.Autodiff;
+using NNNCSharp.Components.Buffers;
+using NNNCSharp.Components.Costs;
+using NNNCSharp.Components.Models;
+using NNNCSharp.Componens.Models.Layers;
+using NNNCSharp.Components.Optimizers;
+using NNNCSharp.Components.Trainers;
+
+Tensor[] trainData; // array containing all of your individual training inputs
+Tensor[] trainTargets; // array containing all of your individual training targets
+BatchBuffer yourBatchBuffer = new(trainData, trainTargets); // will automatically create batch tensors from your trainData and trainTargets arrays
+
+Tensor inputFormat = new(new int[] { 1, [your training data dimensions] }); // specifies input shape the model should expect
+
+// Creates a model with the following architecture:
+// Convolutional layer with 8 filters, 5x5 kernels, and the ReLU activation function
+// Convolutional layer with 16 filters, 5x5 kernels, the ReLU activation function, and a spatial dropout of 0.1
+// Fully connected (Dense) layer with 128 neurons, the ReLU activation function, and a dropout of 0.25
+// Fully connected (Dense) layer with 10 (output) neurons, and no (Linear) activation function
+Model yourModel = new([
+  new Conv(8, new int[] { 5, 5 }, new ReLU()),
+  new Conv(16, new int[] { 5, 5 }, new ReLU(), 0.1),
+  new Dense(128, new ReLU(), 0.25),
+  new Dense(10, new Linear())
+  ], inputFormat);
+
+Optimizer yourOptimizer = new SGD([desired learning rate]); // stochastic gradient descent optimizer
+Cost yourCost = new MSE(); // mean squared error loss
+
+Trainer yourTrainer = new(yourModel, yourOptimizer, yourCost, [desired maximum gradient norm]);
+
+yourTrainer.Train(yourBatchBuffer, [desired batch size], [desired epochs], [whether to train on all batches every epoch (true/false)],
+  [optional function for testing performance*], [optional learning rate decay rate], [optional minimum learning rate fraction],
+  [how many epochs to run between performance tests], [how many inputs to test per performance test]);
+// *The performance test function must match the declaration 'Func<Model, int, bool>' receiving the model to test and the test index as inputs, and returning a boolean based on whether the model passed the test or not.
+
+yourModel = yourTrainer.Model; // get the best-performing model from the trainer
+```
+
+#### DQN Training:
+```
+
+```
 
 ### Saving/Loading Models
 #### Specify the directory to save/load models from:
