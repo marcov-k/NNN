@@ -99,11 +99,43 @@ jobs:
             -ApiKey ${{ steps.nuget-login.outputs.NUGET_API_KEY }} `
             -SkipDuplicate
 
+      - name: Prepare UPM package
+        shell: pwsh
+        run: |
+          $Version = "${{ steps.version.outputs.VERSION }}"
+          $Tag = "${{ steps.version.outputs.TAG }}"
+
+          $PackageJson = Get-Content "upm/package.json" | ConvertFrom-Json
+          $PackageJson.version = $Version
+          $PackageJson | ConvertTo-Json -Depth 10 | Set-Content "upm/package.json"
+
+          Copy-Item "${{ steps.outputs.outputs.MANAGED }}" "upm/Runtime/NNNCSharp.dll"
+          Copy-Item "${{ steps.outputs.outputs.NATIVE }}" "upm/Runtime/NNN.dll"
+          Copy-Item $env:GITHUB_WORKSPACE/LICENSE.txt "upm/"
+          Copy-Item $env:GITHUB_WORKSPACE/README.md "upm/"
+
+          Compress-Archive -Path upm/* -DestinationPath "NNN-UPM-$Tag.zip"
+
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+          git checkout --orphan upm-deploy
+          git rm -rf . --quiet
+          Copy-Item -Recurse upm/* . -Force
+          git add -A
+          git commit -m "UPM release $Tag"
+          git tag "upm-$Tag"
+          git push origin upm-deploy:upm --force
+          git push origin "upm-$Tag"
+
+          git checkout -
+
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             NNN-${{ github.ref_name }}.zip
             nuget-output/*.nupkg
+            NNN-UPM-${{ steps.version.outputs.TAG }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
