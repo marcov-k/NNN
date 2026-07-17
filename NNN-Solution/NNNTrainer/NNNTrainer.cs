@@ -2,7 +2,7 @@
 using NNNCSharp.Components.Autodiff;
 using NNNCSharp.Components.Buffers;
 using NNNCSharp.Components.Costs;
-using NNNCSharp.Components.Environments;
+using NNNCSharp.Components.DQNEnvironments;
 using NNNCSharp.Components.Episodes;
 using NNNCSharp.Components.Models;
 using NNNCSharp.Components.Models.Layers;
@@ -41,7 +41,7 @@ public class NNNTrainer
     static void DQNTraining()
     {
         Model model;
-        NNNCSharp.Components.Environments.Environment env = new Snake();
+        DQNEnvironment env = new Snake();
         double exploration = 1.0;
         double explorationDecay = 0.9999;
         double minExploration = 0.01;
@@ -186,7 +186,7 @@ public class NNNTrainer
     /// <param name="model">Model to train.</param>
     /// <param name="episodeBuffer">Buffer to store past training episodes in.</param>
     /// <param name="testEpisodes">Number of episodes to run per performance test.</param>
-    static void DQNTrainingLoop(DQNTrainer dqnTrainer, NNNCSharp.Components.Environments.Environment env, Model model,
+    static void DQNTrainingLoop(DQNTrainer dqnTrainer, DQNEnvironment env, Model model,
         ref FIFOBuffer<Episode> episodeBuffer, int testEpisodes)
     {
         // Train agent until user indicates to stop

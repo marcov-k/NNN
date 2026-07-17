@@ -4,12 +4,12 @@ using NNNCSharp.Components.Utilities.SaveSystem;
 using static NNNCSharp.Components.Utilities.UIUtils;
 using NNNCSharp.Components.Autodiff;
 
-namespace NNNCSharp.Components.Environments;
+namespace NNNCSharp.Components.DQNEnvironments;
 
 /// <summary>
 /// Snake game environment.
 /// </summary>
-public class Snake : Environment
+public class Snake : DQNEnvironment
 {
     // Base Environment API overrides
     public override Tensor StateFormat => new([1, GridDims.Y, GridDims.X, 8]); // 20 x 20 grid with one-hot encoding for contents of each cell and the direction each cell's content will move in

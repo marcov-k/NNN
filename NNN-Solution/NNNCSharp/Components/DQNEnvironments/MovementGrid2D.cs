@@ -4,12 +4,12 @@ using NNNCSharp.Components.Autodiff;
 using NNNCSharp.Components.Utilities.SaveSystem;
 using static NNNCSharp.Components.Utilities.UIUtils;
 
-namespace NNNCSharp.Components.Environments;
+namespace NNNCSharp.Components.DQNEnvironments;
 
 /// <summary>
 /// 2D grid environment for an agent to navigate between two points.
 /// </summary>
-public class MovementGrid2D : Environment
+public class MovementGrid2D : DQNEnvironment
 {
     // Base Environment API overrides
     public override Tensor StateFormat => new([1, 4]); // encodes agent's and target's grid positions

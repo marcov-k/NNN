@@ -3,12 +3,12 @@ using NNNCSharp.Components.Episodes;
 using NNNCSharp.Components.Models;
 using NNNCSharp.Components.Autodiff;
 
-namespace NNNCSharp.Components.Environments;
+namespace NNNCSharp.Components.DQNEnvironments;
 
 /// <summary>
 /// Base class for DQN training environments.
 /// </summary>
-public abstract class Environment
+public abstract class DQNEnvironment
 {
     /// <summary>
     /// The number of elements present in the environment's state representation.

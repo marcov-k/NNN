@@ -1,7 +1,7 @@
 ﻿using NNNCSharp.Components.Interop;
 using NNNCSharp.Components.Buffers;
 using NNNCSharp.Components.Costs;
-using NNNCSharp.Components.Environments;
+using NNNCSharp.Components.DQNEnvironments;
 using NNNCSharp.Components.Episodes;
 using NNNCSharp.Components.Models;
 using NNNCSharp.Components.Optimizers;
@@ -30,7 +30,7 @@ namespace NNNCSharp.Components.Trainers;
 /// <param name="tau">Target model parameter update factor.</param>
 /// <param name="maxGradNorm">Maximum total magnitude of gradients without normalization.</param>
 /// <param name="minExperiences">Minimum number of experiences before training can begin.</param>
-public class DQNTrainer(Model agent, Environments.Environment environment, Optimizer optimizer, Cost cost, int trainEvery = 4,
+public class DQNTrainer(Model agent, DQNEnvironment environment, Optimizer optimizer, Cost cost, int trainEvery = 4,
     double discount = 0.995, double exploration = 1.0, double explorationDecay = 0.99, double minExploration = 0.01, int replayBufferSize = 10000,
     int batchSize = 64, int agentBufferSize = 5, int opponentCopyRate = 100, int minRandomOpponentEpisodes = 200, double tau = 0.005,
     double maxGradNorm = 1.0, int minExperiences = 1000)
@@ -47,7 +47,7 @@ public class DQNTrainer(Model agent, Environments.Environment environment, Optim
     /// <summary>
     /// Environment agent is being trained in.
     /// </summary>
-    readonly Environments.Environment Environment = environment;
+    readonly DQNEnvironment Environment = environment;
     /// <summary>
     /// Optimizer used to update parameters.
     /// </summary>

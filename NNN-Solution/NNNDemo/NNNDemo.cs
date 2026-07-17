@@ -1,5 +1,5 @@
 ﻿using NNNCSharp.Components.Autodiff;
-using NNNCSharp.Components.Environments;
+using NNNCSharp.Components.DQNEnvironments;
 using NNNCSharp.Components.Utilities.DataLoaders;
 using NNNCSharp.Components.Utilities.SaveSystem;
 using static NNNCSharp.Components.Utilities.UIUtils;
@@ -14,7 +14,7 @@ public class NNNDemo
     /// <summary>
     /// Array of all environments with trained and implemented demonstrations.
     /// </summary>
-    static readonly NNNCSharp.Components.Environments.Environment[] DQNDemoEnvs = [new MovementGrid2D(-10, 10, -10, 10),
+    static readonly DQNEnvironment[] DQNDemoEnvs = [new MovementGrid2D(-10, 10, -10, 10),
         new TicTacToe(), new Snake()];
     /// <summary>
     /// Array of all standard supervised training demo functions.
@@ -63,7 +63,7 @@ public class NNNDemo
 
         Console.WriteLine("\nPress any key to close...");
         Console.ReadKey();
-        System.Environment.Exit(0);
+        Environment.Exit(0);
     }
 
     /// <summary>

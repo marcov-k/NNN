@@ -4,12 +4,12 @@ using NNNCSharp.Components.Utilities.SaveSystem;
 using static NNNCSharp.Components.Utilities.UIUtils;
 using NNNCSharp.Components.Autodiff;
 
-namespace NNNCSharp.Components.Environments;
+namespace NNNCSharp.Components.DQNEnvironments;
 
 /// <summary>
 /// Tic-Tac-Toe game environment.
 /// </summary>
-public class TicTacToe : Environment, ISelfPlay
+public class TicTacToe : DQNEnvironment, ISelfPlay
 {
     // Base Environment API overrides
     public override Tensor StateFormat => new([1, 10]); // encodes state of all 9 board positions + current player to move

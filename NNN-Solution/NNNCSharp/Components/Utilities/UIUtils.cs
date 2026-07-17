@@ -1,4 +1,5 @@
 ﻿using NNNCSharp.Components.Buffers;
+using NNNCSharp.Components.DQNEnvironments;
 using NNNCSharp.Components.Episodes;
 using NNNCSharp.Components.Models;
 using NNNCSharp.Components.Utilities.SaveSystem;
@@ -38,7 +39,7 @@ public static class UIUtils
     /// </summary>
     /// <param name="env">DQN environment episodes took place in.</param>
     /// <param name="episodeBuffer">Buffer of stored episodes for viewing.</param>
-    public static void ViewEpisodes(Environments.Environment env, ref FIFOBuffer<Episode> episodeBuffer)
+    public static void ViewEpisodes(DQNEnvironment env, ref FIFOBuffer<Episode> episodeBuffer)
     {
         if (GetInput("Replay past episodes? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
         {
