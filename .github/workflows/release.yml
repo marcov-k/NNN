@@ -20,6 +20,7 @@ jobs:
         run: nuget restore NNN-Solution/NNN-Solution.sln
 
       - name: Build ReleasePackage
+        shell: cmd
         run: |
           msbuild NNN-Solution/NNN-Solution.sln ^
             /p:Configuration=ReleasePackage ^
