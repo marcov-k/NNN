@@ -45,7 +45,7 @@ I originally intended for this project to simply be my experimentation with impl
 6. Follow the [Creating a Custom Training Environment](#creating-a-custom-training-environment), [Training a Model](#training-a-model), and/or [Saving/Loading Models](#savingloading-models) guides to implement Neural Network Notions in your code.
 
 ### NuGet Package Install
-1. Search for "NNN" in the Visual Studio NuGet package manager and install.
+1. Search for "NNN" in the Visual Studio NuGet package manager and install.\
 &emsp;Or add the following to your .csproj file:
    ```
    <ItemGroup>
