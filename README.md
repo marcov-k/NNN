@@ -136,7 +136,7 @@ public override double TestTrainingProgress(Model agent, int testEpisodes) {}
 // (Default to environment's current state if no state is given)
 public int GetAgentAction(Model agent, Tensor? state = null) {}
 ```
-4. Refer to the [Training a DQN Agent](#dqn-training) guide to train an agent for your custom DQN environment.
+4. Refer to the [Training a DQN Agent](#dqn-training) guide to train an agent for your custom DQN environment and/or the [Set Logging Output Target](#set-logging-output-target) guide to set up logging.
 
 ### Training a Model
 #### Special Cases:
@@ -230,6 +230,7 @@ yourTrainer.Train([optional ref FIFOBuffer<Episode> buffer for storing past epis
 
 yourModel = yourTrainer.Agent; // get the best-performing agent from the trainer
 ```
+&emsp;Refer to the [Set Logging Output Target](#set-logging-output-target) guide to set up logging.
 
 ### Saving/Loading Models
 #### Specify the directory to save/load models from:
@@ -254,6 +255,13 @@ using NNNCSharp.Components.Models;
 using NNNCSharp.Components.Utilities.SaveSystem;
 
 Model yourModel = Saver.LoadModel("[yourfilename]"); // file name without any extension
+```
+
+### Set Logging Output Target
+```
+using NNNCSharp.Components.Utilities
+
+NNNLog.Output = [your target output] (eg. Console.Write, Debug.Log, etc.)
 ```
 
 ## Testing Results
