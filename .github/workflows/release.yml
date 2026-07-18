@@ -71,7 +71,6 @@ jobs:
         run: |
           $Version = "${{ steps.version.outputs.VERSION }}"
 
-          # Copy outputs to where .nuspec expects them
           $NuspecDir = "NNN-Solution/NNNCSharp"
           New-Item -ItemType Directory -Force "$NuspecDir/bin/x64/ReleasePackage" | Out-Null
           Copy-Item "${{ steps.outputs.outputs.MANAGED }}" "$NuspecDir/bin/x64/ReleasePackage/"
