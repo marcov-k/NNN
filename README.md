@@ -105,9 +105,9 @@ Model yourModel = new([
 Optimizer yourOptimizer = new SGD([desired learning rate]); // stochastic gradient descent optimizer
 Cost yourCost = new MSE(); // mean squared error loss
 
-Trainer yourTrainer = new(yourModel, yourOptimizer, yourCost, [desired maximum gradient norm]);
+Trainer yourTrainer = new(yourModel, yourOptimizer, yourCost, [maximum gradient norm (for gradient clipping)]);
 
-yourTrainer.Train(yourBatchBuffer, [desired batch size], [desired epochs],
+yourTrainer.Train(yourBatchBuffer, [batch size], [epochs to train for],
   [whether to train on all batches every epoch (true/false)],
   [optional function for testing performance*], [optional learning rate decay rate],
   [optional minimum learning rate fraction], [how many epochs to run between performance tests],
@@ -121,7 +121,43 @@ yourModel = yourTrainer.Model; // get the best-performing model from the trainer
 
 #### DQN Training:
 ```
+using NNNCSharp.Components.Costs;
+using NNNCSharp.Components.DQNEnvironments;
+using NNNCSharp.Components.Models;
+using NNNCSharp.Components.Models.Layers;
+using NNNCSharp.Components.Optimizers;
+using NNNCSharp.Components.Trainers;
 
+DQNEnvironment yourEnv; // the DQNEnvironment subclass you want to train in
+
+// Creates a model with the following architecture:
+// Convolutional layer with 8 filters, 3x3 kernels, and the ReLU activation function
+// Convolutional layer with 16 filters, 3x3 kernels, the ReLU activation function, and a spatial dropout of 0.05
+// Fully connected (Dense) layer with 128 neurons, the ReLU activation function, and a dropout of 0.1
+// Fully connected (Dense) layer with 64 neurons, the ReLU activation function, and a dropout of 0.1
+// Fully connected (Dense) layer 1 (output) neuron per discrete action in your DQNEnvironment, and no (Linear) activation function
+Model yourModel = new([
+  new Conv(8, new int[] { 3, 3 }, new ReLU()),
+  new Conv(16, new int[] { 3, 3 }, new ReLU(), 0.05),
+  new Dense(128, new ReLU(), 0.1),
+  new Dense(64, new ReLU(), 0.1),
+  new Dense(yourEnv.ActionCount, new Linear())
+  ], yourEnv.StateFormat);
+
+Optimizer yourOptimizer = new SGD([desired learning rate]); // stochastic gradient descent optimizer
+Cost yourCost = new MSE() // mean squared error loss
+
+DQNTrainer yourTrainer = new(yourModel, yourEnv, [initial exploration rate], [exploration rate decay],
+  [minimum exploration rate], [how many steps to take between training on a batch], [discount factor],
+  yourOptimizer, yourCost, [how many experiences to store for replay], [how many opponent agents to store (for self-play environments)],
+  [batch size], [number of episodes between opponent agent copies (for self-play environments)],
+  [minimum number of initial episodes against a random opponent (for self-play environments)], [tau factor to use for target model updates],
+  [maximum gradient norm (for gradient clipping)], [minimum number of experiences before starting to train (must be >= batch size)]);
+
+yourTrainer.Train([optional ref FIFOBuffer<Episode> buffer for storing past episodes], [episodes to train for],
+  [number of episodes between performance tests], [number of episodes run during each performance test]);
+
+yourModel = yourTrainer.Agent; // get the best-performing agent from the trainer
 ```
 
 ### Saving/Loading Models
