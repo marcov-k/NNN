@@ -1,0 +1,15 @@
+{
+  "name": "com.marcov-k.nnn",
+  "version": "0.4.2",
+  "displayName": "NNN - Neural Network Notions",
+  "description": "C++ accelerated neural network framework with C# API with custom training environment support.",
+  "unity": "2021.3",
+  "author": {
+    "name": "Marco Vasko-Klima",
+    "url": "https://github.com/marcov-k/NNN"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/marcov-k/NNN.git"
+  }
+}
