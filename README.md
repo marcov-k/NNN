@@ -25,7 +25,7 @@ I originally intended for this project to simply be my experimentation with impl
  any features not provided in the C# and C++ standard libraries, which I also believed would provide me with valuable experience in designing full-scale frameworks from scratch. Now, many months after I first began
  experimenting with the Neural Network Nonsense project, I can proudly say that those initial efforts have grown into something far larger than I could have ever anticipated.
 
-## How to Use
+## Installation/How to Use
 ### Compatibility:
 - Compatible with .NET Standard 2.1 and newer
 - Requires 64-bit Windows with the Microsoft Visual C++ Redistributable installed
@@ -45,7 +45,8 @@ I originally intended for this project to simply be my experimentation with impl
 6. Follow the [Creating a Custom Training Environment](#creating-a-custom-training-environment), [Training a Model](#training-a-model), and/or [Saving/Loading Models](#savingloading-models) guides to implement Neural Network Notions in your code.
 
 ### NuGet Package Install
-1. Add the following to your .csproj file:
+1. Search for "NNN" in the Visual Studio NuGet package manager and install.
+&emsp;Or add the following to your .csproj file:
    ```
    <ItemGroup>
     <PackageReference Include="NNN" Version="[The GitHub release version you want to use]" />
