@@ -48,7 +48,7 @@ namespace NNNCSharp.Components.Utilities
                 // Allow user to view past episodes until user indicates to stop
                 while (true)
                 {
-                    Console.WriteLine();
+                    NNNLog.WriteLine();
                     int episode = GetEpisodeSelection(episodeBuffer!);
 
                     int step = 0;
@@ -126,7 +126,7 @@ namespace NNNCSharp.Components.Utilities
             }
 
             Saver.SaveModel(model, fileName, desc);
-            Console.WriteLine("\nModel saved");
+            NNNLog.WriteLine("\nModel saved");
         }
 
         /// <summary>
@@ -140,7 +140,7 @@ namespace NNNCSharp.Components.Utilities
             {
                 input = GetInput("Enter file name");
                 if (Saver.FileExists(input)) return input;
-                else Console.WriteLine("\nFile not found");
+                else NNNLog.WriteLine("\nFile not found");
             }
         }
 
@@ -156,7 +156,7 @@ namespace NNNCSharp.Components.Utilities
             while (true)
             {
                 if (int.TryParse(GetInput(prompt), out int integer) && integer >= min && integer <= max) return integer;
-                else Console.WriteLine("\nNot a valid number");
+                else NNNLog.WriteLine("\nNot a valid number");
             }
         }
 
@@ -170,7 +170,7 @@ namespace NNNCSharp.Components.Utilities
             while (true)
             {
                 if (int.TryParse(GetInput(prompt), out int integer)) return integer;
-                else Console.WriteLine("\nNot a valid number");
+                else NNNLog.WriteLine("\nNot a valid number");
             }
         }
 
@@ -185,7 +185,7 @@ namespace NNNCSharp.Components.Utilities
             {
                 int index = GetInteger($"Enter episode number ({episodeBuffer.Count} episodes cached)");
                 if (index > 0 && index <= episodeBuffer.Count) return index - 1;
-                else Console.WriteLine("Invalid episode number");
+                else NNNLog.WriteLine("Invalid episode number");
             }
         }
 
@@ -207,7 +207,7 @@ namespace NNNCSharp.Components.Utilities
             string input;
             while (true)
             {
-                Console.WriteLine($"\n{prompt}");
+                NNNLog.WriteLine($"\n{prompt}");
                 input = Console.ReadLine()?.ToLowerInvariant() ?? string.Empty;
 
                 if (input == userInputs[UserInput.Quit]) Environment.Exit(0); // terminate the program if the user chooses to quit
@@ -227,12 +227,12 @@ namespace NNNCSharp.Components.Utilities
             {
                 for (int col = 0; col < image.Dimensions[1]; col++)
                 {
-                    Console.Write(image[row, col] > renderThreshold ? "@" : " ");
+                    NNNLog.Write(image[row, col] > renderThreshold ? "@" : " ");
                 }
 
-                Console.WriteLine();
+                NNNLog.WriteLine();
             }
-            Console.WriteLine($"Label: {Tensor.ArgMax(label)}");
+            NNNLog.WriteLine($"Label: {Tensor.ArgMax(label)}");
         }
     }
 }

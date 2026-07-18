@@ -1,4 +1,5 @@
-﻿using NNNCSharp.Components.Utilities.SaveSystem;
+﻿using NNNCSharp.Components.Utilities;
+using NNNCSharp.Components.Utilities.SaveSystem;
 using static NNNCSharp.Components.Utilities.UIUtils;
 
 namespace NNNExplorer;
@@ -10,6 +11,7 @@ public class NNNExplorer
 {
     public static void Main(string[] args)
     {
+        NNNLog.Output = Console.Write;
         if (args.Length == 0)
         {
             ExplorerLoop();
@@ -19,7 +21,7 @@ public class NNNExplorer
             DisplayFile(args[0]);
         }
 
-        Console.WriteLine("\nPress any key to close...");
+        NNNLog.WriteLine("\nPress any key to close...");
         Console.ReadKey();
         Environment.Exit(0);
     }
@@ -33,12 +35,12 @@ public class NNNExplorer
         {
             string fileName = GetInput("Enter name of .nnn file to view (without extension)");
             string filePath = Saver.GetFullPath(fileName);
-            Console.WriteLine("\n");
+            NNNLog.WriteLine("\n");
             DisplayFile(filePath);
 
             if (GetInput("View another file? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.No]) break;
 
-            Console.WriteLine();
+            NNNLog.WriteLine();
         }
     }
 
@@ -48,13 +50,13 @@ public class NNNExplorer
     /// <param name="filePath">Path of the file to display.</param>
     static void DisplayFile(string filePath)
     {
-        Console.WriteLine();
+        NNNLog.WriteLine();
 
-        Console.WriteLine($"Reading model stored in {Path.GetFileName(filePath)}\n");
+        NNNLog.WriteLine($"Reading model stored in {Path.GetFileName(filePath)}\n");
 
         if (!File.Exists(filePath))
         {
-            Console.WriteLine("File not found.\n");
+            NNNLog.WriteLine("File not found.\n");
             return;
         }
 
@@ -63,7 +65,7 @@ public class NNNExplorer
             int magic = FileUtils.ReadInt32(stream);
             if (magic != Saver.MagicNumber)
             {
-                Console.WriteLine("Incorrect file type.\n");
+                NNNLog.WriteLine("Incorrect file type.\n");
                 return;
             }
 
@@ -76,14 +78,14 @@ public class NNNExplorer
                 layerData[i] = FileUtils.PrintLayer(stream);
             }
 
-            Console.WriteLine($"Description: {desc}");
-            Console.WriteLine($"Total Parameter Count: {paramCount}");
-            Console.WriteLine($"Layers: {layerCount}");
+            NNNLog.WriteLine($"Description: {desc}");
+            NNNLog.WriteLine($"Total Parameter Count: {paramCount}");
+            NNNLog.WriteLine($"Layers: {layerCount}");
             for (int i = 0; i < layerCount; i++)
             {
-                Console.WriteLine($"\nLayer {i + 1}:\n{layerData[i]}\n");
+                NNNLog.WriteLine($"\nLayer {i + 1}:\n{layerData[i]}\n");
             }
-            Console.WriteLine();
+            NNNLog.WriteLine();
         }
     }
 }

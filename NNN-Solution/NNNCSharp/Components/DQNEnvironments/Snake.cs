@@ -1,8 +1,9 @@
-﻿using NNNCSharp.Components.Episodes;
+﻿using NNNCSharp.Components.Autodiff;
+using NNNCSharp.Components.Episodes;
 using NNNCSharp.Components.Models;
+using NNNCSharp.Components.Utilities;
 using NNNCSharp.Components.Utilities.SaveSystem;
 using static NNNCSharp.Components.Utilities.UIUtils;
-using NNNCSharp.Components.Autodiff;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -262,7 +263,7 @@ namespace NNNCSharp.Components.DQNEnvironments
             DrawPlaying = true;
 
             double averageLength = (double)totalLength / testEpisodes;
-            Console.WriteLine($"Agent reached an average length of {averageLength}");
+            NNNLog.WriteLine($"Agent reached an average length of {averageLength}");
             return averageLength;
         }
 
@@ -281,7 +282,7 @@ namespace NNNCSharp.Components.DQNEnvironments
             };
 
             // Only display basic information about the action taken due to state representation being insufficient to reconstruct the exact board state
-            Console.WriteLine($"\nDirection Moved: {dirMoved}, Step: {step}, Reward: {reward}");
+            NNNLog.WriteLine($"\nDirection Moved: {dirMoved}, Step: {step}, Reward: {reward}");
         }
 
         public override void PlayDemo()
@@ -561,7 +562,7 @@ namespace NNNCSharp.Components.DQNEnvironments
 
                 if (!DrawPlaying) break;
 
-                Console.WriteLine("\nAgent collided or timed out!");
+                NNNLog.WriteLine("\nAgent collided or timed out!");
 
                 playing = GetInput("Watch agent play again? y/n", new() { userInputs[UserInput.Yes], userInputs[UserInput.No] }) == userInputs[UserInput.Yes];
             }
@@ -573,8 +574,8 @@ namespace NNNCSharp.Components.DQNEnvironments
         void DrawSnake()
         {
             using var state = GetBoardState(); // get the current state of the board
-            Console.WriteLine("Key: A - Apple, H - Snake Head, B - Snake Body, T - Snake Tail\n");
-            Console.WriteLine($"Snake Length: {SnakeLength}");
+            NNNLog.WriteLine("Key: A - Apple, H - Snake Head, B - Snake Body, T - Snake Tail\n");
+            NNNLog.WriteLine($"Snake Length: {SnakeLength}");
 
             for (int row = -1; row <= GridDims.Y; row++)
             {
@@ -582,9 +583,9 @@ namespace NNNCSharp.Components.DQNEnvironments
                 {
                     bool rowEdge = row == -1 || row == GridDims.Y;
                     bool colEdge = col == -1 || col == GridDims.X;
-                    if (rowEdge && colEdge) Console.Write("+"); // draw corner
-                    else if (rowEdge) Console.Write("-"); // draw top/bottom edge
-                    else if (colEdge) Console.Write("|"); // draw left/right edge
+                    if (rowEdge && colEdge) NNNLog.Write("+"); // draw corner
+                    else if (rowEdge) NNNLog.Write("-"); // draw top/bottom edge
+                    else if (colEdge) NNNLog.Write("|"); // draw left/right edge
                     else
                     {
                         // Fill the cell based on its encoding
@@ -596,11 +597,11 @@ namespace NNNCSharp.Components.DQNEnvironments
                             BoardEncoding.Apple => "A",
                             _ => " "
                         };
-                        Console.Write(fill);
+                        NNNLog.Write(fill);
                     }
                 }
 
-                Console.Write("\n");
+                NNNLog.Write("\n");
             }
         }
 
@@ -609,21 +610,21 @@ namespace NNNCSharp.Components.DQNEnvironments
         /// </summary>
         static void ShowDemoInstructions()
         {
-            Console.WriteLine("Welcome to the Snake agent demonstration.");
-            Console.WriteLine("The agent contains a total of 131 neurons.");
-            Console.WriteLine("These are arranged in two layers of 64 neurons each and an output layer of 3 neurons - one each for moving forward, left, and right.");
-            Console.WriteLine("The agent receives 7 inputs.");
-            Console.WriteLine("These include: the X and Y distances to the apple, the direction the snake's head is currently facing,");
-            Console.WriteLine("The distances to the nearest obstacle to the front, left, and right, and the proportion of empty spaces which it can currently reach.");
-            Console.WriteLine("This agent was trained over the course of roughly 40,000 games of Snake.");
-            Console.WriteLine("It is nowhere near perfect, and is unlikely to reach high scores.");
-            Console.WriteLine("But this seems to be approaching the limit of what this specific architecture is able to achieve with its limited view of the game.");
-            Console.WriteLine("My next plan is to implement support for convolutional neural networks, which will be far more capable of understanding the full board.");
-            Console.WriteLine("But, until that happens, enjoy watching this current limited version.");
-            Console.WriteLine("I still find it impressive that it was able to learn how to survive as long as it usually does, given it started out being completely random.");
-            Console.WriteLine("Keep in mind that there may be certain initial starting layouts in which it may just simply fail.");
-            Console.WriteLine("Feel free to run the demo again if that were to happen.\n");
-            Console.WriteLine("Press any key to continue...");
+            NNNLog.WriteLine("Welcome to the Snake agent demonstration.");
+            NNNLog.WriteLine("The agent contains a total of 131 neurons.");
+            NNNLog.WriteLine("These are arranged in two layers of 64 neurons each and an output layer of 3 neurons - one each for moving forward, left, and right.");
+            NNNLog.WriteLine("The agent receives 7 inputs.");
+            NNNLog.WriteLine("These include: the X and Y distances to the apple, the direction the snake's head is currently facing,");
+            NNNLog.WriteLine("The distances to the nearest obstacle to the front, left, and right, and the proportion of empty spaces which it can currently reach.");
+            NNNLog.WriteLine("This agent was trained over the course of roughly 40,000 games of Snake.");
+            NNNLog.WriteLine("It is nowhere near perfect, and is unlikely to reach high scores.");
+            NNNLog.WriteLine("But this seems to be approaching the limit of what this specific architecture is able to achieve with its limited view of the game.");
+            NNNLog.WriteLine("My next plan is to implement support for convolutional neural networks, which will be far more capable of understanding the full board.");
+            NNNLog.WriteLine("But, until that happens, enjoy watching this current limited version.");
+            NNNLog.WriteLine("I still find it impressive that it was able to learn how to survive as long as it usually does, given it started out being completely random.");
+            NNNLog.WriteLine("Keep in mind that there may be certain initial starting layouts in which it may just simply fail.");
+            NNNLog.WriteLine("Feel free to run the demo again if that were to happen.\n");
+            NNNLog.WriteLine("Press any key to continue...");
             Console.ReadKey();
         }
 

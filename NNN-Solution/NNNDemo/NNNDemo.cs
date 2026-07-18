@@ -1,5 +1,6 @@
 ﻿using NNNCSharp.Components.Autodiff;
 using NNNCSharp.Components.DQNEnvironments;
+using NNNCSharp.Components.Utilities;
 using NNNCSharp.Components.Utilities.DataLoaders;
 using NNNCSharp.Components.Utilities.SaveSystem;
 using static NNNCSharp.Components.Utilities.UIUtils;
@@ -30,6 +31,7 @@ public class NNNDemo
 
     public static void Main(string[] args)
     {
+        NNNLog.Output = Console.Write;
         RunDemo();
     }
 
@@ -38,8 +40,8 @@ public class NNNDemo
     /// </summary>
     static void RunDemo()
     {
-        Console.WriteLine("Welcome to the Neural Network Nonsense library demonstration.");
-        Console.WriteLine("Enter Q at any time to close the demonstration.");
+        NNNLog.WriteLine("Welcome to the Neural Network Nonsense library demonstration.");
+        NNNLog.WriteLine("Enter Q at any time to close the demonstration.");
 
         // Main interaction loop
         while (true)
@@ -61,7 +63,7 @@ public class NNNDemo
             Console.Clear();
         }
 
-        Console.WriteLine("\nPress any key to close...");
+        NNNLog.WriteLine("\nPress any key to close...");
         Console.ReadKey();
         Environment.Exit(0);
     }
@@ -83,7 +85,7 @@ public class NNNDemo
 
             int envIndex = GetIntegerInRange(prompt, 1, DQNDemoEnvs.Length);
 
-            Console.WriteLine("\n");
+            NNNLog.WriteLine("\n");
             DQNDemoEnvs[envIndex - 1].PlayDemo();
 
             Console.Clear();
@@ -108,7 +110,7 @@ public class NNNDemo
 
             int demoIndex = GetIntegerInRange(prompt, 1, StandardDemos.Length);
 
-            Console.WriteLine("\n");
+            NNNLog.WriteLine("\n");
             StandardDemos[demoIndex - 1].DemoFunction(StandardDemos[demoIndex - 1].FileName);
 
             Console.Clear();
@@ -122,18 +124,18 @@ public class NNNDemo
     /// <param name="fileName">Name of the file to load the MNIST demo model from.</param>
     static void RunMNISTDemo(string fileName)
     {
-        Console.WriteLine("\nLoading MNIST test dataset...");
+        NNNLog.WriteLine("\nLoading MNIST test dataset...");
         var (images, labels) = MNISTLoader.GetTestData();
         var wrappedImages = new Tensor[images.Length];
         for (int i = 0; i < images.Length; i++)
         {
             wrappedImages[i] = Tensor.WrapBatch(images[i]);
         }
-        Console.WriteLine("Loaded MNIST test dataset");
+        NNNLog.WriteLine("Loaded MNIST test dataset");
 
-        Console.WriteLine("\nLoading demo model...");
+        NNNLog.WriteLine("\nLoading demo model...");
         var model = Saver.LoadModel(fileName);
-        Console.WriteLine("Loaded demo model");
+        NNNLog.WriteLine("Loaded demo model");
 
         bool done = false;
         while (!done)
@@ -144,9 +146,9 @@ public class NNNDemo
             var label = labels[index];
 
             int predictLabel = Tensor.ArgMax(model.Predict(wrappedImage));
-            Console.WriteLine($"\n\nImage index in dataset: {index}\n");
+            NNNLog.WriteLine($"\n\nImage index in dataset: {index}\n");
             DrawMNISTImage(image, label, 0.5);
-            Console.WriteLine($"Model prediction: {predictLabel}");
+            NNNLog.WriteLine($"Model prediction: {predictLabel}");
 
             if (GetInput("View another image? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.No]) done = true;
         }

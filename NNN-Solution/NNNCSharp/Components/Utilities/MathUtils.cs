@@ -104,7 +104,7 @@ namespace NNNCSharp.Components.Utilities
                     var numerical = NumericalGradient(inputs, input, e, loss);
                     double analytical = inputs[input].Grad[e];
                     double relError = Math.Abs(numerical - analytical) / (Math.Abs(numerical) + 1e-8);
-                    Console.WriteLine($"inputs[{input}][{e}]: numerical = {numerical}, analytical = {analytical}, relError = {relError}");
+                    NNNLog.WriteLine($"inputs[{input}][{e}]: numerical = {numerical}, analytical = {analytical}, relError = {relError}");
                 }
             }
         }

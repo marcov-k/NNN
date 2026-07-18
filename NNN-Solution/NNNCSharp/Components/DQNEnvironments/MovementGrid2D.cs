@@ -6,6 +6,7 @@ using static NNNCSharp.Components.Utilities.UIUtils;
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using NNNCSharp.Components.Utilities;
 
 namespace NNNCSharp.Components.DQNEnvironments
 {
@@ -170,7 +171,7 @@ namespace NNNCSharp.Components.DQNEnvironments
             }
 
             double successPercent = ((double)successes / testEpisodes) * 100.0;
-            Console.WriteLine($"Agent successfully reached target in {successPercent:F2}% of test episodes");
+            NNNLog.WriteLine($"Agent successfully reached target in {successPercent:F2}% of test episodes");
             return successPercent;
         }
 
@@ -185,7 +186,7 @@ namespace NNNCSharp.Components.DQNEnvironments
 
             DrawState(state);
 
-            Console.Write($"Step: {step}, Action: {(Enum.IsDefined(typeof(Action), action) ? ((Action)action).ToString() : "None")}, Reward: {reward:F3}");
+            NNNLog.Write($"Step: {step}, Action: {(Enum.IsDefined(typeof(Action), action) ? ((Action)action).ToString() : "None")}, Reward: {reward:F3}");
         }
 
         public override void PlayDemo()
@@ -207,7 +208,7 @@ namespace NNNCSharp.Components.DQNEnvironments
         /// <param name="state">State to draw.</param>
         void DrawState(Tensor state)
         {
-            Console.WriteLine("Key: A - Agent, T - Target\n");
+            NNNLog.WriteLine("Key: A - Agent, T - Target\n");
 
             // Draw the grid for the given state
             for (int y = Bounds[3] + 1; y >= Bounds[2] - 1; y--)
@@ -220,34 +221,34 @@ namespace NNNCSharp.Components.DQNEnvironments
 
                     if (xEdge && yEdge)
                     {
-                        Console.Write("+"); // draw corner
+                        NNNLog.Write("+"); // draw corner
                         continue;
                     }
                     else if (xEdge)
                     {
-                        Console.Write("|"); // draw left/right edge
+                        NNNLog.Write("|"); // draw left/right edge
                         continue;
                     }
                     else if (yEdge)
                     {
-                        Console.Write("-"); // draw top/bottom edge
+                        NNNLog.Write("-"); // draw top/bottom edge
                         continue;
                     }
 
                     if (x == state[0] && y == state[1])
                     {
-                        Console.Write("A"); // draw agent
+                        NNNLog.Write("A"); // draw agent
                     }
                     else if (x == state[2] && y == state[3])
                     {
-                        Console.Write("T"); // draw target
+                        NNNLog.Write("T"); // draw target
                     }
                     else
                     {
-                        Console.Write(" "); // draw empty space
+                        NNNLog.Write(" "); // draw empty space
                     }
                 }
-                Console.Write("\n");
+                NNNLog.Write("\n");
             }
         }
 
@@ -320,13 +321,13 @@ namespace NNNCSharp.Components.DQNEnvironments
 
         static void ShowDemoInstructions()
         {
-            Console.WriteLine("Welcome to the 2D movement agent demonstration.");
-            Console.WriteLine("The agent contains a total of 132 neurons.");
-            Console.WriteLine("These are arranged in two layers of 64 neurons each, and an output layer of 4 neurons - one for each cardinal direction.");
-            Console.WriteLine("This agent was trained over the course of 15,000 episodes using randomly generated 21x21 grids.");
-            Console.WriteLine("By the end of this training, it was achieving a 100% success rate in test sessions, each of which used 10,000 episodes.");
-            Console.WriteLine("For this demonstration, a 21x21 grid is used, with the agent's starting and target positions being generated randomly.");
-            Console.WriteLine("Press any key to continue...");
+            NNNLog.WriteLine("Welcome to the 2D movement agent demonstration.");
+            NNNLog.WriteLine("The agent contains a total of 132 neurons.");
+            NNNLog.WriteLine("These are arranged in two layers of 64 neurons each, and an output layer of 4 neurons - one for each cardinal direction.");
+            NNNLog.WriteLine("This agent was trained over the course of 15,000 episodes using randomly generated 21x21 grids.");
+            NNNLog.WriteLine("By the end of this training, it was achieving a 100% success rate in test sessions, each of which used 10,000 episodes.");
+            NNNLog.WriteLine("For this demonstration, a 21x21 grid is used, with the agent's starting and target positions being generated randomly.");
+            NNNLog.WriteLine("Press any key to continue...");
             Console.ReadKey();
         }
     }

@@ -1,8 +1,9 @@
-﻿using NNNCSharp.Components.Episodes;
+﻿using NNNCSharp.Components.Autodiff;
+using NNNCSharp.Components.Episodes;
 using NNNCSharp.Components.Models;
+using NNNCSharp.Components.Utilities;
 using NNNCSharp.Components.Utilities.SaveSystem;
 using static NNNCSharp.Components.Utilities.UIUtils;
-using NNNCSharp.Components.Autodiff;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -161,9 +162,9 @@ namespace NNNCSharp.Components.DQNEnvironments
 
             double winPercent = ((double)wins / testEpisodes) * 100.0;
             double tiePercent = ((double)ties / testEpisodes) * 100.0;
-            Console.WriteLine($"Win percentage vs randomly-acting opponent: {winPercent:F2}");
-            Console.WriteLine($"Tie percentage vs randomly-acting opponent: {tiePercent:F2}");
-            Console.WriteLine($"Win + tie percentage vs randomly-acting opponent: {(winPercent + tiePercent):F2}");
+            NNNLog.WriteLine($"Win percentage vs randomly-acting opponent: {winPercent:F2}");
+            NNNLog.WriteLine($"Tie percentage vs randomly-acting opponent: {tiePercent:F2}");
+            NNNLog.WriteLine($"Win + tie percentage vs randomly-acting opponent: {(winPercent + tiePercent):F2}");
             return 2.0 * winPercent + tiePercent;
         }
 
@@ -178,7 +179,7 @@ namespace NNNCSharp.Components.DQNEnvironments
 
             DrawState(state);
 
-            Console.WriteLine($"\n\nPosition Taken: {action}, Reward: {reward}");
+            NNNLog.WriteLine($"\n\nPosition Taken: {action}, Reward: {reward}");
         }
 
         public override void PlayDemo()
@@ -300,7 +301,7 @@ namespace NNNCSharp.Components.DQNEnvironments
                 // Draw final board state
                 Console.Clear();
                 DrawState(State);
-                Console.WriteLine($"\n\nWinner: {winner}");
+                NNNLog.WriteLine($"\n\nWinner: {winner}");
 
                 playing = GetInput("Play again? y/n", new() { userInputs[UserInput.Yes], userInputs[UserInput.No] }) == userInputs[UserInput.Yes];
             }
@@ -313,17 +314,17 @@ namespace NNNCSharp.Components.DQNEnvironments
         int GetPlayerAction()
         {
             string input = string.Empty;
-            Console.WriteLine();
+            NNNLog.WriteLine();
             while (input != "q")
             {
-                Console.WriteLine("\nEnter desired position:");
+                NNNLog.WriteLine("\nEnter desired position:");
                 input = Console.ReadLine().ToLowerInvariant();
 
                 // Ensure input is a valid action index
                 if (int.TryParse(input, out int action) && ValidAction(action)) return action;
                 else if (input == "q") break;
 
-                Console.WriteLine("Invalid position...");
+                NNNLog.WriteLine("Invalid position...");
             }
             return -1;
         }
@@ -362,7 +363,7 @@ namespace NNNCSharp.Components.DQNEnvironments
         {
             for (int i = 0; i < state.ElementCount - 1; i++) // ignore last state encoding (current acting player encoding)
             {
-                if (i % 3 == 0) Console.WriteLine(); // start a new row after every 3 columns
+                if (i % 3 == 0) NNNLog.WriteLine(); // start a new row after every 3 columns
 
                 // Fill the position based on its encoding
                 string fill = state[i] switch
@@ -371,7 +372,7 @@ namespace NNNCSharp.Components.DQNEnvironments
                     -1.0 => " O ",
                     _ => "   "
                 };
-                Console.Write(fill);
+                NNNLog.Write(fill);
             }
         }
 
@@ -402,16 +403,16 @@ namespace NNNCSharp.Components.DQNEnvironments
 
         static void ShowDemoInstructions()
         {
-            Console.WriteLine("Welcome to the Tic-Tac-Toe agent demonstration.");
-            Console.WriteLine("The agent contains a total of 329 neurons.");
-            Console.WriteLine("These are arranged in two layers of 128 neurons each, one layer of 64 neurons, and an output layer of 9 neurons - one for each position on the board.");
-            Console.WriteLine("The agent receives a total of 10 inputs, one encoding each position on the board and a tenth encoding whether X or O is to move.");
-            Console.WriteLine("This agent was trained over the course of 5,000 games of Tic-Tac-Toe.");
-            Console.WriteLine("During these games, it learned to play both X and O, and trained by playing against past versions of itself.");
-            Console.WriteLine("The positions on the game board are represented by the indices 0-8.");
-            Console.WriteLine("The indices increase across rows and then down columns, with position 0 being in the top left and position 8 in the bottom right.");
-            Console.WriteLine("When playing, simply select the position you would like to take.\n");
-            Console.WriteLine("Press any key to continue...");
+            NNNLog.WriteLine("Welcome to the Tic-Tac-Toe agent demonstration.");
+            NNNLog.WriteLine("The agent contains a total of 329 neurons.");
+            NNNLog.WriteLine("These are arranged in two layers of 128 neurons each, one layer of 64 neurons, and an output layer of 9 neurons - one for each position on the board.");
+            NNNLog.WriteLine("The agent receives a total of 10 inputs, one encoding each position on the board and a tenth encoding whether X or O is to move.");
+            NNNLog.WriteLine("This agent was trained over the course of 5,000 games of Tic-Tac-Toe.");
+            NNNLog.WriteLine("During these games, it learned to play both X and O, and trained by playing against past versions of itself.");
+            NNNLog.WriteLine("The positions on the game board are represented by the indices 0-8.");
+            NNNLog.WriteLine("The indices increase across rows and then down columns, with position 0 being in the top left and position 8 in the bottom right.");
+            NNNLog.WriteLine("When playing, simply select the position you would like to take.\n");
+            NNNLog.WriteLine("Press any key to continue...");
             Console.ReadKey();
         }
     }

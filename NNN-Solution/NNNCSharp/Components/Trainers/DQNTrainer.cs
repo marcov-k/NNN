@@ -208,7 +208,7 @@ namespace NNNCSharp.Components.Trainers
             stopwatch.Start();
 
             // Test initial agent performance
-            Console.WriteLine("\nEvaluating initial agent performance...");
+            NNNLog.WriteLine("\nEvaluating initial agent performance...");
             var bestAgent = Agent.Copy();
             double bestScore = Environment.TestTrainingProgress(Agent, testEpisodes);
 
@@ -267,23 +267,23 @@ namespace NNNCSharp.Components.Trainers
                 if ((e + 1) % testEvery == 0 || (e + 1) == episodes)
                 {
                     var eta = avgElapsed * (episodes - e - 1);
-                    Console.WriteLine($"\n\nEpisodes completed: {e + 1}/{episodes}");
-                    Console.WriteLine($"Total reward for last episode: {totalReward:F2},");
-                    Console.WriteLine($"Average loss for last episode: {(totalLoss / trainSteps):F3}");
-                    Console.WriteLine($"Exploration rate: {Exploration:F2}");
-                    Console.WriteLine($"Experience count: {ReplayBuffer.Count}");
+                    NNNLog.WriteLine($"\n\nEpisodes completed: {e + 1}/{episodes}");
+                    NNNLog.WriteLine($"Total reward for last episode: {totalReward:F2},");
+                    NNNLog.WriteLine($"Average loss for last episode: {(totalLoss / trainSteps):F3}");
+                    NNNLog.WriteLine($"Exploration rate: {Exploration:F2}");
+                    NNNLog.WriteLine($"Experience count: {ReplayBuffer.Count}");
                     if (Environment is ISelfPlay selfPlayEnv)
                     {
-                        Console.WriteLine("Opponent agent for last episode: " + ((selfPlayEnv.OpponentIndex < selfPlayEnv.OpponentCount) ?
+                        NNNLog.WriteLine("Opponent agent for last episode: " + ((selfPlayEnv.OpponentIndex < selfPlayEnv.OpponentCount) ?
                             $"{selfPlayEnv.OpponentIndex + 1}/{selfPlayEnv.OpponentCount}" : "Random"));
                     }
-                    Console.WriteLine($"Final state of last episode:");
+                    NNNLog.WriteLine($"Final state of last episode:");
                     if (episodeBuffer is not null) Environment.Render(episodeBuffer[^1], step + 1);
-                    Console.WriteLine($"\nEnded on step: {step}");
-                    Console.WriteLine($"Episode duration: {MathUtils.RoundToMS(elapsed):g}");
-                    Console.WriteLine($"\nAverage time per episode: {MathUtils.RoundToMS(avgElapsed)}");
-                    Console.WriteLine($"Estimated time remaining: {MathUtils.RoundToMS(eta)}");
-                    Console.WriteLine($"\nEvaluating agent performance...");
+                    NNNLog.WriteLine($"\nEnded on step: {step}");
+                    NNNLog.WriteLine($"Episode duration: {MathUtils.RoundToMS(elapsed):g}");
+                    NNNLog.WriteLine($"\nAverage time per episode: {MathUtils.RoundToMS(avgElapsed)}");
+                    NNNLog.WriteLine($"Estimated time remaining: {MathUtils.RoundToMS(eta)}");
+                    NNNLog.WriteLine($"\nEvaluating agent performance...");
                     double score = Environment.TestTrainingProgress(Agent, testEpisodes);
                     if (score > bestScore)
                     {
@@ -298,7 +298,7 @@ namespace NNNCSharp.Components.Trainers
             Agent.Dispose();
             Agent = bestAgent;
             totalStopwatch.Stop();
-            Console.WriteLine($"Total Training Duration: {MathUtils.RoundToMS(totalStopwatch.Elapsed):g}");
+            NNNLog.WriteLine($"Total Training Duration: {MathUtils.RoundToMS(totalStopwatch.Elapsed):g}");
         }
 
         /// <summary>

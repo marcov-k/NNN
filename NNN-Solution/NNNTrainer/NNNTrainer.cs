@@ -8,6 +8,7 @@ using NNNCSharp.Components.Models;
 using NNNCSharp.Components.Models.Layers;
 using NNNCSharp.Components.Optimizers;
 using NNNCSharp.Components.Trainers;
+using NNNCSharp.Components.Utilities;
 using NNNCSharp.Components.Utilities.DataLoaders;
 using NNNCSharp.Components.Utilities.SaveSystem;
 using static NNNCSharp.Components.Utilities.UIUtils;
@@ -21,6 +22,7 @@ public class NNNTrainer
 {
     public static void Main(string[] args)
     {
+        NNNLog.Output = Console.Write;
         if (GetIntegerInRange("Select training mode:\n1 - Standard\n2 - DQN", 1, 2) == 1)
         {
             StandardTraining();
@@ -30,7 +32,7 @@ public class NNNTrainer
             DQNTraining();
         }
 
-        Console.WriteLine("\nPress any key to quit...");
+        NNNLog.WriteLine("\nPress any key to quit...");
         Console.ReadKey();
         System.Environment.Exit(0);
     }
@@ -63,7 +65,7 @@ public class NNNTrainer
         FIFOBuffer<Episode> episodeBuffer = new(episodeMemorySize);
 
         Console.Clear();
-        Console.WriteLine("Welcome to the DQN Training Terminal (Enter Q to quit)");
+        NNNLog.WriteLine("Welcome to the DQN Training Terminal (Enter Q to quit)");
 
         double activTau = 0.05;
         double dropout = 0.1;
@@ -120,12 +122,12 @@ public class NNNTrainer
     static void StandardTraining()
     {
         Console.Clear();
-        Console.WriteLine("Welcome to the Supervised Training Terminal (Enter Q to quit)");
+        NNNLog.WriteLine("Welcome to the Supervised Training Terminal (Enter Q to quit)");
 
-        Console.WriteLine("\nLoading MNIST dataset...");
+        NNNLog.WriteLine("\nLoading MNIST dataset...");
         var (trainImages, trainLabels) = MNISTLoader.GetTrainingData();
         var (testImages, testLabels) = MNISTLoader.GetTestData();
-        Console.WriteLine("MNIST dataset loaded");
+        NNNLog.WriteLine("MNIST dataset loaded");
 
         double tau = 0.05;
         double convDropout = 0.15;
@@ -197,7 +199,7 @@ public class NNNTrainer
                 // Train agent for a given number of episodes
                 int episodes = GetInteger("Enter number of episodes to train");
                 int testEvery = GetInteger("Enter episodes per training progress test");
-                Console.WriteLine($"\n\nTraining for {episodes} episodes...");
+                NNNLog.WriteLine($"\n\nTraining for {episodes} episodes...");
                 dqnTrainer.Train(ref episodeBuffer!, episodes, testEvery, testEpisodes);
                 model = dqnTrainer.Agent;
 
@@ -235,7 +237,7 @@ public class NNNTrainer
             {
                 int epochs = GetInteger("Enter number of epochs to train");
                 int testEvery = GetInteger("Enter epochs per training progress test");
-                Console.WriteLine($"\n\nTraining for {epochs} epochs...");
+                NNNLog.WriteLine($"\n\nTraining for {epochs} epochs...");
                 trainer.Train(batchBuffer, batchSize, epochs, batchAllInputs: true, testFunc, decayLR,
                     minLRFraction, testEvery: testEvery, testLength: testLength);
             }

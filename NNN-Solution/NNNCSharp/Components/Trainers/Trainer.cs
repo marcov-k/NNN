@@ -79,14 +79,14 @@ namespace NNNCSharp.Components.Trainers
 
             if (testFunc != null)
             {
-                Console.WriteLine($"\nEvaluating initial model performance...");
+                NNNLog.WriteLine($"\nEvaluating initial model performance...");
                 int successes = 0;
                 for (int i = 0; i < testLength; i++)
                 {
                     if (testFunc(Model, i)) successes++;
                 }
                 double successPercent = ((double)successes / testLength) * 100.0;
-                Console.WriteLine($"Model success percentage: {successPercent:F2}%");
+                NNNLog.WriteLine($"Model success percentage: {successPercent:F2}%");
             }
 
             // Train for the given number of epochs
@@ -135,14 +135,14 @@ namespace NNNCSharp.Components.Trainers
                 if ((e + 1) % testEvery == 0 || (e + 1) == epochs)
                 {
                     var eta = avgElapsed * (epochs - e - 1);
-                    Console.WriteLine($"\n\nEpochs completed: {e + 1}/{epochs}");
-                    Console.WriteLine($"Average loss for last epoch: {(totalLoss / inputs.Length):F3}");
-                    Console.WriteLine($"Epoch duration: {MathUtils.RoundToMS(elapsed)}");
-                    Console.WriteLine($"\nAverage time per epoch: {MathUtils.RoundToMS(avgElapsed)}");
-                    Console.WriteLine($"Estimated time remaining: {MathUtils.RoundToMS(eta)}");
+                    NNNLog.WriteLine($"\n\nEpochs completed: {e + 1}/{epochs}");
+                    NNNLog.WriteLine($"Average loss for last epoch: {(totalLoss / inputs.Length):F3}");
+                    NNNLog.WriteLine($"Epoch duration: {MathUtils.RoundToMS(elapsed)}");
+                    NNNLog.WriteLine($"\nAverage time per epoch: {MathUtils.RoundToMS(avgElapsed)}");
+                    NNNLog.WriteLine($"Estimated time remaining: {MathUtils.RoundToMS(eta)}");
                     if (testFunc != null)
                     {
-                        Console.WriteLine($"\nEvaluating model performance...");
+                        NNNLog.WriteLine($"\nEvaluating model performance...");
                         int successes = 0;
                         for (int i = 0; i < testLength; i++)
                         {
@@ -155,7 +155,7 @@ namespace NNNCSharp.Components.Trainers
                             bestModel = Model.Copy();
                             bestAccuracy = successPercent;
                         }
-                        Console.WriteLine($"Model success percentage: {successPercent:F2}%");
+                        NNNLog.WriteLine($"Model success percentage: {successPercent:F2}%");
                     }
                 }
             }
@@ -165,7 +165,7 @@ namespace NNNCSharp.Components.Trainers
             Model.Dispose();
             Model = bestModel;
             totalTimer.Stop();
-            Console.WriteLine($"Total training time: {MathUtils.RoundToMS(totalTimer.Elapsed)}");
+            NNNLog.WriteLine($"Total training time: {MathUtils.RoundToMS(totalTimer.Elapsed)}");
         }
     }
 }
