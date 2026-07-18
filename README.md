@@ -142,7 +142,7 @@ public int GetAgentAction(Model agent, Tensor? state = null) {}
 ### Training a Model
 #### Special Cases:
 - When using Model.Forward() or Model.Predict() with a single input instead of a batch, use Tensor.WrapBatch() on the input first to convert it into a batch of 1 input.
-- Whenever creating a new Tensor through any constructor, function or operator, ensure the instance is dispoed via Tensor.Dispose() once it is no longer being used - otherwise it may become a memory leak.
+- Whenever creating a new Tensor instance through any constructor, function or operator, ensure the instance is disposed via Tensor.Dispose() once it is no longer being used - otherwise it may become a memory leak.
 
 #### Standard Supervised Training:
 ```
