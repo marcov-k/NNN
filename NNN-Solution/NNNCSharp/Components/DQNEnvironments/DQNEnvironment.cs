@@ -26,7 +26,7 @@ namespace NNNCSharp.Components.DQNEnvironments
         /// <summary>
         /// The name of the environment to display to the user.
         /// </summary>
-        public abstract string EnvironmentName { get; }
+        public virtual string EnvironmentName { get; } = "";
 
         /// <summary>
         /// Get the normalized form of the environment's current state.
@@ -80,7 +80,7 @@ namespace NNNCSharp.Components.DQNEnvironments
         /// </summary>
         /// <param name="episode">Episode in which the state is recorded.</param>
         /// <param name="step">Step at which the state occurred in the episode.</param>
-        public abstract void Render(Episode episode, int step);
+        public virtual void Render(Episode episode, int step) { }
 
         /// <summary>
         /// Tests an agent's performance in the environment.
@@ -93,7 +93,7 @@ namespace NNNCSharp.Components.DQNEnvironments
         /// <summary>
         /// Plays a demonstration of the model trained on the environment.
         /// </summary>
-        public abstract void PlayDemo();
+        public virtual void PlayDemo() => throw new NotImplementedException();
     }
 
     /// <summary>
@@ -101,13 +101,6 @@ namespace NNNCSharp.Components.DQNEnvironments
     /// </summary>
     public interface ISelfPlay
     {
-        // Base environment data
-
-        /// <summary>
-        /// Current environment state.
-        /// </summary>
-        public Tensor State { get; init; }
-
         // Opponent agent data
 
         /// <summary>
