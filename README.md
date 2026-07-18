@@ -66,12 +66,83 @@ I originally intended for this project to simply be my experimentation with impl
 3. Follow the [Creating a Custom Training Environment](#creating-a-custom-training-environment), [Training a Model](#training-a-model), and/or [Saving/Loading Models](#savingloading-models) guides to implement Neural Network Notions in your code.
 
 ### Creating a Custom Training Environment
-WIP
+#### DQN Environment
+1. Create a class inheriting from the DQNEnvironment abstract class:
+```
+using NNNCSharp.Components.DQNEnvironments;
+
+public class MyDQNEnv : DQNEnvironment {}
+```
+&emsp;For self-play environments also implement the ISelfPlay interface
+```
+public class MySelfPlayDQNEnv : DQNEnvironment, ISelfPlay {}
+```
+2. Override the following properties:
+```
+// The shape of the Tensor the environment provides to agents (first dimension represents batches)
+public override Tensor StateFormat => new(new int[] { 1, [your state dimensions] });
+
+// The number of unique actions the agent can take for a given step
+public override int ActionCount => [your action count];
+```
+&emsp;For self-play environments also implement the following properties:
+```
+// Whether it is currently the agent's turn to play
+public bool AgentTurn { get; set; }
+
+// The number of opponent agents available to play against
+public int OpponentCount { get; set; }
+
+// The index of the opponent agent being played against during this episode
+public int OpponentIndex { get; set; }
+```
+3. Override the following methods:
+```
+// Return the normalized form of the environment's current state to give to an agent
+public override Tensor GetNormalizedState() {}
+
+// Return the unnormalized form of the environment's current state
+public override Tensor GetState() {}
+
+// Reset the environment's state to its initial state and prepares a new episode
+public override void Reset() {}
+
+// Return the index of the highest Q-Value corresponding to a valid action in the given state
+// (Default to environment's current state if no state is given)
+public override int PickAgentAction(Tensor qValues, Tensor? state = null) {}
+
+// Randomly select a valid action given the environment's current state
+public override int PickRandomAction() {}
+
+// Return whether the given action is valid in the given state
+// (Default to environment's current state if no state is given)
+public override bool ValidAction(int action, Tensor? state) {}
+
+// Perform a single step in the environment using the given action
+// (The steps parameter can be used terminate an episode after a fixed number of steps)
+// Return the following:
+//   The reward/penalty accrued by the action
+//   The normalized form of the environment's state after the action is taken (identical to GetNormalizedState())
+//   Whether the episode has finished
+public override (double reward, Tensor nextState, bool done) Step(int action, int steps) {}
+
+// Run the given number of episodes with the given agent
+// Return a value representing the agent's average performance across the test episodes
+public override double TestTrainingProgress(Model agent, int testEpisodes) {}
+```
+&emsp;For self-play environments also implement the following methods:
+```
+// Use the given agent to select an action in the given state
+// (Default to environment's current state if no state is given)
+public int GetAgentAction(Model agent, Tensor? state = null) {}
+```
+4. Refer to the [Training a DQN Agent](#dqn-training) guide to train an agent for your custom DQN environment.
 
 ### Training a Model
 #### Special Cases:
 - When using Model.Forward() or Model.Predict() with a single input instead of a batch, use Tensor.WrapBatch() on the input first to convert it into a batch of 1 input.
 - Whenever creating a new Tensor through any constructor, function or operator, ensure the instance is dispoed via Tensor.Dispose() once it is no longer being used - otherwise it may become a memory leak.
+
 #### Standard Supervised Training:
 ```
 using NNNCSharp.Components.Autodiff;
