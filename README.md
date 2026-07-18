@@ -66,6 +66,31 @@ I originally intended for this project to simply be my experimentation with impl
 2. Extract the .zip file and paste the full contents into your Unity project's "Packages" folder.
 3. Follow the [Creating a Custom Training Environment](#creating-a-custom-training-environment), [Training a Model](#training-a-model), and/or [Saving/Loading Models](#savingloading-models) guides to implement Neural Network Notions in your code.
 
+### Using Pretrained Models
+1. Locate the .nnn file containing the model you would like to use.<br>Pretrained models for Tic-Tac-Toe and the MNIST dataset can be found in the "NNNSolution/Models/" directory in the GitHub repository.
+2. Copy the .nnn file into a directory in your project.
+3. Specify the directory NNN should load models from:
+```
+using NNNCSharp.Components.Utilities.SaveSystem;
+
+Saver.DirectoryPath = "[path to your directory containing the model]";
+```
+4. Follow the [Saving/Loading Models](#savingloading-models) guide to load the model in your code.
+
+#### Pretrained Model Specifications
+- Tic-Tac-Toe (tictactoedemo.nnn):
+  - Win/Tie Rate: 100% (Based on 5000 games against randomly-acting opponent)
+  - Expected Input Dimensions: [batch, 10] - batch = 1 for selecting next position while playing<br>Can use dimensions of [10] for board encoding and use Tensor.WrapBatch() when getting model predictions:
+    ```
+    using Tensor wrapped = Tensor.WrapBatch(state);
+    Tensor qValues = model.Predict(wrapped);
+    ```
+  - Input Encoding:
+    - Index 0-8 -> Board position values - row-major indexing with top-left being 0
+    - Board Position Encoding -> 0 = Empty, 1 = X, -1 = O
+    - Index 9 -> Player to act
+    - Player Encoding -> 1 = X, -1 = O
+
 ### Creating a Custom Training Environment
 #### DQN Environment
 1. Create a class inheriting from the DQNEnvironment abstract class:
