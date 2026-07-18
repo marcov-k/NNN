@@ -9,17 +9,15 @@
     <license type="file">LICENSE.txt</license>
     <readme>README.md</readme>
     <tags>neural-network machine-learning deep-learning</tags>
+	<dependencies>
+	  <group targetFramework="netstandard2.1" />
+	</dependencies>
   </metadata>
   <files>
-    <!-- Managed assembly -->
     <file src="bin/x64/ReleasePackage/NNNCSharp.dll" target="lib/netstandard2.1/NNNCSharp.dll" />
+    <file src="bin/x64/ReleasePackage/NNN.dll" target="runtimes/win-x64/native/NNN.dll" />
     
-    <!-- Native DLL for Windows x64 -->
-    <file src="bin/x64/ReleasePackage/NNN.dll" 
-          target="runtimes/win-x64/native/NNN.dll" />
-    
-    <!-- MSBuild props to copy native DLL on build -->
-    <file src="NNN.props" target="build/NNN.props" />
+    <file src="NNN.props" target="build/netstandard2.1/NNN.props" />
     
     <file src="../../LICENSE.txt" target="" />
     <file src="../../README.md" target="" />

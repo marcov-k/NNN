@@ -6,4 +6,8 @@
       <Link>NNN.dll</Link>
     </None>
   </ItemGroup>
+	<Target Name="ValidateNNNOS" BeforeTargets="Build">
+		<Error Condition="'$(OS)'!='Windows_NT'"
+			   Text="[NNN Error] The native C++ backend (NNN.dll) is only compatible with 64-bit Windows. Compilation aborted on this OS." />
+	</Target>
 </Project>
