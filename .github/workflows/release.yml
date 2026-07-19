@@ -110,8 +110,12 @@ jobs:
 
           Copy-Item "${{ steps.outputs.outputs.MANAGED }}" "upm/Runtime/NNNCSharp.dll"
           Copy-Item "${{ steps.outputs.outputs.NATIVE }}" "upm/Runtime/NNN.dll"
+          
           Copy-Item $env:GITHUB_WORKSPACE/LICENSE.txt "upm/"
+          Copy-Item $env:GITHUB_WORKSPACE/LICENSE.txt.meta "upm/"
+          
           Copy-Item $env:GITHUB_WORKSPACE/README.md "upm/"
+          Copy-Item $env:GITHUB_WORKSPACE/README.md.meta "upm/"
 
           Compress-Archive -Path upm/* -DestinationPath "NNN-UPM-$Tag.zip"
 
