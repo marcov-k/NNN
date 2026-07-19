@@ -1,0 +1,16 @@
+{
+  "name": "NNN.Runtime",
+  "rootNamespace": "NNNCSharp",
+  "references": [],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": true,
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "NNNCSharp.dll"
+  ],
+  "autoReferences": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
