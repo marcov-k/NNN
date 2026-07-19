@@ -25,7 +25,7 @@ I originally intended for this project to simply be my experimentation with impl
  any features not provided in the C# and C++ standard libraries, which I also believed would provide me with valuable experience in designing full-scale frameworks from scratch. Now, many months after I first began
  experimenting with the Neural Network Nonsense project, I can proudly say that those initial efforts have grown into something far larger than I could have ever anticipated.
 
-## Installation/How to Use
+## Installation
 ### Compatibility:
 - Compatible with .NET Standard 2.1 and newer
 - Requires 64-bit Windows with the Microsoft Visual C++ Redistributable installed
@@ -66,6 +66,7 @@ I originally intended for this project to simply be my experimentation with impl
 2. Extract the .zip file and paste the full contents into your Unity project's "Packages" folder.
 3. Follow the [Creating a Custom Training Environment](#creating-a-custom-training-environment), [Training a Model](#training-a-model), and/or [Saving/Loading Models](#savingloading-models) guides to implement Neural Network Notions in your code.
 
+## How to Use
 ### Using Pretrained Models
 1. Locate the .nnn file containing the model you would like to use.<br>Pretrained models for Tic-Tac-Toe and the MNIST dataset can be found in the "NNNSolution/Models/" directory in the GitHub repository.
 2. Copy the .nnn file into a directory in your project.
@@ -74,6 +75,10 @@ I originally intended for this project to simply be my experimentation with impl
 using NNNCSharp.Components.Utilities.SaveSystem;
 
 Saver.DirectoryPath = "[path to your directory containing the model]";
+```
+&emsp;For Unity projects add the directory to your project's "Assets/StreamingAssets" directory (create StreamingAssets manually if it does not exist) and specify the path as so:
+```
+Saver.DirectoryPath = Path.Combine(Application.streamingDataPath, "[path to your directory from StreamingAssetsAssets/]");
 ```
 4. Follow the [Saving/Loading Models](#savingloading-models) guide to load the model in your code.
 
@@ -264,6 +269,10 @@ yourModel = yourTrainer.Agent; // get the best-performing agent from the trainer
 using NNNCSharp.Components.Utilities.SaveSystem;
 
 Saver.DirectoryPath = "[your target directory]";
+```
+&emsp;For Unity projects add the directory to your project's "Assets/StreamingAssets" directory (create StreamingAssets manually if it does not exist) and specify the path as so:
+```
+Saver.DirectoryPath = Path.Combine(Application.streamingDataPath, "[path to your directory from StreamingAssetsAssets/]");
 ```
 *The framework will automatically create a directory with the given path if none exists.
    
