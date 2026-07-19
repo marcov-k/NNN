@@ -24,6 +24,12 @@ PluginImporter:
         CPU: x86_64
         DefaultValueInitialized: true
   - first:
+      Standalone: Win64
+    second:
+      enabled: 1
+      CPU: x86_64
+      DefaultValueInitialized: true
+  - first:
       Windows: x86_64
     second:
       enabled: 1
