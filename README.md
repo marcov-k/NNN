@@ -746,7 +746,7 @@ NNN-Solution - Directory (Full project solution)\
 ### General Formatting Notes:
 - All multi-byte numbers use little-endian encoding
 - Each [layer type's](#layer-data-format) encoding includes different parameters - identified by [Layer ID](#layer-ids)
-- Certain [activation functions](#activation-function-data-format---found-immediately-after-activation-id-for-activation-functions-with-parameters) encode additional parameters (eg. LeakyReLU's Tau) immediately after their ID - identified by [Activation ID](#activation-ids)
+- Certain [activation functions](#activation-function-data-format---found-immediately-after-activation-id-for-activation-functions-with-parameters) encode additional parameters (eg. Leaky ReLU's Tau) immediately after their ID - identified by [Activation ID](#activation-ids)
 - Data appears in the file in the exact order as listed below
 
 ### File Header Format:
