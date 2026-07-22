@@ -728,6 +728,7 @@ NNN-Solution - Directory (Full project solution)\
 │&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;│\
 │&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;├── IDManager - C# Script (Static class for looking up IDs for file format)\
 │&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;├── MathUtils - C# Script\
+│&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;├── NNNLog - C# Script (Logging output target control)\
 │&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;└── UIUtils - C# Script\
 │\
 ├── NNNDemo - Directory (Program for running NNN demonstrations)\
