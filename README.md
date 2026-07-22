@@ -746,7 +746,7 @@ NNN-Solution - Directory (Full project solution)\
 ### General Formatting Notes:
 - All multi-byte numbers use little-endian encoding
 - Each [layer type's](#layer-data-format) encoding includes different parameters - identified by [Layer ID](#layer-ids)
-- Certain [activation functions](#activation-data-format---found-immediately-after-activation-id-for-activation-functions-with-parameters) encode additional parameters (eg. LeakyReLU's Tau) immediately after their ID - identified by [Activation ID](#activation-ids)
+- Certain [activation functions](#activation-function-data-format---found-immediately-after-activation-id-for-activation-functions-with-parameters) encode additional parameters (eg. LeakyReLU's Tau) immediately after their ID - identified by [Activation ID](#activation-ids)
 - Data appears in the file in the exact order as listed below
 
 ### File Header Format:
@@ -775,7 +775,7 @@ NNN-Solution - Directory (Full project solution)\
   - Filter Count -> int32 (4 bytes) -> number of filters in the layer
   - Kernels -> tensor ([see formatting](#tensor-format)) -> kernels parameter of the layer ([f, h, w..., c] ordering)
 
-### Activation Data Format - found immediately after Activation ID (for activation functions with parameters):
+### Activation Function Data Format - found immediately after Activation ID (for activation functions with parameters):
 - #### Leaky ReLU:
   - Tau -> double (8 bytes) -> tau parameter of the function
 
