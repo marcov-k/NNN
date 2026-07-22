@@ -3,6 +3,8 @@
 # Neural Network Notions
 A neural network framework created from scratch in C# and C++ implementing automatic differentiation, backpropagation, and customizable architectures for neural networks.
 
+### View the Complete Documentation [Here](https://github.com/marcov-k/NNN/wiki)
+
 ## Key Features
 - Deep Q-Network (DQN) training capabilities
 - Prioritized experience replay (PER) buffer implementation
@@ -32,39 +34,40 @@ I originally intended for this project to simply be my experimentation with impl
 
 ### Raw DLL Download
 1. Download the NNN-vX.X.X.zip file from the GitHub release.
-2. Extract the .zip file, you will see an "NNN" directory - which contains the "runtime" directory, along with the LICENSE and README files.
-4. Add the DLL files (NNN.dll and NNNCSharp.dll) in the extracted "runtime" directory into anywhere in your project's directory.
+2. Extract the .zip file - you will see the NNN/ directory containing the runtime/ directory, as well as the LICENSE and README files.
+4. Add the DLL files (NNN.dll and NNNCSharp.dll) in the extracted runtime/ directory into anywhere in your project's directory.
 5. Add the following to your .csproj file:
    ```
    <ItemGroup>
      <Reference Include="NNNCSharp">
-       <HintPath>[Path to the NNNCSharp DLL in your project's directory]</HintPath>
+       <HintPath>Relative/Path/To/NNNCSharp.dll</HintPath>
      </Reference>
    </ItemGroup>
    ```
-6. Follow the [Creating a Custom Training Environment](#creating-a-custom-training-environment), [Training a Model](#training-a-model), and/or [Saving/Loading Models](#savingloading-models) guides to implement Neural Network Notions in your code.
+6. Follow the [Creating a Custom Training Environment](#creating-a-custom-training-environment), [Training a Model](#training-a-model), and/or [Saving/Loading Models](#savingloading-models) guides, or refer to the [C# API Documentation](https://github.com/marcov-k/NNN/wiki/C%23-API) to implement Neural Network Notions in your code.
 
 ### NuGet Package Install
-1. Search for "NNN" in the Visual Studio NuGet package manager and install.\
-&emsp;Or add the following to your .csproj file:
-   ```
-   <ItemGroup>
-    <PackageReference Include="NNN" Version="[The GitHub release version you want to use]" />
-   </ItemGroup>
-   ```
-2. Follow the [Creating a Custom Training Environment](#creating-a-custom-training-environment), [Training a Model](#training-a-model), and/or [Saving/Loading Models](#savingloading-models) guides to implement Neural Network Notions in your code.
+- #### Option 1 - NuGet Package Manager
+    Search for "NNN" in the Visual Studio NuGet package manager and install.
+- #### Option 2 - Explicit Package Reference
+    Add the following to your .csproj file:
+    ```
+    <ItemGroup>
+      <PackageReference Include="NNN" Version="[Version you would like to use]" />
+    </ItemGroup>
+    ```
+Follow the [Creating a Custom Training Environment](#creating-a-custom-training-environment), [Training a Model](#training-a-model), and/or [Saving/Loading Models](#savingloading-models) guides, or refer to the [C# API Documentation](https://github.com/marcov-k/NNN/wiki/C%23-API) to implement Neural Network Notions in your code.
 
 ### Unity Package Install
-#### Option 1 - via git URL
+#### Option 1 - Via Git URL
 1. Open the Unity Package Manager and click the "+" in the top left corner.
 2. Select "Add package from git URL."
-3. Enter the URL "https://github.com/marcov-k/NNN.git#upm"
-4. Follow the [Creating a Custom Training Environment](#creating-a-custom-training-environment), [Training a Model](#training-a-model), and/or [Saving/Loading Models](#savingloading-models) guides to implement Neural Network Notions in your code.
-
-#### Option 2 - via zip
+3. Enter the following URL: https://github.com/marcov-k/NNN.git#upm
+#### Option 2 - Via Zip
 1. Download the NNN-UPM-vX.X.X.zip file from the GitHub release.
-2. Extract the .zip file and paste the full contents into your Unity project's "Packages" folder.
-3. Follow the [Creating a Custom Training Environment](#creating-a-custom-training-environment), [Training a Model](#training-a-model), and/or [Saving/Loading Models](#savingloading-models) guides to implement Neural Network Notions in your code.
+2. Extract the .zip file and paste the complete extracted folder into your Unity project's Packages/ directory.
+
+Follow the [Creating a Custom Training Environment](#creating-a-custom-training-environment), [Training a Model](#training-a-model), and/or [Saving/Loading Models](#savingloading-models) guides, or refer to the [C# API Documentation](https://github.com/marcov-k/NNN/wiki/C%23-API) to implement Neural Network Notions in your code.
 
 ## How to Use
 ### Using Pretrained Models
@@ -742,8 +745,8 @@ NNN-Solution - Directory (Full project solution)\
 ## File Format (.nnn)
 ### General Formatting Notes:
 - All multi-byte numbers use little-endian encoding
-- Each layer type's encoding includes different parameters - identified by [Layer ID](#layer-ids)
-- Certain [activation functions](#activation-data-format---found-immediately-after-activation-id-for-activation-functions-with-parameters) encode additional parameters (eg. LeakyReLU's Tau) immediately after their ID - identified by [Activation ID](#activation-ids)
+- Each [layer type's](#layer-data-format) encoding includes different parameters - identified by [Layer ID](#layer-ids)
+- Certain [activation functions](#activation-function-data-format---found-immediately-after-activation-id-for-activation-functions-with-parameters) encode additional parameters (eg. Leaky ReLU's Tau) immediately after their ID - identified by [Activation ID](#activation-ids)
 - Data appears in the file in the exact order as listed below
 
 ### File Header Format:
@@ -772,7 +775,7 @@ NNN-Solution - Directory (Full project solution)\
   - Filter Count -> int32 (4 bytes) -> number of filters in the layer
   - Kernels -> tensor ([see formatting](#tensor-format)) -> kernels parameter of the layer ([f, h, w..., c] ordering)
 
-### Activation Data Format - found immediately after Activation ID (for activation functions with parameters):
+### Activation Function Data Format - found immediately after Activation ID (for activation functions with parameters):
 - #### Leaky ReLU:
   - Tau -> double (8 bytes) -> tau parameter of the function
 
