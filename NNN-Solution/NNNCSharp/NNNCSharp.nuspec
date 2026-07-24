@@ -9,7 +9,7 @@
     <license type="file">LICENSE.txt</license>
     <readme>README.md</readme>
     <tags>neural-network ml machine-learning deep-learning q-learning dqn deep-q-learning rl 
-	reinforcement-learning ai artificial intelligence</tags>
+	reinforcement-learning ai artificial-intelligence</tags>
 	<dependencies>
 	  <group targetFramework="netstandard2.1" />
 	</dependencies>
