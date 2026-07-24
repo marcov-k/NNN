@@ -1,5 +1,3 @@
-<div style="font-family: monospace; list-style-type: none; padding-left: 0; line-height: 1.5;">
- 
 # Neural Network Notions
 A neural network framework created from scratch in C# and C++ implementing automatic differentiation, backpropagation, and customizable architectures for neural networks.
 
