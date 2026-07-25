@@ -6,7 +6,6 @@ namespace NNNCSharp.Components.Buffers
     /// Sum tree class.
     /// </summary>
     /// <typeparam name="T">Type to store.</typeparam>
-    /// <param name="capacity">Maximum size of the sum tree.</param>
     public class SumTree<T>
     {
         /// <summary>
@@ -16,7 +15,7 @@ namespace NNNCSharp.Components.Buffers
         /// <summary>
         /// Array representing the sum tree.
         /// </summary>
-        readonly float[] Tree;
+        readonly double[] Tree;
         /// <summary>
         /// Data associated with each sum tree node.
         /// </summary>
@@ -32,12 +31,16 @@ namespace NNNCSharp.Components.Buffers
         /// <summary>
         /// Total priority of all elements stored in the sum tree.
         /// </summary>
-        public float TotalPriority => Tree[0];
+        public double TotalPriority => Tree[0];
 
+        /// <summary>
+        /// Creates a new SumTree instance.
+        /// </summary>
+        /// <param name="capacity">Maximum size of the sum tree.</param>
         public SumTree(int capacity)
         {
             Capacity = capacity;
-            Tree = new float[2 * capacity - 1];
+            Tree = new double[2 * capacity - 1];
             Data = new T[capacity];
         }
 
@@ -46,7 +49,7 @@ namespace NNNCSharp.Components.Buffers
         /// </summary>
         /// <param name="item">Element to add.</param>
         /// <param name="priority">Priority of new element.</param>
-        public void Add(T item, float priority)
+        public void Add(T item, double priority)
         {
             // Add item to main data array
             if (Data[WritePointer] is IDisposable disposable) disposable.Dispose();
@@ -66,10 +69,10 @@ namespace NNNCSharp.Components.Buffers
         /// </summary>
         /// <param name="treeIndex">Index to update the priority of.</param>
         /// <param name="priority">New value of the priority.</param>
-        public void Update(int treeIndex, float priority)
+        public void Update(int treeIndex, double priority)
         {
             // Update priority at index
-            float change = priority - Tree[treeIndex];
+            double change = priority - Tree[treeIndex];
             Tree[treeIndex] = priority;
 
             // Update priority sums of parent nodes
@@ -85,7 +88,7 @@ namespace NNNCSharp.Components.Buffers
         /// </summary>
         /// <param name="value">PER sampling value to use.</param>
         /// <returns>Sum tree index, priority, and element selected via PER sampling.</returns>
-        public (int treeIndex, float priority, T item) Get(float value)
+        public (int treeIndex, double priority, T item) Get(double value)
         {
             int parentIndex = 0;
 
@@ -95,7 +98,7 @@ namespace NNNCSharp.Components.Buffers
                 int leftChild = 2 * parentIndex + 1;
                 int rightChild = leftChild + 1;
 
-                if (value <= Tree[leftChild])
+                if (value < Tree[leftChild])
                 {
                     parentIndex = leftChild;
                 }
@@ -107,6 +110,7 @@ namespace NNNCSharp.Components.Buffers
             }
 
             int dataIndex = parentIndex - (Capacity - 1);
+
             return (parentIndex, Tree[parentIndex], Data[dataIndex]);
         }
     }

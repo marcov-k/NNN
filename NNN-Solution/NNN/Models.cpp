@@ -8,7 +8,7 @@
 // Clips all parameter gradients based on a maximum norm value.
 void Models::clip_gradients(const std::vector<std::shared_ptr<Tensor>*>& paras, float max_norm)
 {
-	thread_local std::vector<float> scratch1;
+	thread_local AlignedFloatVector scratch1;
 
 	float total_norm = 0.0f;
 	for (std::shared_ptr<Tensor>* para_ptr : paras)
@@ -34,7 +34,7 @@ void Models::clip_gradients(const std::vector<std::shared_ptr<Tensor>*>& paras, 
 void Models::soft_update(const std::vector<std::shared_ptr<Tensor>*>& agent_paras,
 	const std::vector<std::shared_ptr<Tensor>*>& target_paras, float tau, float one_minus_tau)
 {
-	thread_local std::vector<float> scratch1;
+	thread_local AlignedFloatVector scratch1;
 
 	for (size_t i = 0; i < agent_paras.size(); ++i)
 	{

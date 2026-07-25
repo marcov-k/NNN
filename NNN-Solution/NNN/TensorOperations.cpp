@@ -205,8 +205,8 @@ std::shared_ptr<Tensor> Tensor::div(const std::shared_ptr<Tensor>& a, const std:
 			{
 				if (!a->requires_grad && !b->requires_grad) return;
 
-				thread_local std::vector<float> scratch1;
-				thread_local std::vector<float> scratch2;
+				thread_local AlignedFloatVector scratch1;
+				thread_local AlignedFloatVector scratch2;
 
 				const int element_count = result->element_count();
 				scratch1.resize(element_count);
@@ -271,8 +271,8 @@ std::shared_ptr<Tensor> Tensor::div(float a, const std::shared_ptr<Tensor>& b)
 			{
 				if (!b->requires_grad) return;
 
-				thread_local std::vector<float> scratch1;
-				thread_local std::vector<float> scratch2;
+				thread_local AlignedFloatVector scratch1;
+				thread_local AlignedFloatVector scratch2;
 
 				const int element_count = result->element_count();
 				scratch1.resize(element_count);
@@ -307,8 +307,8 @@ std::shared_ptr<Tensor> Tensor::pow(const std::shared_ptr<Tensor>& a, const std:
 			{
 				if (!a->requires_grad && !exp->requires_grad) return;
 
-				thread_local std::vector<float> scratch1;
-				thread_local std::vector<float> scratch2;
+				thread_local AlignedFloatVector scratch1;
+				thread_local AlignedFloatVector scratch2;
 
 				const int element_count = result->element_count();
 				scratch1.resize(element_count);
@@ -351,7 +351,7 @@ std::shared_ptr<Tensor> Tensor::pow(const std::shared_ptr<Tensor>& a, float exp)
 			{
 				if (!a->requires_grad) return;
 
-				thread_local std::vector<float> scratch1;
+				thread_local AlignedFloatVector scratch1;
 
 				const int element_count = result->element_count();
 				scratch1.resize(element_count);
@@ -383,7 +383,7 @@ std::shared_ptr<Tensor> Tensor::pow(float a, const std::shared_ptr<Tensor>& exp)
 			{
 				if (!exp->requires_grad) return;
 
-				thread_local std::vector<float> scratch1;
+				thread_local AlignedFloatVector scratch1;
 
 				const int element_count = result->element_count();
 				scratch1.resize(element_count);
@@ -440,9 +440,9 @@ std::shared_ptr<Tensor> Tensor::log(const std::shared_ptr<Tensor>& arg, const st
 			{
 				if (!arg->requires_grad && !log_base->requires_grad) return;
 
-				thread_local std::vector<float> scratch1;
-				thread_local std::vector<float> scratch2;
-				thread_local std::vector<float> scratch3;
+				thread_local AlignedFloatVector scratch1;
+				thread_local AlignedFloatVector scratch2;
+				thread_local AlignedFloatVector scratch3;
 
 				const int element_count = result->element_count();
 				scratch1.resize(element_count);
@@ -488,8 +488,8 @@ std::shared_ptr<Tensor> Tensor::log(const std::shared_ptr<Tensor>& arg, float lo
 			{
 				if (!arg->requires_grad) return;
 
-				thread_local std::vector<float> scratch1;
-				thread_local std::vector<float> scratch2;
+				thread_local AlignedFloatVector scratch1;
+				thread_local AlignedFloatVector scratch2;
 
 				const int element_count = result->element_count();
 				scratch1.resize(element_count);
@@ -522,8 +522,8 @@ std::shared_ptr<Tensor> Tensor::log(float arg, const std::shared_ptr<Tensor>& lo
 			{
 				if (!log_base->requires_grad) return;
 
-				thread_local std::vector<float> scratch1;
-				thread_local std::vector<float> scratch2;
+				thread_local AlignedFloatVector scratch1;
+				thread_local AlignedFloatVector scratch2;
 
 				const int element_count = result->element_count();
 				scratch1.resize(element_count);
@@ -557,7 +557,7 @@ std::shared_ptr<Tensor> Tensor::ln(const std::shared_ptr<Tensor>& t)
 			{
 				if (!t->requires_grad) return;
 
-				thread_local std::vector<float> scratch1;
+				thread_local AlignedFloatVector scratch1;
 
 				const int element_count = result->element_count();
 				scratch1.resize(element_count);
@@ -599,7 +599,7 @@ std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const s
 	const bool use_parallel = total_rows > 16 && (long)total_rows * n * p > MATMUL_PARALLEL_THRESHOLD;
 
 	// Transpose b
-	std::vector<float> b_t(b_batched ? b_mat_size * batch_size : b_mat_size);
+	AlignedFloatVector b_t(b_batched ? b_mat_size * batch_size : b_mat_size);
 	if (b_batched)
 	{
 		for (size_t batch = 0; batch < batch_size; ++batch)
@@ -630,8 +630,8 @@ std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const s
 			{
 				if (!a->requires_grad && !b->requires_grad) return;
 
-				thread_local std::vector<float> d_r_t;
-				thread_local std::vector<float> a_t;
+				thread_local AlignedFloatVector d_r_t;
+				thread_local AlignedFloatVector a_t;
 
 				if (a->requires_grad)
 				{
@@ -737,8 +737,8 @@ std::shared_ptr<Tensor> Tensor::convolve(const std::shared_ptr<Tensor>& input, c
 	const auto& owner = input->requires_grad ? input : kernels;
 	auto result = get_result_tensor(owner, result_dims, input->requires_grad || kernels->requires_grad);
 
-	auto kernels_mat = std::make_shared<std::vector<float>>(kernels->element_count());
-	auto input_col = std::make_shared<std::vector<float>>(g.im2col_rows * g.im2col_cols);
+	auto kernels_mat = std::make_shared<AlignedFloatVector>(kernels->element_count());
+	auto input_col = std::make_shared<AlignedFloatVector>(g.im2col_rows * g.im2col_cols);
 
 	const bool use_parallel = (long)g.batches * g.out_spatial_size * g.filter_count * g.kernel_volume_size > CONV_PARALLEL_THRESHOLD;
 
@@ -762,8 +762,8 @@ std::shared_ptr<Tensor> Tensor::convolve(const std::shared_ptr<Tensor>& input, c
 				// Compute grad_input = convolve(grad_r, rotated kernels)
 				if (input->requires_grad)
 				{
-					thread_local std::vector<float> d_col;
-					thread_local std::vector<float> kernels_mat_t;
+					thread_local AlignedFloatVector d_col;
+					thread_local AlignedFloatVector kernels_mat_t;
 
 					d_col.assign(g.im2col_rows * g.im2col_cols, 0.0);
 					kernels_mat_t.resize(kernels_mat->size());
@@ -779,9 +779,9 @@ std::shared_ptr<Tensor> Tensor::convolve(const std::shared_ptr<Tensor>& input, c
 				// Compute grad_kernels = convolve(input, rotated grad_r)
 				if (kernels->requires_grad)
 				{
-					thread_local std::vector<float> d_out_t;
-					thread_local std::vector<float> input_col_t;
-					thread_local std::vector<float> d_kernels_ft;
+					thread_local AlignedFloatVector d_out_t;
+					thread_local AlignedFloatVector input_col_t;
+					thread_local AlignedFloatVector d_kernels_ft;
 
 					d_out_t.resize(g.filter_count * g.im2col_rows);
 					input_col_t.resize(input_col->size());

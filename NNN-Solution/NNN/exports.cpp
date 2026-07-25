@@ -11,6 +11,19 @@ static void* wrap_handle(const std::shared_ptr<Tensor>& t)
 // Exported methods for interop with C# - unwrap and/or wrap tensor handles, and pass inputs to C++ implementations and outputs to C#.
 extern "C"
 {
+	/* C++ utility functions */
+
+	// Allocates a block of memory with the given size and alignment.
+	void* alloc_aligned(size_t size, size_t alignment)
+	{
+		return _aligned_malloc(size, alignment);
+	}
+
+	void free_aligned(void* ptr)
+	{
+		_aligned_free(ptr);
+	}
+
 	/* Initialization and disposal */
 
 	// Creates a new tensor instance with the given dimensions and requires_grad flag.
@@ -482,12 +495,12 @@ extern "C"
 		Optimizers::sgd(*tensor_handle_para, lr);
 	}
 
-	void optimizers_adam(void* handle_para, float lr, int iter, float* m, float* v, int moments_count,
+	void optimizers_adam(void* handle_para, float lr, int iter, void* m, void* v, int moments_count,
 		float beta1, float one_minus_beta1, float beta2, float one_minus_beta2, float epsilon, float weight_decay)
 	{
 		auto* tensor_handle_para = static_cast<std::shared_ptr<Tensor>*>(handle_para);
-		std::span<float> m_span(m, moments_count);
-		std::span<float> v_span(v, moments_count);
+		std::span<float> m_span(static_cast<float*>(m), moments_count);
+		std::span<float> v_span(static_cast<float*>(v), moments_count);
 		Optimizers::adam(*tensor_handle_para, lr, iter, m_span, v_span, beta1, one_minus_beta1, beta2, one_minus_beta2,
 			epsilon, weight_decay);
 	}

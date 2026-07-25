@@ -13,6 +13,24 @@ namespace NNNCSharp.Components.Interop
         /// </summary>
         const string DllName = "NNN.dll";
 
+        // C++ utility functions
+
+        /// <summary>
+        /// Allocates a block of C++ memory with the given size and alignment.
+        /// </summary>
+        /// <param name="size">Size of memory to allocate.</param>
+        /// <param name="alignment">Alignment to allocate with.</param>
+        /// <returns>void* handle of the new allocated C++ memory.</returns>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr alloc_aligned(UIntPtr size, UIntPtr alignment);
+
+        /// <summary>
+        /// Frees a block of aligned C++ memory.
+        /// </summary>
+        /// <param name="ptr">void* handle of the C++ memory to free.</param>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void free_aligned(IntPtr ptr);
+
         // Initialization and disposal
 
         /// <summary>
@@ -663,8 +681,8 @@ namespace NNNCSharp.Components.Interop
         /// <param name="handle_para">void* handle of the parameter C++ tensor.</param>
         /// <param name="lr">Learning rate parameter to use.</param>
         /// <param name="iter">Current optimizer iteration.</param>
-        /// <param name="m">First moments to use.</param>
-        /// <param name="v">Second moments to use.</param>
+        /// <param name="m">void* handle of the first moments to use.</param>
+        /// <param name="v">void* handle of the second moments to use.</param>
         /// <param name="moments_count">Length of the moments arrays.</param>
         /// <param name="beta1">Beta1 parameter to use.</param>
         /// <param name="one_minus_beta1">Precalculated 1 - beta1 parameter to use.</param>
@@ -673,7 +691,7 @@ namespace NNNCSharp.Components.Interop
         /// <param name="epsilon">Epsilon value to use.</param>
         /// <param name="weight_decay">Weight decay parameter to use.</param>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern void optimizers_adam(IntPtr handle_para, float lr, int iter, float[] m, float[] v, int moments_count,
+        internal static extern void optimizers_adam(IntPtr handle_para, float lr, int iter, IntPtr m, IntPtr v, int moments_count,
             float beta1, float one_minus_beta1, float beta2, float one_minus_beta2, float epsilon, float weight_decay);
 
         // Models

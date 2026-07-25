@@ -31,17 +31,17 @@ namespace NNNCSharp.Components.Costs
         /// <param name="target">Target values.</param>
         /// <param name="weights">Sampling weights of the predictions' associated experiences.</param>
         /// <returns>CostResult storing Tensor of per-prediction losses and corresponding PER sampling priorites.</returns>
-        public virtual CostResult CalculateCostWithPriority(Tensor predictions, Tensor target, float[]? weights = null)
+        public virtual CostResult CalculateCostWithPriority(Tensor predictions, Tensor target, double[]? weights = null)
         {
             var losses = CalculatePerSampleCost(predictions, target); // calculate loss of each prediction
 
             // Update PER sampling priorities and scale losses based on sampling bias
-            var priorities = new float[losses.ElementCount];
+            var priorities = new double[losses.ElementCount];
             for (int i = 0; i < losses.ElementCount; i++)
             {
                 priorities[i] = Math.Abs(losses[i]) + 1e-8f;
 
-                if (weights != null) losses[i] *= weights[i];
+                if (weights != null) losses[i] *= (float)weights[i];
             }
 
             return new CostResult(losses, priorities);
@@ -53,5 +53,5 @@ namespace NNNCSharp.Components.Costs
     /// </summary>
     /// <param name="Losses">Tensor storing per-prediction losses.</param>
     /// <param name="Priorities">Array storing per-prediction PER sampling priorities.</param>
-    public record CostResult(Tensor Losses, float[] Priorities);
+    public record CostResult(Tensor Losses, double[] Priorities);
  }

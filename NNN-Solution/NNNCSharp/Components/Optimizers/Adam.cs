@@ -8,11 +8,6 @@ namespace NNNCSharp.Components.Optimizers
     /// <summary>
     /// Adaptive Moment Estimation optimizer.
     /// </summary>
-    /// <param name="learningRate">Gradient scaling factor for parameter updates.</param>
-    /// <param name="beta1">Exponential decay rate of first moment estimates.</param>
-    /// <param name="beta2">Exponential decay rate of second moment estimates.</param>
-    /// <param name="epsilon">Epsilon value to use.</param>
-    /// <param name="weightDecay">Weight decay value to use.</param>
     public class Adam : Optimizer
     {
         /// <summary>
@@ -40,6 +35,14 @@ namespace NNNCSharp.Components.Optimizers
         /// </summary>
         readonly float WeightDecay;
 
+        /// <summary>
+        /// Creates a new Adam optimizer instance.
+        /// </summary>
+        /// <param name="learningRate">Gradient scaling factor for parameter updates.</param>
+        /// <param name="beta1">Exponential decay rate of first moment estimates.</param>
+        /// <param name="beta2">Exponential decay rate of second moment estimates.</param>
+        /// <param name="epsilon">Epsilon value to use.</param>
+        /// <param name="weightDecay">Weight decay value to use.</param>
         public Adam(float learningRate = 0.001f, float beta1 = 0.9f, float beta2 = 0.999f,
             float epsilon = 1e-8f, float weightDecay = 0.0f) : base(learningRate)
         {
@@ -54,21 +57,37 @@ namespace NNNCSharp.Components.Optimizers
         /// <summary>
         /// Dictionary of per-parameter persistent buffers for first and second moments.
         /// </summary>
-        readonly Dictionary<Tensor, (float[] m, float[] v)> _state = new();
+        readonly Dictionary<Tensor, (IntPtr m, IntPtr v)> _state = new();
 
         public override void Step(Tensor parameter, int iteration)
         {
-            // Create a new persistent moment buffer if necessary
+            // Create a new persistent 32-bit aligned moment buffer if necessary
             if (!_state.TryGetValue(parameter, out var moments))
             {
-                moments = (new float[parameter.ElementCount], new float[parameter.ElementCount]);
+                int byteCount = parameter.ElementCount * sizeof(float);
+                IntPtr m = NativeMethods.alloc_aligned((UIntPtr)byteCount, (UIntPtr)32);
+                IntPtr v = NativeMethods.alloc_aligned((UIntPtr)byteCount, (UIntPtr)32);
+                unsafe
+                {
+                    new Span<byte>((void*)m, byteCount).Clear();
+                    new Span<byte>((void*)v, byteCount).Clear();
+                }
+                moments = (m, v);
                 _state[parameter] = moments;
             }
-            var (m, v) = moments;
 
-            NativeMethods.optimizers_adam(parameter.Handle, LR, iteration, m, v, m.Length, Beta1, OneMinusBeta1, Beta2,
-                OneMinusBeta2, Epsilon, WeightDecay);
+            NativeMethods.optimizers_adam(parameter.Handle, LR, iteration, moments.m, moments.v, parameter.ElementCount,
+                Beta1, OneMinusBeta1, Beta2, OneMinusBeta2, Epsilon, WeightDecay);
             GC.KeepAlive(parameter);
+        }
+
+        ~Adam()
+        {
+            foreach (var (m, v) in _state.Values)
+            {
+                NativeMethods.free_aligned(m);
+                NativeMethods.free_aligned(v);
+            }
         }
     }
 }

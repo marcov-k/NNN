@@ -34,14 +34,32 @@ struct TensorPtrEqual
 	}
 };
 
-template<typename T, size_t Alignment = 32>
+// 32-bit aligned vector allocator.
+template<typename T>
 struct AlignedAllocator
 {
 	using value_type = T;
+	using pointer = T*;
+	using const_pointer = const T*;
+	using reference = T&;
+	using const_reference = const T&;
+	using size_type = size_t;
+	using difference_type = ptrdiff_t;
+
+	AlignedAllocator() noexcept = default;
+
+	template<typename U>
+	AlignedAllocator(const AlignedAllocator<U>&) noexcept {}
+
+	template<typename U>
+	struct rebind
+	{
+		using other = AlignedAllocator<U>;
+	};
 
 	T* allocate(size_t n)
 	{
-		void* ptr = _aligned_malloc(n * sizeof(T), Alignment);
+		void* ptr = _aligned_malloc(n * sizeof(T), 32);
 		if (!ptr) throw std::bad_alloc();
 		return static_cast<T*>(ptr);
 	}
@@ -52,16 +70,10 @@ struct AlignedAllocator
 	}
 
 	template<typename U>
-	struct rebind
-	{
-		using other = AlignedAllocator<U, Alignment>;
-	};
+	bool operator==(const AlignedAllocator<U>&) const noexcept { return true; }
 
 	template<typename U>
-	bool operator==(const AlignedAllocator<U, Alignment>&) const noexcept { return true; }
-
-	template<typename U>
-	bool operator!=(const AlignedAllocator<U, Alignment>&) const noexcept { return false; }
+	bool operator!=(const AlignedAllocator<U>&) const noexcept { return false; }
 };
 
 using AlignedFloatVector = std::vector<float, AlignedAllocator<float>>;

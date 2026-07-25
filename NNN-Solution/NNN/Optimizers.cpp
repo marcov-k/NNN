@@ -17,8 +17,8 @@ void Optimizers::adam(const std::shared_ptr<Tensor>& para, float lr, int iter, s
 	const float bias_corr2 = 1.0f - std::pow(beta2, (float)(iter + 1));
 
 	// Initialize persistent scratch buffers
-	thread_local std::vector<float> scratch1;
-	thread_local std::vector<float> scratch2;
+	thread_local AlignedFloatVector scratch1;
+	thread_local AlignedFloatVector scratch2;
 
 	const int param_count = para->element_count();
 	scratch1.resize(param_count);

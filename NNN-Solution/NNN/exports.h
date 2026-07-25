@@ -7,6 +7,14 @@
 // Exported methods for interop with C#.
 extern "C"
 {
+	/* C++ utility functions */
+
+	// Allocates a block of memory with the given size and alignment.
+	__declspec(dllexport) void* alloc_aligned(size_t size, size_t alignment);
+
+	// Frees a block of aligned memory.
+	__declspec(dllexport) void free_aligned(void* ptr);
+
 	/* Initialization and disposal */
 
 	// Creates a new tensor instance with the given dimensions and requires_grad flag.
@@ -242,7 +250,7 @@ extern "C"
 	__declspec(dllexport) void optimizers_sgd(void* handle_para, float lr);
 
 	// Performs an Adam optimizer step with the given parameters on the given parameter tensor.
-	__declspec(dllexport) void optimizers_adam(void* handle_para, float lr, int iter, float* m, float* v, int moments_count,
+	__declspec(dllexport) void optimizers_adam(void* handle_para, float lr, int iter, void* m, void* v, int moments_count,
 		float beta1, float one_minus_beta1, float beta2, float one_minus_beta2, float epsilon, float weight_decay);
 
 	/* Models */

@@ -148,7 +148,7 @@ std::shared_ptr<Tensor> Tensor::sigmoid(const std::shared_ptr<Tensor>& t)
 			{
 				if (!t->requires_grad) return;
 
-				thread_local std::vector<float> scratch1;
+				thread_local AlignedFloatVector scratch1;
 
 				const int element_count = result->element_count();
 				scratch1.resize(element_count);
@@ -178,7 +178,7 @@ std::shared_ptr<Tensor> Tensor::tanh(const std::shared_ptr<Tensor>& t)
 			{
 				if (!t->requires_grad) return;
 
-				thread_local std::vector<float> scratch1;
+				thread_local AlignedFloatVector scratch1;
 
 				const int element_count = result->element_count();
 				scratch1.resize(element_count);
@@ -267,7 +267,7 @@ std::shared_ptr<Tensor> Tensor::softmax(const std::shared_ptr<Tensor>& t)
 			{
 				if (!t->requires_grad) return;
 
-				thread_local std::vector<float> scratch1;
+				thread_local AlignedFloatVector scratch1;
 
 				scratch1.resize(classes);
 

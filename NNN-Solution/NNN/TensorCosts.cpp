@@ -23,7 +23,7 @@ std::shared_ptr<Tensor> Tensor::mse(const std::shared_ptr<Tensor>& t, const std:
 			{
 				if (!t->requires_grad) return;
 
-				thread_local std::vector<float> scratch1;
+				thread_local AlignedFloatVector scratch1;
 
 				const int element_count = result->element_count();
 				scratch1.resize(element_count);
@@ -59,8 +59,8 @@ std::shared_ptr<Tensor> Tensor::huber(const std::shared_ptr<Tensor>& t, const st
 			{
 				if (!t->requires_grad) return;
 
-				thread_local std::vector<float> scratch1;
-				thread_local std::vector<float> scratch2;
+				thread_local AlignedFloatVector scratch1;
+				thread_local AlignedFloatVector scratch2;
 
 				const int element_count = result->element_count();
 				scratch1.resize(element_count);
@@ -87,7 +87,7 @@ std::shared_ptr<Tensor> Tensor::softmax_cross_entropy(const std::shared_ptr<Tens
 
 	std::shared_ptr<Tensor> result = get_result_tensor(t, {(int)batches, 1}, t->requires_grad);
 
-	auto probs = std::make_shared<std::vector<float>>(element_count); // allow backward lambda to capture pointer (avoids copy allocation)
+	auto probs = std::make_shared<AlignedFloatVector>(element_count); // allow backward lambda to capture pointer (avoids copy allocation)
 
 	const float* __restrict t_data = t->_data.data();
 	float* __restrict p_data = probs->data();
@@ -178,7 +178,7 @@ std::shared_ptr<Tensor> Tensor::softmax_cross_entropy(const std::shared_ptr<Tens
 			{
 				if (!t->requires_grad) return;
 
-				thread_local std::vector<float> scratch1;
+				thread_local AlignedFloatVector scratch1;
 				scratch1.resize(classes);
 
 				const float* __restrict p_data = probs->data();

@@ -268,7 +268,7 @@ namespace NNNCSharp.Components.Trainers
                 {
                     var eta = avgElapsed * (episodes - e - 1);
                     NNNLog.WriteLine($"\n\nEpisodes completed: {e + 1}/{episodes}");
-                    NNNLog.WriteLine($"Total reward for last episode: {totalReward:F2},");
+                    NNNLog.WriteLine($"Total reward for last episode: {totalReward:F2}");
                     NNNLog.WriteLine($"Average loss for last episode: {(totalLoss / trainSteps):F3}");
                     NNNLog.WriteLine($"Exploration rate: {Exploration:F2}");
                     NNNLog.WriteLine($"Experience count: {ReplayBuffer.Count}");

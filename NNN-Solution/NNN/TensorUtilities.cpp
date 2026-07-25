@@ -410,7 +410,7 @@ std::shared_ptr<Tensor> Tensor::get_spatial_dropout_mask(const std::vector<int>&
 	const int channels = dims.back();
 	const int spatial_size = batch_size / channels;
 
-	thread_local std::vector<float> channel_vals;
+	thread_local AlignedFloatVector channel_vals;
 	channel_vals.resize(channels);
 
 	// Randomly drop channels based on dropout rate
