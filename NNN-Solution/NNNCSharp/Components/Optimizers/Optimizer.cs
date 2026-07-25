@@ -11,9 +11,9 @@ namespace NNNCSharp.Components.Optimizers
         /// <summary>
         /// Gradient scaling factor for parameter updates.
         /// </summary>
-        public double LR { get; set; }
+        public float LR { get; set; }
 
-        public Optimizer(double learningRate)
+        public Optimizer(float learningRate)
         {
             LR = learningRate;
         }

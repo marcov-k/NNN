@@ -17,14 +17,14 @@ namespace NNNCSharp.Components.Utilities
         /// Generates a random number from a probability distribution with a mean of 0 and standard deviation of 1.
         /// </summary>
         /// <returns>Random number generated from a probability distribution with a mean of 0 and standard deviation of 1.</returns>
-        public static double NextGaussian()
+        public static float NextGaussian()
         {
             // Generate 2 random values from uniform distribution
-            double u1 = 1.0 - Random.NextDouble();
-            double u2 = 1.0 - Random.NextDouble();
+            float u1 = 1.0f - (float)Random.NextDouble();
+            float u2 = 1.0f - (float)Random.NextDouble();
 
             // Apply Box-Muller Transform -> Z_1 = sqrt(-2 * ln(u_1)) * sin(2π * u_2)
-            double randStdNormal = Math.Sqrt(-2.0 * Math.Log(u1)) * Math.Sin(2.0 * Math.PI * u2);
+            float randStdNormal = MathF.Sqrt(-2.0f * MathF.Log(u1)) * MathF.Sin(2.0f * MathF.PI * u2);
             return randStdNormal;
         }
 
@@ -34,12 +34,12 @@ namespace NNNCSharp.Components.Utilities
         /// <param name="mean">Mean of the probability distribution to generate from.</param>
         /// <param name="stdDev">Standard deviation of the probability distribution to generate from.</param>
         /// <returns>Random number generated from a probability distribution with the given mean and standard deviation.</returns>
-        public static double NextGaussian(double mean, double stdDev)
+        public static float NextGaussian(float mean, float stdDev)
         {
-            double randStdNormal = NextGaussian(); // generate random number from standard distribution
+            float randStdNormal = NextGaussian(); // generate random number from standard distribution
 
             // Convert to target distribution -> X = (Z * σ) + μ
-            double randNormal = randStdNormal * stdDev + mean;
+            float randNormal = randStdNormal * stdDev + mean;
             return randNormal;
         }
 
@@ -49,7 +49,7 @@ namespace NNNCSharp.Components.Utilities
         /// <param name="value">Value to round.</param>
         /// <param name="interval">Interval to round to.</param>
         /// <returns>Input value rounded to the given interval.</returns>
-        public static int RoundToInterval(double value, int interval)
+        public static int RoundToInterval(float value, int interval)
         {
             return (int)Math.Round(value / interval, MidpointRounding.AwayFromZero) * interval;
         }
@@ -59,9 +59,9 @@ namespace NNNCSharp.Components.Utilities
         /// </summary>
         /// <param name="value">Input value to sample at.</param>
         /// <returns>Value of the sigmoid function at the given input value.</returns>
-        public static double Sigmoid(double value)
+        public static float Sigmoid(float value)
         {
-            return 1.0 / (1.0 + Math.Exp(-value));
+            return 1.0f / (1.0f + MathF.Exp(-value));
         }
 
         /// <summary>
@@ -69,9 +69,9 @@ namespace NNNCSharp.Components.Utilities
         /// </summary>
         /// <param name="value">Input value to sample at.</param>
         /// <returns>Value of the hyperbolic tangent function at the given input value.</returns>
-        public static double Tanh(double value)
+        public static float Tanh(float value)
         {
-            return Math.Tanh(value);
+            return MathF.Tanh(value);
         }
 
         /// <summary>
@@ -90,7 +90,7 @@ namespace NNNCSharp.Components.Utilities
         /// <param name="inputs">Inputs to the test function.</param>
         /// <param name="testOp">Test function for autodiff engine.</param>
         /// <param name="loss">Corresponding function for numerical analysis.</param>
-        public static void GradientTest(Tensor[] inputs, Func<Tensor[], Tensor> testOp, Func<Tensor[], double> loss)
+        public static void GradientTest(Tensor[] inputs, Func<Tensor[], Tensor> testOp, Func<Tensor[], float> loss)
         {
             var result = testOp(inputs);
             var mean = Tensor.Mean(result);
@@ -102,8 +102,8 @@ namespace NNNCSharp.Components.Utilities
                 for (int e = 0; e < inputs[input].ElementCount; e++)
                 {
                     var numerical = NumericalGradient(inputs, input, e, loss);
-                    double analytical = inputs[input].Grad[e];
-                    double relError = Math.Abs(numerical - analytical) / (Math.Abs(numerical) + 1e-8);
+                    float analytical = inputs[input].Grad[e];
+                    float relError = Math.Abs(numerical - analytical) / (Math.Abs(numerical) + 1e-8f);
                     NNNLog.WriteLine($"inputs[{input}][{e}]: numerical = {numerical}, analytical = {analytical}, relError = {relError}");
                 }
             }
@@ -117,14 +117,14 @@ namespace NNNCSharp.Components.Utilities
         /// <param name="e">Index of the element in the input to test.</param>
         /// <param name="loss">Test function for numerical analysis.</param>
         /// <returns></returns>
-        static double NumericalGradient(Tensor[] inputs, int inputIndex, int e, Func<Tensor[], double> loss)
+        static float NumericalGradient(Tensor[] inputs, int inputIndex, int e, Func<Tensor[], float> loss)
         {
             // Estimate gradient via finite difference
-            double eps = 1e-8;
+            float eps = 1e-8f;
             inputs[inputIndex][e] += eps;
-            double lossPlus = loss(inputs);
+            float lossPlus = loss(inputs);
             inputs[inputIndex][e] -= 2 * eps;
-            double lossMinus = loss(inputs);
+            float lossMinus = loss(inputs);
             inputs[inputIndex][e] += eps;
             return (lossPlus - lossMinus) / (2 * eps);
         }

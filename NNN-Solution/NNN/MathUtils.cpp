@@ -5,55 +5,57 @@
 
 /* Register operations */
 
-// Computes the sum of a 256-bit register of doubles.
-double MathUtils::sum_m256d(__m256d v)
+// Computes the sum of a 256-bit register of floats.
+float MathUtils::sum_m256(__m256 v)
 {
-	__m128d hi = _mm256_extractf128_pd(v, 1);
-	__m128d lo = _mm256_castpd256_pd128(v);
-	__m128d sum128 = _mm_add_pd(hi, lo);
-	__m128d permuted = _mm_permute_pd(sum128, 1);
-	__m128d total = _mm_add_sd(sum128, permuted);
-	return _mm_cvtsd_f64(total);
+	const __m128 hi = _mm256_extractf128_ps(v, 1);
+	const __m128 lo = _mm256_castps256_ps128(v);
+	const __m128 sum128 = _mm_add_ps(lo, hi);
+	const __m128 shuf = _mm_movehl_ps(sum128, sum128);
+	const __m128 sums = _mm_add_ps(sum128, shuf);
+	const __m128 s2 = _mm_add_ss(sums, _mm_shuffle_ps(sums, sums, 0x55));
+	return _mm_cvtss_f32(s2);
 }
 
-double MathUtils::max_m256d(__m256d v)
+float MathUtils::max_m256(__m256 v)
 {
-	__m128d hi = _mm256_extractf128_pd(v, 1);
-	__m128d lo = _mm256_castpd256_pd128(v);
-	__m128d max128 = _mm_max_pd(lo, hi);
-	__m128d permuted = _mm_permute_pd(max128, 1);
-	__m128d max64 = _mm_max_pd(max128, permuted);
-	return _mm_cvtsd_f64(max64);
+	const __m256 v_high = _mm256_permute2f128_ps(v, v, 0x31);
+	const __m256 v_max1 = _mm256_max_ps(v, v_high);
+	const __m256 v_shuf1 = _mm256_permute_ps(v_max1, _MM_SHUFFLE(2, 3, 0, 1));
+	const __m256 v_max2 = _mm256_max_ps(v_max1, v_shuf1);
+	const __m256 v_shuf2 = _mm256_permute_ps(v_max2, _MM_SHUFFLE(1, 0, 3, 2));
+	const __m256 v_max3 = _mm256_max_ps(v_max2, v_shuf2);
+	return _mm_cvtss_f32(_mm256_castps256_ps128(v_max3));
+}
+
+float MathUtils::min_m256(__m256 v)
+{
+	const __m256 v_high = _mm256_permute2f128_ps(v, v, 0x31);
+	const __m256 v_min1 = _mm256_min_ps(v, v_high);
+	const __m256 v_shuf1 = _mm256_permute_ps(v_min1, _MM_SHUFFLE(2, 3, 0, 1));
+	const __m256 v_min2 = _mm256_min_ps(v_min1, v_shuf1);
+	const __m256 v_shuf2 = _mm256_permute_ps(v_min2, _MM_SHUFFLE(1, 0, 3, 2));
+	const __m256 v_min3 = _mm256_min_ps(v_min2, v_shuf2);
+	return _mm_cvtss_f32(_mm256_castps256_ps128(v_min3));
 }
 
 /* Vector addition */
 
 // Vectorizes the addition of two vectors and writes the result into the provided vector -> c = a + b
-void MathUtils::vector_add(const double* const __restrict a, const double* const __restrict b, double* const __restrict c, size_t n)
+void MathUtils::vector_add(const float* const __restrict a, const float* const __restrict b, float* const __restrict c, size_t n)
 {
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
-		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
-
-		__m256d sum0 = _mm256_add_pd(reg_a0, reg_b0);
-		__m256d sum1 = _mm256_add_pd(reg_a1, reg_b1);
-
-		_mm256_storeu_pd(&c[i], sum0);
-		_mm256_storeu_pd(&c[i + 4], sum1);
+		_mm256_store_ps(&c[i], _mm256_add_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&b[i])));
+		_mm256_store_ps(&c[i + 8], _mm256_add_ps(_mm256_load_ps(&a[i + 8]), _mm256_load_ps(&b[i + 8])));
+		_mm256_store_ps(&c[i + 16], _mm256_add_ps(_mm256_load_ps(&a[i + 16]), _mm256_load_ps(&b[i + 16])));
+		_mm256_store_ps(&c[i + 24], _mm256_add_ps(_mm256_load_ps(&a[i + 24]), _mm256_load_ps(&b[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d reg_b = _mm256_loadu_pd(&b[i]);
-
-		__m256d sum = _mm256_add_pd(reg_a, reg_b);
-		_mm256_storeu_pd(&c[i], sum);
+		_mm256_store_ps(&c[i], _mm256_add_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&b[i])));
 	}
 
 	for (; i < n; ++i)
@@ -62,31 +64,20 @@ void MathUtils::vector_add(const double* const __restrict a, const double* const
 	}
 }
 
-void MathUtils::vector_add(double* const __restrict a, const double* const __restrict b, size_t n)
+void MathUtils::vector_add(float* const __restrict a, const float* const __restrict b, size_t n)
 {
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
-		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
-
-		__m256d sum0 = _mm256_add_pd(reg_a0, reg_b0);
-		__m256d sum1 = _mm256_add_pd(reg_a1, reg_b1);
-
-		_mm256_storeu_pd(&a[i], sum0);
-		_mm256_storeu_pd(&a[i + 4], sum1);
+		_mm256_store_ps(&a[i], _mm256_add_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&b[i])));
+		_mm256_store_ps(&a[i + 8], _mm256_add_ps(_mm256_load_ps(&a[i + 8]), _mm256_load_ps(&b[i + 8])));
+		_mm256_store_ps(&a[i + 16], _mm256_add_ps(_mm256_load_ps(&a[i + 16]), _mm256_load_ps(&b[i + 16])));
+		_mm256_store_ps(&a[i + 24], _mm256_add_ps(_mm256_load_ps(&a[i + 24]), _mm256_load_ps(&b[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d reg_b = _mm256_loadu_pd(&b[i]);
-
-		__m256d sum = _mm256_add_pd(reg_a, reg_b);
-		_mm256_storeu_pd(&a[i], sum);
+		_mm256_store_ps(&a[i], _mm256_add_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&b[i])));
 	}
 
 	for (; i < n; ++i)
@@ -95,28 +86,22 @@ void MathUtils::vector_add(double* const __restrict a, const double* const __res
 	}
 }
 
-void MathUtils::vector_add(const double* const __restrict a, double b, double* const __restrict c, size_t n)
+void MathUtils::vector_add(const float* const __restrict a, float b, float* const __restrict c, size_t n)
 {
-	const __m256d reg_b = _mm256_set1_pd(b);
+	const __m256 reg_b = _mm256_set1_ps(b);
 
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d sum0 = _mm256_add_pd(reg_a0, reg_b);
-		__m256d sum1 = _mm256_add_pd(reg_a1, reg_b);
-
-		_mm256_storeu_pd(&c[i], sum0);
-		_mm256_storeu_pd(&c[i + 4], sum1);
+		_mm256_store_ps(&c[i], _mm256_add_ps(_mm256_load_ps(&a[i]), reg_b));
+		_mm256_store_ps(&c[i + 8], _mm256_add_ps(_mm256_load_ps(&a[i + 8]), reg_b));
+		_mm256_store_ps(&c[i + 16], _mm256_add_ps(_mm256_load_ps(&a[i + 16]), reg_b));
+		_mm256_store_ps(&c[i + 24], _mm256_add_ps(_mm256_load_ps(&a[i + 24]), reg_b));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d sum = _mm256_add_pd(reg_a, reg_b);
-		_mm256_storeu_pd(&c[i], sum);
+		_mm256_store_ps(&c[i], _mm256_add_ps(_mm256_load_ps(&a[i]), reg_b));
 	}
 
 	for (; i < n; ++i)
@@ -125,28 +110,22 @@ void MathUtils::vector_add(const double* const __restrict a, double b, double* c
 	}
 }
 
-void MathUtils::vector_add(double* const __restrict a, double b, size_t n)
+void MathUtils::vector_add(float* const __restrict a, float b, size_t n)
 {
-	const __m256d reg_b = _mm256_set1_pd(b);
+	const __m256 reg_b = _mm256_set1_ps(b);
 
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 8)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d sum0 = _mm256_add_pd(reg_a0, reg_b);
-		__m256d sum1 = _mm256_add_pd(reg_a1, reg_b);
-
-		_mm256_storeu_pd(&a[i], sum0);
-		_mm256_storeu_pd(&a[i + 4], sum1);
+		_mm256_store_ps(&a[i], _mm256_add_ps(_mm256_load_ps(&a[i]), reg_b));
+		_mm256_store_ps(&a[i + 8], _mm256_add_ps(_mm256_load_ps(&a[i + 8]), reg_b));
+		_mm256_store_ps(&a[i + 16], _mm256_add_ps(_mm256_load_ps(&a[i + 16]), reg_b));
+		_mm256_store_ps(&a[i + 24], _mm256_add_ps(_mm256_load_ps(&a[i + 24]), reg_b));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d sum = _mm256_add_pd(reg_a, reg_b);
-		_mm256_storeu_pd(&a[i], sum);
+		_mm256_store_ps(&a[i], _mm256_add_ps(_mm256_load_ps(&a[i]), reg_b));
 	}
 
 	for (; i < n; ++i)
@@ -158,30 +137,20 @@ void MathUtils::vector_add(double* const __restrict a, double b, size_t n)
 /* Vector subtraction */
 
 // Vectorizes the subtraction of two vectors and writes the result into the provided vector -> c = a - b
-void MathUtils::vector_sub(const double* const __restrict a, const double* const __restrict b, double* const __restrict c, size_t n)
+void MathUtils::vector_sub(const float* const __restrict a, const float* const __restrict b, float* const __restrict c, size_t n)
 {
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
-		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
-
-		__m256d dif0 = _mm256_sub_pd(reg_a0, reg_b0);
-		__m256d dif1 = _mm256_sub_pd(reg_a1, reg_b1);
-
-		_mm256_storeu_pd(&c[i], dif0);
-		_mm256_storeu_pd(&c[i + 4], dif1);
+		_mm256_store_ps(&c[i], _mm256_sub_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&b[i])));
+		_mm256_store_ps(&c[i + 8], _mm256_sub_ps(_mm256_load_ps(&a[i + 8]), _mm256_load_ps(&b[i + 8])));
+		_mm256_store_ps(&c[i + 16], _mm256_sub_ps(_mm256_load_ps(&a[i + 16]), _mm256_load_ps(&b[i + 16])));
+		_mm256_store_ps(&c[i + 24], _mm256_sub_ps(_mm256_load_ps(&a[i + 24]), _mm256_load_ps(&b[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d reg_b = _mm256_loadu_pd(&b[i]);
-		__m256d dif = _mm256_sub_pd(reg_a, reg_b);
-		_mm256_storeu_pd(&c[i], dif);
+		_mm256_store_ps(&c[i], _mm256_sub_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&b[i])));
 	}
 
 	for (; i < n; ++i)
@@ -190,30 +159,20 @@ void MathUtils::vector_sub(const double* const __restrict a, const double* const
 	}
 }
 
-void MathUtils::vector_sub(double* const __restrict a, const double* const __restrict b, size_t n)
+void MathUtils::vector_sub(float* const __restrict a, const float* const __restrict b, size_t n)
 {
 	size_t i = 0;
+	for (; i + 32 <= n; i += 32)
+	{
+		_mm256_store_ps(&a[i], _mm256_sub_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&b[i])));
+		_mm256_store_ps(&a[i + 8], _mm256_sub_ps(_mm256_load_ps(&a[i + 8]), _mm256_load_ps(&b[i + 8])));
+		_mm256_store_ps(&a[i + 16], _mm256_sub_ps(_mm256_load_ps(&a[i + 16]), _mm256_load_ps(&b[i + 16])));
+		_mm256_store_ps(&a[i + 24], _mm256_sub_ps(_mm256_load_ps(&a[i + 24]), _mm256_load_ps(&b[i + 24])));
+	}
+	
 	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
-		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
-
-		__m256d dif0 = _mm256_sub_pd(reg_a0, reg_b0);
-		__m256d dif1 = _mm256_sub_pd(reg_a1, reg_b1);
-
-		_mm256_storeu_pd(&a[i], dif0);
-		_mm256_storeu_pd(&a[i + 4], dif1);
-	}
-
-	for (; i + 4 <= n; i += 4)
-	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d reg_b = _mm256_loadu_pd(&b[i]);
-		__m256d dif = _mm256_sub_pd(reg_a, reg_b);
-		_mm256_storeu_pd(&a[i], dif);
+		_mm256_store_ps(&a[i], _mm256_sub_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&b[i])));
 	}
 
 	for (; i < n; ++i)
@@ -222,28 +181,22 @@ void MathUtils::vector_sub(double* const __restrict a, const double* const __res
 	}
 }
 
-void MathUtils::vector_sub(const double* const __restrict a, double b, double* const __restrict c, size_t n)
+void MathUtils::vector_sub(const float* const __restrict a, float b, float* const __restrict c, size_t n)
 {
-	const __m256d reg_b = _mm256_set1_pd(b);
+	const __m256 reg_b = _mm256_set1_ps(b);
 
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d dif0 = _mm256_sub_pd(reg_a0, reg_b);
-		__m256d dif1 = _mm256_sub_pd(reg_a1, reg_b);
-
-		_mm256_storeu_pd(&c[i], dif0);
-		_mm256_storeu_pd(&c[i + 4], dif1);
+		_mm256_store_ps(&c[i], _mm256_sub_ps(_mm256_load_ps(&a[i]), reg_b));
+		_mm256_store_ps(&c[i + 8], _mm256_sub_ps(_mm256_load_ps(&a[i + 8]), reg_b));
+		_mm256_store_ps(&c[i + 16], _mm256_sub_ps(_mm256_load_ps(&a[i + 16]), reg_b));
+		_mm256_store_ps(&c[i + 24], _mm256_sub_ps(_mm256_load_ps(&a[i + 24]), reg_b));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d dif = _mm256_sub_pd(reg_a, reg_b);
-		_mm256_storeu_pd(&c[i], dif);
+		_mm256_store_ps(&c[i], _mm256_sub_ps(_mm256_load_ps(&a[i]), reg_b));
 	}
 
 	for (; i < n; ++i)
@@ -252,28 +205,22 @@ void MathUtils::vector_sub(const double* const __restrict a, double b, double* c
 	}
 }
 
-void MathUtils::vector_sub(double* const __restrict a, double b, size_t n)
+void MathUtils::vector_sub(float* const __restrict a, float b, size_t n)
 {
-	const __m256d reg_b = _mm256_set1_pd(b);
+	const __m256 reg_b = _mm256_set1_ps(b);
 
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d dif0 = _mm256_sub_pd(reg_a0, reg_b);
-		__m256d dif1 = _mm256_sub_pd(reg_a1, reg_b);
-
-		_mm256_storeu_pd(&a[i], dif0);
-		_mm256_storeu_pd(&a[i + 4], dif1);
+		_mm256_store_ps(&a[i], _mm256_sub_ps(_mm256_load_ps(&a[i]), reg_b));
+		_mm256_store_ps(&a[i + 8], _mm256_sub_ps(_mm256_load_ps(&a[i + 8]), reg_b));
+		_mm256_store_ps(&a[i + 16], _mm256_sub_ps(_mm256_load_ps(&a[i + 16]), reg_b));
+		_mm256_store_ps(&a[i + 24], _mm256_sub_ps(_mm256_load_ps(&a[i + 24]), reg_b));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d dif = _mm256_sub_pd(reg_a, reg_b);
-		_mm256_storeu_pd(&a[i], dif);
+		_mm256_store_ps(&a[i], _mm256_sub_ps(_mm256_load_ps(&a[i]), reg_b));
 	}
 
 	for (; i < n; ++i)
@@ -282,28 +229,22 @@ void MathUtils::vector_sub(double* const __restrict a, double b, size_t n)
 	}
 }
 
-void MathUtils::vector_sub(double a, const double* const __restrict b, double* const __restrict c, size_t n)
+void MathUtils::vector_sub(float a, const float* const __restrict b, float* const __restrict c, size_t n)
 {
-	const __m256d reg_a = _mm256_set1_pd(a);
+	const __m256 reg_a = _mm256_set1_ps(a);
 
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
-		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
-
-		__m256d dif0 = _mm256_sub_pd(reg_a, reg_b0);
-		__m256d dif1 = _mm256_sub_pd(reg_a, reg_b1);
-
-		_mm256_storeu_pd(&c[i], dif0);
-		_mm256_storeu_pd(&c[i + 4], dif1);
+		_mm256_store_ps(&c[i], _mm256_sub_ps(reg_a, _mm256_load_ps(&b[i])));
+		_mm256_store_ps(&c[i + 8], _mm256_sub_ps(reg_a, _mm256_load_ps(&b[i + 8])));
+		_mm256_store_ps(&c[i + 16], _mm256_sub_ps(reg_a, _mm256_load_ps(&b[i + 16])));
+		_mm256_store_ps(&c[i + 24], _mm256_sub_ps(reg_a, _mm256_load_ps(&b[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_b = _mm256_loadu_pd(&b[i]);
-		__m256d dif = _mm256_sub_pd(reg_a, reg_b);
-		_mm256_storeu_pd(&c[i], dif);
+		_mm256_store_ps(&c[i], _mm256_sub_ps(reg_a, _mm256_load_ps(&b[i])));
 	}
 
 	for (; i < n; ++i)
@@ -312,28 +253,22 @@ void MathUtils::vector_sub(double a, const double* const __restrict b, double* c
 	}
 }
 
-void MathUtils::vector_sub(double a, double* const __restrict b, size_t n)
+void MathUtils::vector_sub(float a, float* const __restrict b, size_t n)
 {
-	const __m256d reg_a = _mm256_set1_pd(a);
+	const __m256 reg_a = _mm256_set1_ps(a);
 
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
-		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
-
-		__m256d dif0 = _mm256_sub_pd(reg_a, reg_b0);
-		__m256d dif1 = _mm256_sub_pd(reg_a, reg_b1);
-
-		_mm256_storeu_pd(&b[i], dif0);
-		_mm256_storeu_pd(&b[i + 4], dif1);
+		_mm256_store_ps(&b[i], _mm256_sub_ps(reg_a, _mm256_load_ps(&b[i])));
+		_mm256_store_ps(&b[i + 8], _mm256_sub_ps(reg_a, _mm256_load_ps(&b[i + 8])));
+		_mm256_store_ps(&b[i + 16], _mm256_sub_ps(reg_a, _mm256_load_ps(&b[i + 16])));
+		_mm256_store_ps(&b[i + 24], _mm256_sub_ps(reg_a, _mm256_load_ps(&b[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_b = _mm256_loadu_pd(&b[i]);
-		__m256d dif = _mm256_sub_pd(reg_a, reg_b);
-		_mm256_storeu_pd(&b[i], dif);
+		_mm256_store_ps(&b[i], _mm256_sub_ps(reg_a, _mm256_load_ps(&b[i])));
 	}
 
 	for (; i < n; ++i)
@@ -345,30 +280,20 @@ void MathUtils::vector_sub(double a, double* const __restrict b, size_t n)
 /* Vector multiplication */
 
 // Vectorizes the multiplication of two vectors and writes the result into the provided vector -> c = a * b
-void MathUtils::vector_mul(const double* const __restrict a, const double* const __restrict b, double* const __restrict c, size_t n)
+void MathUtils::vector_mul(const float* const __restrict a, const float* const __restrict b, float* const __restrict c, size_t n)
 {
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
-		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
-
-		__m256d pro0 = _mm256_mul_pd(reg_a0, reg_b0);
-		__m256d pro1 = _mm256_mul_pd(reg_a1, reg_b1);
-
-		_mm256_storeu_pd(&c[i], pro0);
-		_mm256_storeu_pd(&c[i + 4], pro1);
+		_mm256_store_ps(&c[i], _mm256_mul_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&b[i])));
+		_mm256_store_ps(&c[i + 8], _mm256_mul_ps(_mm256_load_ps(&a[i + 8]), _mm256_load_ps(&b[i + 8])));
+		_mm256_store_ps(&c[i + 16], _mm256_mul_ps(_mm256_load_ps(&a[i + 16]), _mm256_load_ps(&b[i + 16])));
+		_mm256_store_ps(&c[i + 24], _mm256_mul_ps(_mm256_load_ps(&a[i + 24]), _mm256_load_ps(&b[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d reg_b = _mm256_loadu_pd(&b[i]);
-		__m256d pro = _mm256_mul_pd(reg_a, reg_b);
-		_mm256_storeu_pd(&c[i], pro);
+		_mm256_store_ps(&c[i], _mm256_mul_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&b[i])));
 	}
 
 	for (; i < n; ++i)
@@ -377,30 +302,20 @@ void MathUtils::vector_mul(const double* const __restrict a, const double* const
 	}
 }
 
-void MathUtils::vector_mul(double* const __restrict a, const double* const __restrict b, size_t n)
+void MathUtils::vector_mul(float* const __restrict a, const float* const __restrict b, size_t n)
 {
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 23 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
-		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
-
-		__m256d pro0 = _mm256_mul_pd(reg_a0, reg_b0);
-		__m256d pro1 = _mm256_mul_pd(reg_a1, reg_b1);
-
-		_mm256_storeu_pd(&a[i], pro0);
-		_mm256_storeu_pd(&a[i + 4], pro1);
+		_mm256_store_ps(&a[i], _mm256_mul_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&b[i])));
+		_mm256_store_ps(&a[i + 8], _mm256_mul_ps(_mm256_load_ps(&a[i + 8]), _mm256_load_ps(&b[i + 8])));
+		_mm256_store_ps(&a[i + 16], _mm256_mul_ps(_mm256_load_ps(&a[i + 16]), _mm256_load_ps(&b[i + 16])));
+		_mm256_store_ps(&a[i + 24], _mm256_mul_ps(_mm256_load_ps(&a[i + 24]), _mm256_load_ps(&b[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d reg_b = _mm256_loadu_pd(&b[i]);
-		__m256d pro = _mm256_mul_pd(reg_a, reg_b);
-		_mm256_storeu_pd(&a[i], pro);
+		_mm256_store_ps(&a[i], _mm256_mul_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&b[i])));
 	}
 
 	for (; i < n; ++i)
@@ -409,28 +324,22 @@ void MathUtils::vector_mul(double* const __restrict a, const double* const __res
 	}
 }
 
-void MathUtils::vector_mul(const double* const __restrict a, double b, double* const __restrict c, size_t n)
+void MathUtils::vector_mul(const float* const __restrict a, float b, float* const __restrict c, size_t n)
 {
-	const __m256d reg_b = _mm256_set1_pd(b);
+	const __m256 reg_b = _mm256_set1_ps(b);
 
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d pro0 = _mm256_mul_pd(reg_a0, reg_b);
-		__m256d pro1 = _mm256_mul_pd(reg_a1, reg_b);
-
-		_mm256_storeu_pd(&c[i], pro0);
-		_mm256_storeu_pd(&c[i + 4], pro1);
+		_mm256_store_ps(&c[i], _mm256_mul_ps(_mm256_load_ps(&a[i]), reg_b));
+		_mm256_store_ps(&c[i + 8], _mm256_mul_ps(_mm256_load_ps(&a[i + 8]), reg_b));
+		_mm256_store_ps(&c[i + 16], _mm256_mul_ps(_mm256_load_ps(&a[i + 16]), reg_b));
+		_mm256_store_ps(&c[i + 24], _mm256_mul_ps(_mm256_load_ps(&a[i + 24]), reg_b));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d pro = _mm256_mul_pd(reg_a, reg_b);
-		_mm256_storeu_pd(&c[i], pro);
+		_mm256_store_ps(&c[i], _mm256_mul_ps(_mm256_load_ps(&a[i]), reg_b));
 	}
 
 	for (; i < n; ++i)
@@ -439,28 +348,22 @@ void MathUtils::vector_mul(const double* const __restrict a, double b, double* c
 	}
 }
 
-void MathUtils::vector_mul(double* const __restrict a, double b, size_t n)
+void MathUtils::vector_mul(float* const __restrict a, float b, size_t n)
 {
-	const __m256d reg_b = _mm256_set1_pd(b);
+	const __m256 reg_b = _mm256_set1_ps(b);
 
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d pro0 = _mm256_mul_pd(reg_a0, reg_b);
-		__m256d pro1 = _mm256_mul_pd(reg_a1, reg_b);
-
-		_mm256_storeu_pd(&a[i], pro0);
-		_mm256_storeu_pd(&a[i + 4], pro1);
+		_mm256_store_ps(&a[i], _mm256_mul_ps(_mm256_load_ps(&a[i]), reg_b));
+		_mm256_store_ps(&a[i + 8], _mm256_mul_ps(_mm256_load_ps(&a[i + 8]), reg_b));
+		_mm256_store_ps(&a[i + 16], _mm256_mul_ps(_mm256_load_ps(&a[i + 16]), reg_b));
+		_mm256_store_ps(&a[i + 24], _mm256_mul_ps(_mm256_load_ps(&a[i + 24]), reg_b));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d pro = _mm256_mul_pd(reg_a, reg_b);
-		_mm256_storeu_pd(&a[i], pro);
+		_mm256_store_ps(&a[i], _mm256_mul_ps(_mm256_load_ps(&a[i]), reg_b));
 	}
 
 	for (; i < n; ++i)
@@ -472,30 +375,20 @@ void MathUtils::vector_mul(double* const __restrict a, double b, size_t n)
 /* Vector division */
 
 // Vectorizes the division of two vectors and writes the result into the provided vector -> c = a / b
-void MathUtils::vector_div(const double* const __restrict a, const double* const __restrict b, double* const __restrict c, size_t n)
+void MathUtils::vector_div(const float* const __restrict a, const float* const __restrict b, float* const __restrict c, size_t n)
 {
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
-		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
-
-		__m256d quo0 = _mm256_div_pd(reg_a0, reg_b0);
-		__m256d quo1 = _mm256_div_pd(reg_a1, reg_b1);
-
-		_mm256_storeu_pd(&c[i], quo0);
-		_mm256_storeu_pd(&c[i + 4], quo1);
+		_mm256_store_ps(&c[i], _mm256_div_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&b[i])));
+		_mm256_store_ps(&c[i + 8], _mm256_div_ps(_mm256_load_ps(&a[i + 8]), _mm256_load_ps(&b[i + 8])));
+		_mm256_store_ps(&c[i + 16], _mm256_div_ps(_mm256_load_ps(&a[i + 16]), _mm256_load_ps(&b[i + 16])));
+		_mm256_store_ps(&c[i + 24], _mm256_div_ps(_mm256_load_ps(&a[i + 24]), _mm256_load_ps(&b[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d reg_b = _mm256_loadu_pd(&b[i]);
-		__m256d quo = _mm256_div_pd(reg_a, reg_b);
-		_mm256_storeu_pd(&c[i], quo);
+		_mm256_store_ps(&c[i], _mm256_div_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&b[i])));
 	}
 
 	for (; i < n; ++i)
@@ -504,30 +397,20 @@ void MathUtils::vector_div(const double* const __restrict a, const double* const
 	}
 }
 
-void MathUtils::vector_div(double* const __restrict a, const double* const __restrict b, size_t n)
+void MathUtils::vector_div(float* const __restrict a, const float* const __restrict b, size_t n)
 {
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
-		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
-
-		__m256d quo0 = _mm256_div_pd(reg_a0, reg_b0);
-		__m256d quo1 = _mm256_div_pd(reg_a1, reg_b1);
-
-		_mm256_storeu_pd(&a[i], quo0);
-		_mm256_storeu_pd(&a[i + 4], quo1);
+		_mm256_store_ps(&a[i], _mm256_div_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&b[i])));
+		_mm256_store_ps(&a[i + 8], _mm256_div_ps(_mm256_load_ps(&a[i + 8]), _mm256_load_ps(&b[i + 8])));
+		_mm256_store_ps(&a[i + 16], _mm256_div_ps(_mm256_load_ps(&a[i + 16]), _mm256_load_ps(&b[i + 16])));
+		_mm256_store_ps(&a[i + 24], _mm256_div_ps(_mm256_load_ps(&a[i + 24]), _mm256_load_ps(&b[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d reg_b = _mm256_loadu_pd(&b[i]);
-		__m256d quo = _mm256_div_pd(reg_a, reg_b);
-		_mm256_storeu_pd(&a[i], quo);
+		_mm256_store_ps(&a[i], _mm256_div_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&b[i])));
 	}
 
 	for (; i < n; ++i)
@@ -536,29 +419,23 @@ void MathUtils::vector_div(double* const __restrict a, const double* const __res
 	}
 }
 
-void MathUtils::vector_div(const double* const __restrict a, double b, double* const __restrict c, size_t n)
+void MathUtils::vector_div(const float* const __restrict a, float b, float* const __restrict c, size_t n)
 {
-	const double recip_b = 1.0 / b;
-	const __m256d reg_recip_b = _mm256_set1_pd(recip_b);
+	const float recip_b = 1.0f / b;
+	const __m256 reg_recip_b = _mm256_set1_ps(recip_b);
 
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d quo0 = _mm256_mul_pd(reg_a0, reg_recip_b);
-		__m256d quo1 = _mm256_mul_pd(reg_a1, reg_recip_b);
-
-		_mm256_storeu_pd(&c[i], quo0);
-		_mm256_storeu_pd(&c[i + 4], quo1);
+		_mm256_store_ps(&c[i], _mm256_mul_ps(_mm256_load_ps(&a[i]), reg_recip_b));
+		_mm256_store_ps(&c[i + 8], _mm256_mul_ps(_mm256_load_ps(&a[i + 8]), reg_recip_b));
+		_mm256_store_ps(&c[i + 16], _mm256_mul_ps(_mm256_load_ps(&a[i + 16]), reg_recip_b));
+		_mm256_store_ps(&c[i + 24], _mm256_mul_ps(_mm256_load_ps(&a[i + 24]), reg_recip_b));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d quo = _mm256_mul_pd(reg_a, reg_recip_b);
-		_mm256_storeu_pd(&c[i], quo);
+		_mm256_store_ps(&c[i], _mm256_mul_ps(_mm256_load_ps(&a[i]), reg_recip_b));
 	}
 
 	for (; i < n; ++i)
@@ -567,29 +444,23 @@ void MathUtils::vector_div(const double* const __restrict a, double b, double* c
 	}
 }
 
-void MathUtils::vector_div(double* const __restrict a, double b, size_t n)
+void MathUtils::vector_div(float* const __restrict a, float b, size_t n)
 {
-	const double recip_b = 1.0 / b;
-	const __m256d reg_recip_b = _mm256_set1_pd(recip_b);
+	const float recip_b = 1.0f / b;
+	const __m256 reg_recip_b = _mm256_set1_ps(recip_b);
 
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d quo0 = _mm256_mul_pd(reg_a0, reg_recip_b);
-		__m256d quo1 = _mm256_mul_pd(reg_a1, reg_recip_b);
-
-		_mm256_storeu_pd(&a[i], quo0);
-		_mm256_storeu_pd(&a[i + 4], quo1);
+		_mm256_store_ps(&a[i], _mm256_mul_ps(_mm256_load_ps(&a[i]), reg_recip_b));
+		_mm256_store_ps(&a[i + 8], _mm256_mul_ps(_mm256_load_ps(&a[i + 8]), reg_recip_b));
+		_mm256_store_ps(&a[i + 16], _mm256_mul_ps(_mm256_load_ps(&a[i + 16]), reg_recip_b));
+		_mm256_store_ps(&a[i + 24], _mm256_mul_ps(_mm256_load_ps(&a[i + 24]), reg_recip_b));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d quo = _mm256_mul_pd(reg_a, reg_recip_b);
-		_mm256_storeu_pd(&a[i], quo);
+		_mm256_store_ps(&a[i], _mm256_mul_ps(_mm256_load_ps(&a[i]), reg_recip_b));
 	}
 
 	for (; i < n; ++i)
@@ -598,28 +469,22 @@ void MathUtils::vector_div(double* const __restrict a, double b, size_t n)
 	}
 }
 
-void MathUtils::vector_div(double a, const double* const __restrict b, double* const __restrict c, size_t n)
+void MathUtils::vector_div(float a, const float* const __restrict b, float* const __restrict c, size_t n)
 {
-	const __m256d reg_a = _mm256_set1_pd(a);
+	const __m256 reg_a = _mm256_set1_ps(a);
 
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
-		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
-
-		__m256d quo0 = _mm256_div_pd(reg_a, reg_b0);
-		__m256d quo1 = _mm256_div_pd(reg_a, reg_b1);
-
-		_mm256_storeu_pd(&c[i], quo0);
-		_mm256_storeu_pd(&c[i + 4], quo1);
+		_mm256_store_ps(&c[i], _mm256_div_ps(reg_a, _mm256_load_ps(&b[i])));
+		_mm256_store_ps(&c[i + 8], _mm256_div_ps(reg_a, _mm256_load_ps(&b[i + 8])));
+		_mm256_store_ps(&c[i + 16], _mm256_div_ps(reg_a, _mm256_load_ps(&b[i + 16])));
+		_mm256_store_ps(&c[i + 24], _mm256_div_ps(reg_a, _mm256_load_ps(&b[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_b = _mm256_loadu_pd(&b[i]);
-		__m256d quo = _mm256_div_pd(reg_a, reg_b);
-		_mm256_storeu_pd(&c[i], quo);
+		_mm256_store_ps(&c[i], _mm256_div_ps(reg_a, _mm256_load_ps(&b[i])));
 	}
 
 	for (; i < n; ++i)
@@ -628,28 +493,22 @@ void MathUtils::vector_div(double a, const double* const __restrict b, double* c
 	}
 }
 
-void MathUtils::vector_div(double a, double* const __restrict b, size_t n)
+void MathUtils::vector_div(float a, float* const __restrict b, size_t n)
 {
-	const __m256d reg_a = _mm256_set1_pd(a);
+	const __m256 reg_a = _mm256_set1_ps(a);
 
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
-		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
-
-		__m256d quo0 = _mm256_div_pd(reg_a, reg_b0);
-		__m256d quo1 = _mm256_div_pd(reg_a, reg_b1);
-
-		_mm256_storeu_pd(&b[i], quo0);
-		_mm256_storeu_pd(&b[i + 4], quo1);
+		_mm256_store_ps(&b[i], _mm256_div_ps(reg_a, _mm256_load_ps(&b[i])));
+		_mm256_store_ps(&b[i + 8], _mm256_div_ps(reg_a, _mm256_load_ps(&b[i + 8])));
+		_mm256_store_ps(&b[i + 16], _mm256_div_ps(reg_a, _mm256_load_ps(&b[i + 16])));
+		_mm256_store_ps(&b[i + 24], _mm256_div_ps(reg_a, _mm256_load_ps(&b[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_b = _mm256_loadu_pd(&b[i]);
-		__m256d quo = _mm256_div_pd(reg_a, reg_b);
-		_mm256_storeu_pd(&b[i], quo);
+		_mm256_store_ps(&b[i], _mm256_div_ps(reg_a, _mm256_load_ps(&b[i])));
 	}
 
 	for (; i < n; ++i)
@@ -661,30 +520,20 @@ void MathUtils::vector_div(double a, double* const __restrict b, size_t n)
 /* Vector exponentiation */
 
 // Vectorizes the exponentiation of two vectors and writes the result into the provided vector -> c = a ^ b
-void MathUtils::vector_pow(const double* const __restrict a, const double* const __restrict b, double* const __restrict c, size_t n)
+void MathUtils::vector_pow(const float* const __restrict a, const float* const __restrict b, float* const __restrict c, size_t n)
 {
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
-		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
-
-		__m256d exp0 = _mm256_pow_pd(reg_a0, reg_b0);
-		__m256d exp1 = _mm256_pow_pd(reg_a1, reg_b1);
-
-		_mm256_storeu_pd(&c[i], exp0);
-		_mm256_storeu_pd(&c[i + 4], exp1);
+		_mm256_store_ps(&c[i], _mm256_pow_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&b[i])));
+		_mm256_store_ps(&c[i + 8], _mm256_pow_ps(_mm256_load_ps(&a[i + 8]), _mm256_load_ps(&b[i + 8])));
+		_mm256_store_ps(&c[i + 16], _mm256_pow_ps(_mm256_load_ps(&a[i + 16]), _mm256_load_ps(&b[i + 16])));
+		_mm256_store_ps(&c[i + 24], _mm256_pow_ps(_mm256_load_ps(&a[i + 24]), _mm256_load_ps(&b[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d reg_b = _mm256_loadu_pd(&b[i]);
-		__m256d exp = _mm256_pow_pd(reg_a, reg_b);
-		_mm256_storeu_pd(&c[i], exp);
+		_mm256_store_ps(&c[i], _mm256_pow_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&b[i])));
 	}
 
 	for (; i < n; ++i)
@@ -693,30 +542,20 @@ void MathUtils::vector_pow(const double* const __restrict a, const double* const
 	}
 }
 
-void MathUtils::vector_pow(double* const __restrict a, const double* const __restrict b, size_t n)
+void MathUtils::vector_pow(float* const __restrict a, const float* const __restrict b, size_t n)
 {
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
-		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
-
-		__m256d exp0 = _mm256_pow_pd(reg_a0, reg_b0);
-		__m256d exp1 = _mm256_pow_pd(reg_a1, reg_b1);
-
-		_mm256_storeu_pd(&a[i], exp0);
-		_mm256_storeu_pd(&a[i + 4], exp1);
+		_mm256_store_ps(&a[i], _mm256_pow_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&b[i])));
+		_mm256_store_ps(&a[i + 8], _mm256_pow_ps(_mm256_load_ps(&a[i + 8]), _mm256_load_ps(&b[i + 8])));
+		_mm256_store_ps(&a[i + 16], _mm256_pow_ps(_mm256_load_ps(&a[i + 16]), _mm256_load_ps(&b[i + 16])));
+		_mm256_store_ps(&a[i + 24], _mm256_pow_ps(_mm256_load_ps(&a[i + 24]), _mm256_load_ps(&b[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d reg_b = _mm256_loadu_pd(&b[i]);
-		__m256d exp = _mm256_pow_pd(reg_a, reg_b);
-		_mm256_storeu_pd(&a[i], exp);
+		_mm256_store_ps(&a[i], _mm256_pow_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&b[i])));
 	}
 
 	for (; i < n; ++i)
@@ -725,28 +564,22 @@ void MathUtils::vector_pow(double* const __restrict a, const double* const __res
 	}
 }
 
-void MathUtils::vector_pow(const double* const __restrict a, double b, double* const __restrict c, size_t n)
+void MathUtils::vector_pow(const float* const __restrict a, float b, float* const __restrict c, size_t n)
 {
-	const __m256d reg_b = _mm256_set1_pd(b);
+	const __m256 reg_b = _mm256_set1_ps(b);
 
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d exp0 = _mm256_pow_pd(reg_a0, reg_b);
-		__m256d exp1 = _mm256_pow_pd(reg_a1, reg_b);
-
-		_mm256_storeu_pd(&c[i], exp0);
-		_mm256_storeu_pd(&c[i + 4], exp1);
+		_mm256_store_ps(&c[i], _mm256_pow_ps(_mm256_load_ps(&a[i]), reg_b));
+		_mm256_store_ps(&c[i + 8], _mm256_pow_ps(_mm256_load_ps(&a[i + 8]), reg_b));
+		_mm256_store_ps(&c[i + 16], _mm256_pow_ps(_mm256_load_ps(&a[i + 16]), reg_b));
+		_mm256_store_ps(&c[i + 24], _mm256_pow_ps(_mm256_load_ps(&a[i + 24]), reg_b));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d exp = _mm256_pow_pd(reg_a, reg_b);
-		_mm256_storeu_pd(&c[i], exp);
+		_mm256_store_ps(&c[i], _mm256_pow_ps(_mm256_load_ps(&a[i]), reg_b));
 	}
 
 	for (; i < n; ++i)
@@ -755,28 +588,22 @@ void MathUtils::vector_pow(const double* const __restrict a, double b, double* c
 	}
 }
 
-void MathUtils::vector_pow(double* const __restrict a, double b, size_t n)
+void MathUtils::vector_pow(float* const __restrict a, float b, size_t n)
 {
-	const __m256d reg_b = _mm256_set1_pd(b);
+	const __m256 reg_b = _mm256_set1_ps(b);
 
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d exp0 = _mm256_pow_pd(reg_a0, reg_b);
-		__m256d exp1 = _mm256_pow_pd(reg_a1, reg_b);
-
-		_mm256_storeu_pd(&a[i], exp0);
-		_mm256_storeu_pd(&a[i + 4], exp1);
+		_mm256_store_ps(&a[i], _mm256_pow_ps(_mm256_load_ps(&a[i]), reg_b));
+		_mm256_store_ps(&a[i + 8], _mm256_pow_ps(_mm256_load_ps(&a[i + 8]), reg_b));
+		_mm256_store_ps(&a[i + 16], _mm256_pow_ps(_mm256_load_ps(&a[i + 16]), reg_b));
+		_mm256_store_ps(&a[i + 24], _mm256_pow_ps(_mm256_load_ps(&a[i + 24]), reg_b));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d exp = _mm256_pow_pd(reg_a, reg_b);
-		_mm256_storeu_pd(&a[i], exp);
+		_mm256_store_ps(&a[i], _mm256_pow_ps(_mm256_load_ps(&a[i]), reg_b));
 	}
 
 	for (; i < n; ++i)
@@ -785,28 +612,22 @@ void MathUtils::vector_pow(double* const __restrict a, double b, size_t n)
 	}
 }
 
-void MathUtils::vector_pow(double a, const double* const __restrict b, double* const __restrict c, size_t n)
+void MathUtils::vector_pow(float a, const float* const __restrict b, float* const __restrict c, size_t n)
 {
-	const __m256d reg_a = _mm256_set1_pd(a);
+	const __m256 reg_a = _mm256_set1_ps(a);
 
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
-		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
-
-		__m256d exp0 = _mm256_pow_pd(reg_a, reg_b0);
-		__m256d exp1 = _mm256_pow_pd(reg_a, reg_b1);
-
-		_mm256_storeu_pd(&c[i], exp0);
-		_mm256_storeu_pd(&c[i + 4], exp1);
+		_mm256_store_ps(&c[i], _mm256_pow_ps(reg_a, _mm256_load_ps(&b[i])));
+		_mm256_store_ps(&c[i + 8], _mm256_pow_ps(reg_a, _mm256_load_ps(&b[i + 8])));
+		_mm256_store_ps(&c[i + 16], _mm256_pow_ps(reg_a, _mm256_load_ps(&b[i + 16])));
+		_mm256_store_ps(&c[i + 24], _mm256_pow_ps(reg_a, _mm256_load_ps(&b[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_b = _mm256_loadu_pd(&b[i]);
-		__m256d exp = _mm256_pow_pd(reg_a, reg_b);
-		_mm256_storeu_pd(&c[i], exp);
+		_mm256_store_ps(&c[i], _mm256_pow_ps(reg_a, _mm256_load_ps(&b[i])));
 	}
 
 	for (; i < n; ++i)
@@ -818,38 +639,20 @@ void MathUtils::vector_pow(double a, const double* const __restrict b, double* c
 /* Vector logarithm */
 
 // Vectorizes the logarithm of a vector argument and base and writes the result into the provided vector -> r = log_base(arg)
-void MathUtils::vector_log(const double* const __restrict arg, const double* const __restrict log_base, double* const __restrict r, size_t n)
+void MathUtils::vector_log(const float* const __restrict arg, const float* const __restrict log_base, float* const __restrict r, size_t n)
 {
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_arg0 = _mm256_loadu_pd(&arg[i]);
-		__m256d reg_arg1 = _mm256_loadu_pd(&arg[i + 4]);
-
-		__m256d reg_base0 = _mm256_loadu_pd(&log_base[i]);
-		__m256d reg_base1 = _mm256_loadu_pd(&log_base[i + 4]);
-
-		__m256d ln_arg0 = _mm256_log_pd(reg_arg0);
-		__m256d ln_arg1 = _mm256_log_pd(reg_arg1);
-
-		__m256d ln_base0 = _mm256_log_pd(reg_base0);
-		__m256d ln_base1 = _mm256_log_pd(reg_base1);
-
-		__m256d log0 = _mm256_div_pd(ln_arg0, ln_base0);
-		__m256d log1 = _mm256_div_pd(ln_arg1, ln_base1);
-
-		_mm256_storeu_pd(&r[i], log0);
-		_mm256_storeu_pd(&r[i + 4], log1);
+		_mm256_store_ps(&r[i], _mm256_div_ps(_mm256_log_ps(_mm256_load_ps(&arg[i])), _mm256_log_ps(_mm256_load_ps(&log_base[i]))));
+		_mm256_store_ps(&r[i + 8], _mm256_div_ps(_mm256_log_ps(_mm256_load_ps(&arg[i + 8])), _mm256_log_ps(_mm256_load_ps(&log_base[i + 8]))));
+		_mm256_store_ps(&r[i + 16], _mm256_div_ps(_mm256_log_ps(_mm256_load_ps(&arg[i + 16])), _mm256_log_ps(_mm256_load_ps(&log_base[i + 16]))));
+		_mm256_store_ps(&r[i + 24], _mm256_div_ps(_mm256_log_ps(_mm256_load_ps(&arg[i + 24])), _mm256_log_ps(_mm256_load_ps(&log_base[i + 24]))));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_arg = _mm256_loadu_pd(&arg[i]);
-		__m256d reg_base = _mm256_loadu_pd(&log_base[i]);
-		__m256d ln_arg = _mm256_log_pd(reg_arg);
-		__m256d ln_base = _mm256_log_pd(reg_base);
-		__m256d log = _mm256_div_pd(ln_arg, ln_base);
-		_mm256_storeu_pd(&r[i], log);
+		_mm256_store_ps(&r[i], _mm256_div_ps(_mm256_log_ps(_mm256_load_ps(&arg[i])), _mm256_log_ps(_mm256_load_ps(&log_base[i]))));
 	}
 
 	for (; i < n; ++i)
@@ -858,38 +661,20 @@ void MathUtils::vector_log(const double* const __restrict arg, const double* con
 	}
 }
 
-void MathUtils::vector_log(double* const __restrict arg, const double* const __restrict log_base, size_t n)
+void MathUtils::vector_log(float* const __restrict arg, const float* const __restrict log_base, size_t n)
 {
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_arg0 = _mm256_loadu_pd(&arg[i]);
-		__m256d reg_arg1 = _mm256_loadu_pd(&arg[i + 4]);
-
-		__m256d reg_base0 = _mm256_loadu_pd(&log_base[i]);
-		__m256d reg_base1 = _mm256_loadu_pd(&log_base[i + 4]);
-
-		__m256d ln_arg0 = _mm256_log_pd(reg_arg0);
-		__m256d ln_arg1 = _mm256_log_pd(reg_arg1);
-
-		__m256d ln_base0 = _mm256_log_pd(reg_base0);
-		__m256d ln_base1 = _mm256_log_pd(reg_base1);
-
-		__m256d log0 = _mm256_div_pd(ln_arg0, ln_base0);
-		__m256d log1 = _mm256_div_pd(ln_arg1, ln_base1);
-
-		_mm256_storeu_pd(&arg[i], log0);
-		_mm256_storeu_pd(&arg[i + 4], log1);
+		_mm256_store_ps(&arg[i], _mm256_div_ps(_mm256_log_ps(_mm256_load_ps(&arg[i])), _mm256_log_ps(_mm256_load_ps(&log_base[i]))));
+		_mm256_store_ps(&arg[i + 8], _mm256_div_ps(_mm256_log_ps(_mm256_load_ps(&arg[i + 8])), _mm256_log_ps(_mm256_load_ps(&log_base[i + 8]))));
+		_mm256_store_ps(&arg[i + 16], _mm256_div_ps(_mm256_log_ps(_mm256_load_ps(&arg[i + 16])), _mm256_log_ps(_mm256_load_ps(&log_base[i + 16]))));
+		_mm256_store_ps(&arg[i + 24], _mm256_div_ps(_mm256_log_ps(_mm256_load_ps(&arg[i + 24])), _mm256_log_ps(_mm256_load_ps(&log_base[i + 24]))));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_arg = _mm256_loadu_pd(&arg[i]);
-		__m256d reg_base = _mm256_loadu_pd(&log_base[i]);
-		__m256d ln_arg = _mm256_log_pd(reg_arg);
-		__m256d ln_base = _mm256_log_pd(reg_base);
-		__m256d log = _mm256_div_pd(ln_arg, ln_base);
-		_mm256_storeu_pd(&arg[i], log);
+		_mm256_store_ps(&arg[i], _mm256_div_ps(_mm256_log_ps(_mm256_load_ps(&arg[i])), _mm256_log_ps(_mm256_load_ps(&log_base[i]))));
 	}
 
 	for (; i < n; ++i)
@@ -898,33 +683,23 @@ void MathUtils::vector_log(double* const __restrict arg, const double* const __r
 	}
 }
 
-void MathUtils::vector_log(const double* const __restrict arg, double log_base, double* const __restrict r, size_t n)
+void MathUtils::vector_log(const float* const __restrict arg, float log_base, float* const __restrict r, size_t n)
 {
-	const double ln_base = 1.0 / std::log(log_base);
-	const __m256d reg_ln_base = _mm256_set1_pd(ln_base);
+	const float ln_base = 1.0f / std::log(log_base);
+	const __m256 reg_ln_base = _mm256_set1_ps(ln_base);
 
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_arg0 = _mm256_loadu_pd(&arg[i]);
-		__m256d reg_arg1 = _mm256_loadu_pd(&arg[i + 4]);
-
-		__m256d ln_arg0 = _mm256_log_pd(reg_arg0);
-		__m256d ln_arg1 = _mm256_log_pd(reg_arg1);
-
-		__m256d log0 = _mm256_mul_pd(ln_arg0, reg_ln_base);
-		__m256d log1 = _mm256_mul_pd(ln_arg1, reg_ln_base);
-
-		_mm256_storeu_pd(&r[i], log0);
-		_mm256_storeu_pd(&r[i + 4], log1);
+		_mm256_store_ps(&r[i], _mm256_mul_ps(_mm256_log_ps(_mm256_load_ps(&arg[i])), reg_ln_base));
+		_mm256_store_ps(&r[i + 8], _mm256_mul_ps(_mm256_log_ps(_mm256_load_ps(&arg[i + 8])), reg_ln_base));
+		_mm256_store_ps(&r[i + 16], _mm256_mul_ps(_mm256_log_ps(_mm256_load_ps(&arg[i + 16])), reg_ln_base));
+		_mm256_store_ps(&r[i + 24], _mm256_mul_ps(_mm256_log_ps(_mm256_load_ps(&arg[i + 24])), reg_ln_base));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_arg = _mm256_loadu_pd(&arg[i]);
-		__m256d ln_arg = _mm256_log_pd(reg_arg);
-		__m256d log = _mm256_mul_pd(ln_arg, reg_ln_base);
-		_mm256_storeu_pd(&r[i], log);
+		_mm256_store_ps(&r[i], _mm256_mul_ps(_mm256_log_ps(_mm256_load_ps(&arg[i])), reg_ln_base));
 	}
 
 	for (; i < n; ++i)
@@ -933,33 +708,23 @@ void MathUtils::vector_log(const double* const __restrict arg, double log_base, 
 	}
 }
 
-void MathUtils::vector_log(double* const __restrict arg, double log_base, size_t n)
+void MathUtils::vector_log(float* const __restrict arg, float log_base, size_t n)
 {
-	const double ln_base = 1.0 / std::log(log_base);
-	const __m256d reg_ln_base = _mm256_set1_pd(ln_base);
+	const float ln_base = 1.0f / std::log(log_base);
+	const __m256 reg_ln_base = _mm256_set1_ps(ln_base);
 
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_arg0 = _mm256_loadu_pd(&arg[i]);
-		__m256d reg_arg1 = _mm256_loadu_pd(&arg[i + 4]);
-
-		__m256d ln_arg0 = _mm256_log_pd(reg_arg0);
-		__m256d ln_arg1 = _mm256_log_pd(reg_arg1);
-
-		__m256d log0 = _mm256_mul_pd(ln_arg0, reg_ln_base);
-		__m256d log1 = _mm256_mul_pd(ln_arg1, reg_ln_base);
-
-		_mm256_storeu_pd(&arg[i], log0);
-		_mm256_storeu_pd(&arg[i + 4], log1);
+		_mm256_store_ps(&arg[i], _mm256_mul_ps(_mm256_log_ps(_mm256_load_ps(&arg[i])), reg_ln_base));
+		_mm256_store_ps(&arg[i + 8], _mm256_mul_ps(_mm256_log_ps(_mm256_load_ps(&arg[i + 8])), reg_ln_base));
+		_mm256_store_ps(&arg[i + 16], _mm256_mul_ps(_mm256_log_ps(_mm256_load_ps(&arg[i + 16])), reg_ln_base));
+		_mm256_store_ps(&arg[i + 24], _mm256_mul_ps(_mm256_log_ps(_mm256_load_ps(&arg[i + 24])), reg_ln_base));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_arg = _mm256_loadu_pd(&arg[i]);
-		__m256d ln_arg = _mm256_log_pd(reg_arg);
-		__m256d log = _mm256_mul_pd(ln_arg, reg_ln_base);
-		_mm256_storeu_pd(&arg[i], log);
+		_mm256_store_ps(&arg[i], _mm256_mul_ps(_mm256_log_ps(_mm256_load_ps(&arg[i])), reg_ln_base));
 	}
 
 	for (; i < n; ++i)
@@ -968,33 +733,23 @@ void MathUtils::vector_log(double* const __restrict arg, double log_base, size_t
 	}
 }
 
-void MathUtils::vector_log(double arg, const double* const __restrict log_base, double* const __restrict r, size_t n)
+void MathUtils::vector_log(float arg, const float* const __restrict log_base, float* const __restrict r, size_t n)
 {
-	const double ln_arg = std::log(arg);
-	const __m256d reg_ln_arg = _mm256_set1_pd(ln_arg);
+	const float ln_arg = std::log(arg);
+	const __m256 reg_ln_arg = _mm256_set1_ps(ln_arg);
 
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_base0 = _mm256_loadu_pd(&log_base[i]);
-		__m256d reg_base1 = _mm256_loadu_pd(&log_base[i + 4]);
-
-		__m256d ln_base0 = _mm256_log_pd(reg_base0);
-		__m256d ln_base1 = _mm256_log_pd(reg_base1);
-
-		__m256d log0 = _mm256_div_pd(reg_ln_arg, ln_base0);
-		__m256d log1 = _mm256_div_pd(reg_ln_arg, ln_base1);
-
-		_mm256_storeu_pd(&r[i], log0);
-		_mm256_storeu_pd(&r[i + 4], log1);
+		_mm256_store_ps(&r[i], _mm256_div_ps(reg_ln_arg, _mm256_log_ps(_mm256_load_ps(&log_base[i]))));
+		_mm256_store_ps(&r[i + 8], _mm256_div_ps(reg_ln_arg, _mm256_log_ps(_mm256_load_ps(&log_base[i + 8]))));
+		_mm256_store_ps(&r[i + 16], _mm256_div_ps(reg_ln_arg, _mm256_log_ps(_mm256_load_ps(&log_base[i + 16]))));
+		_mm256_store_ps(&r[i + 24], _mm256_div_ps(reg_ln_arg, _mm256_log_ps(_mm256_load_ps(&log_base[i + 24]))));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_base = _mm256_loadu_pd(&log_base[i]);
-		__m256d ln_base = _mm256_log_pd(reg_base);
-		__m256d log = _mm256_div_pd(reg_ln_arg, ln_base);
-		_mm256_storeu_pd(&r[i], log);
+		_mm256_store_ps(&r[i], _mm256_div_ps(reg_ln_arg, _mm256_log_ps(_mm256_load_ps(&log_base[i]))));
 	}
 
 	for (; i < n; ++i)
@@ -1006,35 +761,21 @@ void MathUtils::vector_log(double arg, const double* const __restrict log_base, 
 /* Vector fused multiply addition */
 
 // Vectorizes the fused multiply addition of three vectors and writes the result into the provided vector -> r = a + b * c
-void MathUtils::vector_fmadd(const double* const __restrict a, const double* const __restrict b, const double* const __restrict c,
-	double* const __restrict r, size_t n)
+void MathUtils::vector_fmadd(const float* const __restrict a, const float* const __restrict b, const float* const __restrict c,
+	float* const __restrict r, size_t n)
 {
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
-		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
-
-		__m256d reg_c0 = _mm256_loadu_pd(&c[i]);
-		__m256d reg_c1 = _mm256_loadu_pd(&c[i + 4]);
-
-		__m256d fmadd0 = _mm256_fmadd_pd(reg_b0, reg_c0, reg_a0);
-		__m256d fmadd1 = _mm256_fmadd_pd(reg_b1, reg_c1, reg_a1);
-
-		_mm256_storeu_pd(&r[i], fmadd0);
-		_mm256_storeu_pd(&r[i + 4], fmadd1);
+		_mm256_store_ps(&r[i], _mm256_fmadd_ps(_mm256_load_ps(&b[i]), _mm256_load_ps(&c[i]), _mm256_load_ps(&a[i])));
+		_mm256_store_ps(&r[i + 8], _mm256_fmadd_ps(_mm256_load_ps(&b[i + 8]), _mm256_load_ps(&c[i + 8]), _mm256_load_ps(&a[i + 8])));
+		_mm256_store_ps(&r[i + 16], _mm256_fmadd_ps(_mm256_load_ps(&b[i + 16]), _mm256_load_ps(&c[i + 16]), _mm256_load_ps(&a[i + 16])));
+		_mm256_store_ps(&r[i + 24], _mm256_fmadd_ps(_mm256_load_ps(&b[i + 24]), _mm256_load_ps(&c[i + 24]), _mm256_load_ps(&a[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d reg_b = _mm256_loadu_pd(&b[i]);
-		__m256d reg_c = _mm256_loadu_pd(&c[i]);
-		__m256d fmadd = _mm256_fmadd_pd(reg_b, reg_c, reg_a);
-		_mm256_storeu_pd(&r[i], fmadd);
+		_mm256_store_ps(&r[i], _mm256_fmadd_ps(_mm256_load_ps(&b[i]), _mm256_load_ps(&c[i]), _mm256_load_ps(&a[i])));
 	}
 
 	for (; i < n; ++i)
@@ -1043,34 +784,20 @@ void MathUtils::vector_fmadd(const double* const __restrict a, const double* con
 	}
 }
 
-void MathUtils::vector_fmadd(double* const __restrict a, const double* const __restrict b, const double* const __restrict c, size_t n)
+void MathUtils::vector_fmadd(float* const __restrict a, const float* const __restrict b, const float* const __restrict c, size_t n)
 {
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
-		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
-
-		__m256d reg_c0 = _mm256_loadu_pd(&c[i]);
-		__m256d reg_c1 = _mm256_loadu_pd(&c[i + 4]);
-
-		__m256d fmadd0 = _mm256_fmadd_pd(reg_b0, reg_c0, reg_a0);
-		__m256d fmadd1 = _mm256_fmadd_pd(reg_b1, reg_c1, reg_a1);
-
-		_mm256_storeu_pd(&a[i], fmadd0);
-		_mm256_storeu_pd(&a[i + 4], fmadd1);
+		_mm256_store_ps(&a[i], _mm256_fmadd_ps(_mm256_load_ps(&b[i]), _mm256_load_ps(&c[i]), _mm256_load_ps(&a[i])));
+		_mm256_store_ps(&a[i + 8], _mm256_fmadd_ps(_mm256_load_ps(&b[i + 8]), _mm256_load_ps(&c[i + 8]), _mm256_load_ps(&a[i + 8])));
+		_mm256_store_ps(&a[i + 16], _mm256_fmadd_ps(_mm256_load_ps(&b[i + 16]), _mm256_load_ps(&c[i + 16]), _mm256_load_ps(&a[i + 16])));
+		_mm256_store_ps(&a[i + 24], _mm256_fmadd_ps(_mm256_load_ps(&b[i + 24]), _mm256_load_ps(&c[i + 24]), _mm256_load_ps(&a[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d reg_b = _mm256_loadu_pd(&b[i]);
-		__m256d reg_c = _mm256_loadu_pd(&c[i]);
-		__m256d fmadd = _mm256_fmadd_pd(reg_b, reg_c, reg_a);
-		_mm256_storeu_pd(&a[i], fmadd);
+		_mm256_store_ps(&a[i], _mm256_fmadd_ps(_mm256_load_ps(&b[i]), _mm256_load_ps(&c[i]), _mm256_load_ps(&a[i])));
 	}
 
 	for (; i < n; ++i)
@@ -1079,33 +806,23 @@ void MathUtils::vector_fmadd(double* const __restrict a, const double* const __r
 	}
 }
 
-void MathUtils::vector_fmadd(const double* const __restrict a, const double* const __restrict b, double c,
-	double* const __restrict r, size_t n)
+void MathUtils::vector_fmadd(const float* const __restrict a, const float* const __restrict b, float c,
+	float* const __restrict r, size_t n)
 {
-	const __m256d reg_c = _mm256_set1_pd(c);
+	const __m256 reg_c = _mm256_set1_ps(c);
 
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
-		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
-
-		__m256d fmadd0 = _mm256_fmadd_pd(reg_b0, reg_c, reg_a0);
-		__m256d fmadd1 = _mm256_fmadd_pd(reg_b1, reg_c, reg_a1);
-
-		_mm256_storeu_pd(&r[i], fmadd0);
-		_mm256_storeu_pd(&r[i + 4], fmadd1);
+		_mm256_store_ps(&r[i], _mm256_fmadd_ps(_mm256_load_ps(&b[i]), reg_c, _mm256_load_ps(&a[i])));
+		_mm256_store_ps(&r[i + 8], _mm256_fmadd_ps(_mm256_load_ps(&b[i + 8]), reg_c, _mm256_load_ps(&a[i + 8])));
+		_mm256_store_ps(&r[i + 16], _mm256_fmadd_ps(_mm256_load_ps(&b[i + 16]), reg_c, _mm256_load_ps(&a[i + 16])));
+		_mm256_store_ps(&r[i + 24], _mm256_fmadd_ps(_mm256_load_ps(&b[i + 24]), reg_c, _mm256_load_ps(&a[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d reg_b = _mm256_loadu_pd(&b[i]);
-		__m256d fmadd = _mm256_fmadd_pd(reg_b, reg_c, reg_a);
-		_mm256_storeu_pd(&r[i], fmadd);
+		_mm256_store_ps(&r[i], _mm256_fmadd_ps(_mm256_load_ps(&b[i]), reg_c, _mm256_load_ps(&a[i])));
 	}
 
 	for (; i < n; ++i)
@@ -1114,32 +831,22 @@ void MathUtils::vector_fmadd(const double* const __restrict a, const double* con
 	}
 }
 
-void MathUtils::vector_fmadd(double* const __restrict a, const double* const __restrict b, double c, size_t n)
+void MathUtils::vector_fmadd(float* const __restrict a, const float* const __restrict b, float c, size_t n)
 {
-	const __m256d reg_c = _mm256_set1_pd(c);
+	const __m256 reg_c = _mm256_set1_ps(c);
 
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 8)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
-		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
-
-		__m256d fmadd0 = _mm256_fmadd_pd(reg_b0, reg_c, reg_a0);
-		__m256d fmadd1 = _mm256_fmadd_pd(reg_b1, reg_c, reg_a1);
-
-		_mm256_storeu_pd(&a[i], fmadd0);
-		_mm256_storeu_pd(&a[i + 4], fmadd1);
+		_mm256_store_ps(&a[i], _mm256_fmadd_ps(_mm256_load_ps(&b[i]), reg_c, _mm256_load_ps(&a[i])));
+		_mm256_store_ps(&a[i + 8], _mm256_fmadd_ps(_mm256_load_ps(&b[i + 8]), reg_c, _mm256_load_ps(&a[i + 8])));
+		_mm256_store_ps(&a[i + 16], _mm256_fmadd_ps(_mm256_load_ps(&b[i + 16]), reg_c, _mm256_load_ps(&a[i + 16])));
+		_mm256_store_ps(&a[i + 24], _mm256_fmadd_ps(_mm256_load_ps(&b[i + 24]), reg_c, _mm256_load_ps(&a[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d reg_b = _mm256_loadu_pd(&b[i]);
-		__m256d fmadd = _mm256_fmadd_pd(reg_b, reg_c, reg_a);
-		_mm256_storeu_pd(&a[i], fmadd);
+		_mm256_store_ps(&a[i], _mm256_fmadd_ps(_mm256_load_ps(&b[i]), reg_c, _mm256_load_ps(&a[i])));
 	}
 
 	for (; i < n; ++i)
@@ -1151,35 +858,21 @@ void MathUtils::vector_fmadd(double* const __restrict a, const double* const __r
 /* Vector fused negative multiply addition */
 
 // Vectorizes the fused negative multiply addition of three vectors and writes the result into the provided vector -> r = a - b * c
-void MathUtils::vector_fnmadd(const double* const __restrict a, const double* const __restrict b, const double* const __restrict c,
-	double* const __restrict r, size_t n)
+void MathUtils::vector_fnmadd(const float* const __restrict a, const float* const __restrict b, const float* const __restrict c,
+	float* const __restrict r, size_t n)
 {
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
-		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
-
-		__m256d reg_c0 = _mm256_loadu_pd(&c[i]);
-		__m256d reg_c1 = _mm256_loadu_pd(&c[i + 4]);
-
-		__m256d fnmadd0 = _mm256_fnmadd_pd(reg_b0, reg_c0, reg_a0);
-		__m256d fnmadd1 = _mm256_fnmadd_pd(reg_b1, reg_c1, reg_a1);
-
-		_mm256_storeu_pd(&r[i], fnmadd0);
-		_mm256_storeu_pd(&r[i + 4], fnmadd1);
+		_mm256_store_ps(&r[i], _mm256_fnmadd_ps(_mm256_load_ps(&b[i]), _mm256_load_ps(&c[i]), _mm256_load_ps(&a[i])));
+		_mm256_store_ps(&r[i + 8], _mm256_fnmadd_ps(_mm256_load_ps(&b[i + 8]), _mm256_load_ps(&c[i + 8]), _mm256_load_ps(&a[i + 8])));
+		_mm256_store_ps(&r[i + 16], _mm256_fnmadd_ps(_mm256_load_ps(&b[i + 16]), _mm256_load_ps(&c[i + 16]), _mm256_load_ps(&a[i + 16])));
+		_mm256_store_ps(&r[i + 24], _mm256_fnmadd_ps(_mm256_load_ps(&b[i + 24]), _mm256_load_ps(&c[i + 24]), _mm256_load_ps(&a[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d reg_b = _mm256_loadu_pd(&b[i]);
-		__m256d reg_c = _mm256_loadu_pd(&c[i]);
-		__m256d fnmadd = _mm256_fnmadd_pd(reg_b, reg_c, reg_a);
-		_mm256_storeu_pd(&r[i], fnmadd);
+		_mm256_store_ps(&r[i], _mm256_fnmadd_ps(_mm256_load_ps(&b[i]), _mm256_load_ps(&c[i]), _mm256_load_ps(&a[i])));
 	}
 
 	for (; i < n; ++i)
@@ -1188,34 +881,20 @@ void MathUtils::vector_fnmadd(const double* const __restrict a, const double* co
 	}
 }
 
-void MathUtils::vector_fnmadd(double* const __restrict a, const double* const __restrict b, const double* const __restrict c, size_t n)
+void MathUtils::vector_fnmadd(float* const __restrict a, const float* const __restrict b, const float* const __restrict c, size_t n)
 {
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
-		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
-
-		__m256d reg_c0 = _mm256_loadu_pd(&c[i]);
-		__m256d reg_c1 = _mm256_loadu_pd(&c[i + 4]);
-
-		__m256d fnmadd0 = _mm256_fnmadd_pd(reg_b0, reg_c0, reg_a0);
-		__m256d fnmadd1 = _mm256_fnmadd_pd(reg_b1, reg_c1, reg_a1);
-
-		_mm256_storeu_pd(&a[i], fnmadd0);
-		_mm256_storeu_pd(&a[i + 4], fnmadd1);
+		_mm256_store_ps(&a[i], _mm256_fnmadd_ps(_mm256_load_ps(&b[i]), _mm256_load_ps(&c[i]), _mm256_load_ps(&a[i])));
+		_mm256_store_ps(&a[i + 8], _mm256_fnmadd_ps(_mm256_load_ps(&b[i + 8]), _mm256_load_ps(&c[i + 8]), _mm256_load_ps(&a[i + 8])));
+		_mm256_store_ps(&a[i + 16], _mm256_fnmadd_ps(_mm256_load_ps(&b[i + 16]), _mm256_load_ps(&c[i + 16]), _mm256_load_ps(&a[i + 16])));
+		_mm256_store_ps(&a[i + 24], _mm256_fnmadd_ps(_mm256_load_ps(&b[i + 24]), _mm256_load_ps(&c[i + 24]), _mm256_load_ps(&a[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d reg_b = _mm256_loadu_pd(&b[i]);
-		__m256d reg_c = _mm256_loadu_pd(&c[i]);
-		__m256d fnmadd = _mm256_fnmadd_pd(reg_b, reg_c, reg_a);
-		_mm256_storeu_pd(&a[i], fnmadd);
+		_mm256_store_ps(&a[i], _mm256_fnmadd_ps(_mm256_load_ps(&b[i]), _mm256_load_ps(&c[i]), _mm256_load_ps(&a[i])));
 	}
 
 	for (; i < n; ++i)
@@ -1224,33 +903,23 @@ void MathUtils::vector_fnmadd(double* const __restrict a, const double* const __
 	}
 }
 
-void MathUtils::vector_fnmadd(const double* const __restrict a, const double* const __restrict b, double c,
-	double* const __restrict r, size_t n)
+void MathUtils::vector_fnmadd(const float* const __restrict a, const float* const __restrict b, float c,
+	float* const __restrict r, size_t n)
 {
-	const __m256d reg_c = _mm256_set1_pd(c);
+	const __m256 reg_c = _mm256_set1_ps(c);
 
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
-		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
-
-		__m256d fnmadd0 = _mm256_fnmadd_pd(reg_b0, reg_c, reg_a0);
-		__m256d fnmadd1 = _mm256_fnmadd_pd(reg_b1, reg_c, reg_a1);
-
-		_mm256_storeu_pd(&r[i], fnmadd0);
-		_mm256_storeu_pd(&r[i + 4], fnmadd1);
+		_mm256_store_ps(&r[i], _mm256_fnmadd_ps(_mm256_load_ps(&b[i]), reg_c, _mm256_load_ps(&a[i])));
+		_mm256_store_ps(&r[i + 8], _mm256_fnmadd_ps(_mm256_load_ps(&b[i + 8]), reg_c, _mm256_load_ps(&a[i + 8])));
+		_mm256_store_ps(&r[i + 16], _mm256_fnmadd_ps(_mm256_load_ps(&b[i + 16]), reg_c, _mm256_load_ps(&a[i + 16])));
+		_mm256_store_ps(&r[i + 24], _mm256_fnmadd_ps(_mm256_load_ps(&b[i + 24]), reg_c, _mm256_load_ps(&a[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d reg_b = _mm256_loadu_pd(&b[i]);
-		__m256d fnmadd = _mm256_fnmadd_pd(reg_b, reg_c, reg_a);
-		_mm256_storeu_pd(&r[i], fnmadd);
+		_mm256_store_ps(&r[i], _mm256_fnmadd_ps(_mm256_load_ps(&b[i]), reg_c, _mm256_load_ps(&a[i])));
 	}
 
 	for (; i < n; ++i)
@@ -1259,32 +928,22 @@ void MathUtils::vector_fnmadd(const double* const __restrict a, const double* co
 	}
 }
 
-void MathUtils::vector_fnmadd(double* const __restrict a, const double* const __restrict b, double c, size_t n)
+void MathUtils::vector_fnmadd(float* const __restrict a, const float* const __restrict b, float c, size_t n)
 {
-	const __m256d reg_c = _mm256_set1_pd(c);
+	const __m256 reg_c = _mm256_set1_ps(c);
 
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
-		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
-
-		__m256d fnmadd0 = _mm256_fnmadd_pd(reg_b0, reg_c, reg_a0);
-		__m256d fnmadd1 = _mm256_fnmadd_pd(reg_b1, reg_c, reg_a1);
-
-		_mm256_storeu_pd(&a[i], fnmadd0);
-		_mm256_storeu_pd(&a[i + 4], fnmadd1);
+		_mm256_store_ps(&a[i], _mm256_fnmadd_ps(_mm256_load_ps(&b[i]), reg_c, _mm256_load_ps(&a[i])));
+		_mm256_store_ps(&a[i + 8], _mm256_fnmadd_ps(_mm256_load_ps(&b[i + 8]), reg_c, _mm256_load_ps(&a[i + 8])));
+		_mm256_store_ps(&a[i + 16], _mm256_fnmadd_ps(_mm256_load_ps(&b[i + 16]), reg_c, _mm256_load_ps(&a[i + 16])));
+		_mm256_store_ps(&a[i + 24], _mm256_fnmadd_ps(_mm256_load_ps(&b[i + 24]), reg_c, _mm256_load_ps(&a[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d reg_b = _mm256_loadu_pd(&b[i]);
-		__m256d fnmadd = _mm256_fnmadd_pd(reg_b, reg_c, reg_a);
-		_mm256_storeu_pd(&a[i], fnmadd);
+		_mm256_store_ps(&a[i], _mm256_fnmadd_ps(_mm256_load_ps(&b[i]), reg_c, _mm256_load_ps(&a[i])));
 	}
 
 	for (; i < n; ++i)
@@ -1296,26 +955,20 @@ void MathUtils::vector_fnmadd(double* const __restrict a, const double* const __
 /* Vector square */
 
 // Vectorizes the square of a vector and writes the result into the provided vector -> r = a ^ 2
-void MathUtils::vector_sq(const double* const __restrict a, double* const __restrict r, size_t n)
+void MathUtils::vector_sq(const float* const __restrict a, float* const __restrict r, size_t n)
 {
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d sq0 = _mm256_mul_pd(reg_a0, reg_a0);
-		__m256d sq1 = _mm256_mul_pd(reg_a1, reg_a1);
-
-		_mm256_storeu_pd(&r[i], sq0);
-		_mm256_storeu_pd(&r[i + 4], sq1);
+		_mm256_store_ps(&r[i], _mm256_mul_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&a[i])));
+		_mm256_store_ps(&r[i + 8], _mm256_mul_ps(_mm256_load_ps(&a[i + 8]), _mm256_load_ps(&a[i + 8])));
+		_mm256_store_ps(&r[i + 16], _mm256_mul_ps(_mm256_load_ps(&a[i + 16]), _mm256_load_ps(&a[i + 16])));
+		_mm256_store_ps(&r[i + 24], _mm256_mul_ps(_mm256_load_ps(&a[i + 24]), _mm256_load_ps(&a[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d sq = _mm256_mul_pd(reg_a, reg_a);
-		_mm256_storeu_pd(&r[i], sq);
+		_mm256_store_ps(&r[i], _mm256_mul_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&a[i])));
 	}
 
 	for (; i < n; ++i)
@@ -1324,26 +977,20 @@ void MathUtils::vector_sq(const double* const __restrict a, double* const __rest
 	}
 }
 
-void MathUtils::vector_sq(double* const __restrict a, size_t n)
+void MathUtils::vector_sq(float* const __restrict a, size_t n)
 {
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d sq0 = _mm256_mul_pd(reg_a0, reg_a0);
-		__m256d sq1 = _mm256_mul_pd(reg_a1, reg_a1);
-
-		_mm256_storeu_pd(&a[i], sq0);
-		_mm256_storeu_pd(&a[i + 4], sq1);
+		_mm256_store_ps(&a[i], _mm256_mul_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&a[i])));
+		_mm256_store_ps(&a[i + 8], _mm256_mul_ps(_mm256_load_ps(&a[i + 8]), _mm256_load_ps(&a[i + 8])));
+		_mm256_store_ps(&a[i + 16], _mm256_mul_ps(_mm256_load_ps(&a[i + 16]), _mm256_load_ps(&a[i + 16])));
+		_mm256_store_ps(&a[i + 24], _mm256_mul_ps(_mm256_load_ps(&a[i + 24]), _mm256_load_ps(&a[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d sq = _mm256_mul_pd(reg_a, reg_a);
-		_mm256_storeu_pd(&a[i], sq);
+		_mm256_store_ps(&a[i], _mm256_mul_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&a[i])));
 	}
 
 	for (; i < n; ++i)
@@ -1355,26 +1002,20 @@ void MathUtils::vector_sq(double* const __restrict a, size_t n)
 /* Vector square root */
 
 // Vectorizes the square root of a vector and writes the result into the provided vector -> r = sqrt(a)
-void MathUtils::vector_sqrt(const double* const __restrict a, double* const __restrict r, size_t n)
+void MathUtils::vector_sqrt(const float* const __restrict a, float* const __restrict r, size_t n)
 {
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d sqrt0 = _mm256_sqrt_pd(reg_a0);
-		__m256d sqrt1 = _mm256_sqrt_pd(reg_a1);
-
-		_mm256_storeu_pd(&r[i], sqrt0);
-		_mm256_storeu_pd(&r[i + 4], sqrt1);
+		_mm256_store_ps(&r[i], _mm256_sqrt_ps(_mm256_load_ps(&a[i])));
+		_mm256_store_ps(&r[i + 8], _mm256_sqrt_ps(_mm256_load_ps(&a[i + 8])));
+		_mm256_store_ps(&r[i + 16], _mm256_sqrt_ps(_mm256_load_ps(&a[i + 16])));
+		_mm256_store_ps(&r[i + 24], _mm256_sqrt_ps(_mm256_load_ps(&a[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d sqrt = _mm256_sqrt_pd(reg_a);
-		_mm256_storeu_pd(&r[i], sqrt);
+		_mm256_store_ps(&r[i], _mm256_sqrt_ps(_mm256_load_ps(&a[i])));
 	}
 
 	for (; i < n; ++i)
@@ -1383,26 +1024,20 @@ void MathUtils::vector_sqrt(const double* const __restrict a, double* const __re
 	}
 }
 
-void MathUtils::vector_sqrt(double* const __restrict a, size_t n)
+void MathUtils::vector_sqrt(float* const __restrict a, size_t n)
 {
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d sqrt0 = _mm256_sqrt_pd(reg_a0);
-		__m256d sqrt1 = _mm256_sqrt_pd(reg_a1);
-
-		_mm256_storeu_pd(&a[i], sqrt0);
-		_mm256_storeu_pd(&a[i + 4], sqrt1);
+		_mm256_store_ps(&a[i], _mm256_sqrt_ps(_mm256_load_ps(&a[i])));
+		_mm256_store_ps(&a[i + 8], _mm256_sqrt_ps(_mm256_load_ps(&a[i + 8])));
+		_mm256_store_ps(&a[i + 16], _mm256_sqrt_ps(_mm256_load_ps(&a[i + 16])));
+		_mm256_store_ps(&a[i + 24], _mm256_sqrt_ps(_mm256_load_ps(&a[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d sqrt = _mm256_sqrt_pd(reg_a);
-		_mm256_storeu_pd(&a[i], sqrt);
+		_mm256_store_ps(&a[i], _mm256_sqrt_ps(_mm256_load_ps(&a[i])));
 	}
 
 	for (; i < n; ++i)
@@ -1414,26 +1049,20 @@ void MathUtils::vector_sqrt(double* const __restrict a, size_t n)
 /* Vector natural exponentiation */
 
 // Vectorizes the natural exponentiation of a vector and writes the result into the provided vector -> r = e ^ a
-void MathUtils::vector_exp(const double* const __restrict a, double* const __restrict r, size_t n)
+void MathUtils::vector_exp(const float* const __restrict a, float* const __restrict r, size_t n)
 {
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d exp0 = _mm256_exp_pd(reg_a0);
-		__m256d exp1 = _mm256_exp_pd(reg_a1);
-
-		_mm256_storeu_pd(&r[i], exp0);
-		_mm256_storeu_pd(&r[i + 4], exp1);
+		_mm256_store_ps(&r[i], _mm256_exp_ps(_mm256_load_ps(&a[i])));
+		_mm256_store_ps(&r[i + 8], _mm256_exp_ps(_mm256_load_ps(&a[i + 8])));
+		_mm256_store_ps(&r[i + 16], _mm256_exp_ps(_mm256_load_ps(&a[i + 16])));
+		_mm256_store_ps(&r[i + 24], _mm256_exp_ps(_mm256_load_ps(&a[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d exp = _mm256_exp_pd(reg_a);
-		_mm256_storeu_pd(&r[i], exp);
+		_mm256_store_ps(&r[i], _mm256_exp_ps(_mm256_load_ps(&a[i])));
 	}
 
 	for (; i < n; ++i)
@@ -1442,28 +1071,21 @@ void MathUtils::vector_exp(const double* const __restrict a, double* const __res
 	}
 }
 
-void MathUtils::vector_exp(double* const __restrict a, size_t n)
+void MathUtils::vector_exp(float* const __restrict a, size_t n)
 {
 	size_t i = 0;
+	for (; i + 32 <= n; i += 32)
+	{
+		_mm256_store_ps(&a[i], _mm256_exp_ps(_mm256_load_ps(&a[i])));
+		_mm256_store_ps(&a[i + 8], _mm256_exp_ps(_mm256_load_ps(&a[i + 8])));
+		_mm256_store_ps(&a[i + 16], _mm256_exp_ps(_mm256_load_ps(&a[i + 16])));
+		_mm256_store_ps(&a[i + 24], _mm256_exp_ps(_mm256_load_ps(&a[i + 24])));
+	}
+
 	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d exp0 = _mm256_exp_pd(reg_a0);
-		__m256d exp1 = _mm256_exp_pd(reg_a1);
-
-		_mm256_storeu_pd(&a[i], exp0);
-		_mm256_storeu_pd(&a[i + 4], exp1);
+		_mm256_store_ps(&a[i], _mm256_exp_ps(_mm256_load_ps(&a[i])));
 	}
-
-	for (; i + 4 <= n; i += 4)
-	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d exp = _mm256_exp_pd(reg_a);
-		_mm256_storeu_pd(&a[i], exp);
-	}
-
 	for (; i < n; ++i)
 	{
 		a[i] = std::exp(a[i]);
@@ -1473,26 +1095,20 @@ void MathUtils::vector_exp(double* const __restrict a, size_t n)
 /* Vector natural logarithm */
 
 // Vectorizes the natural logarithm of a vector and writes the result into the provided vector -> r = ln(a)
-void MathUtils::vector_ln(const double* const __restrict a, double* const __restrict r, size_t n)
+void MathUtils::vector_ln(const float* const __restrict a, float* const __restrict r, size_t n)
 {
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d ln0 = _mm256_log_pd(reg_a0);
-		__m256d ln1 = _mm256_log_pd(reg_a1);
-
-		_mm256_storeu_pd(&r[i], ln0);
-		_mm256_storeu_pd(&r[i + 4], ln1);
+		_mm256_store_ps(&r[i], _mm256_log_ps(_mm256_load_ps(&a[i])));
+		_mm256_store_ps(&r[i + 8], _mm256_log_ps(_mm256_load_ps(&a[i + 8])));
+		_mm256_store_ps(&r[i + 16], _mm256_log_ps(_mm256_load_ps(&a[i + 16])));
+		_mm256_store_ps(&r[i + 24], _mm256_log_ps(_mm256_load_ps(&a[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d ln = _mm256_log_pd(reg_a);
-		_mm256_storeu_pd(&r[i], ln);
+		_mm256_store_ps(&r[i], _mm256_log_ps(_mm256_load_ps(&a[i])));
 	}
 
 	for (; i < n; ++i)
@@ -1501,26 +1117,20 @@ void MathUtils::vector_ln(const double* const __restrict a, double* const __rest
 	}
 }
 
-void MathUtils::vector_ln(double* const __restrict a, size_t n)
+void MathUtils::vector_ln(float* const __restrict a, size_t n)
 {
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d ln0 = _mm256_log_pd(reg_a0);
-		__m256d ln1 = _mm256_log_pd(reg_a1);
-
-		_mm256_storeu_pd(&a[i], ln0);
-		_mm256_storeu_pd(&a[i + 4], ln1);
+		_mm256_store_ps(&a[i], _mm256_log_ps(_mm256_load_ps(&a[i])));
+		_mm256_store_ps(&a[i + 8], _mm256_log_ps(_mm256_load_ps(&a[i + 8])));
+		_mm256_store_ps(&a[i + 16], _mm256_log_ps(_mm256_load_ps(&a[i + 16])));
+		_mm256_store_ps(&a[i + 24], _mm256_log_ps(_mm256_load_ps(&a[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d ln = _mm256_log_pd(reg_a);
-		_mm256_storeu_pd(&a[i], ln);
+		_mm256_store_ps(&a[i], _mm256_log_ps(_mm256_load_ps(&a[i])));
 	}
 
 	for (; i < n; ++i)
@@ -1532,30 +1142,32 @@ void MathUtils::vector_ln(double* const __restrict a, size_t n)
 /* Vector operations */
 
 // Vectorizes the sum of a vector.
-double MathUtils::vector_sum(const double* const __restrict a, size_t n)
+float MathUtils::vector_sum(const float* const __restrict a, size_t n)
 {
-	__m256d acc0 = _mm256_setzero_pd();
-	__m256d acc1 = _mm256_setzero_pd();
+	__m256 acc0 = _mm256_setzero_ps();
+	__m256 acc1 = _mm256_setzero_ps();
+	__m256 acc2 = _mm256_setzero_ps();
+	__m256 acc3 = _mm256_setzero_ps();
 
 	size_t i = 0;
+	for (; i + 32 <= n; i += 32)
+	{
+		acc0 = _mm256_add_ps(acc0, _mm256_load_ps(&a[i]));
+		acc1 = _mm256_add_ps(acc1, _mm256_load_ps(&a[i + 8]));
+		acc2 = _mm256_add_ps(acc2, _mm256_load_ps(&a[i + 16]));
+		acc3 = _mm256_add_ps(acc3, _mm256_load_ps(&a[i + 24]));
+	}
+
+	acc0 = _mm256_add_ps(acc0, acc1);
+	acc2 = _mm256_add_ps(acc2, acc3);
+	acc0 = _mm256_add_ps(acc0, acc2);
+
 	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg1 = _mm256_loadu_pd(&a[i + 4]);
-
-		acc0 = _mm256_add_pd(acc0, reg0);
-		acc1 = _mm256_add_pd(acc1, reg1);
+		acc0 = _mm256_add_ps(acc0, _mm256_load_ps(&a[i]));
 	}
 
-	__m256d total_acc = _mm256_add_pd(acc0, acc1);
-
-	for (; i + 4 <= n; i += 4)
-	{
-		__m256d reg = _mm256_loadu_pd(&a[i]);
-		total_acc = _mm256_add_pd(total_acc, reg);
-	}
-
-	double sum = sum_m256d(total_acc);
+	float sum = sum_m256(acc0);
 
 	for (; i < n; ++i)
 	{
@@ -1565,30 +1177,32 @@ double MathUtils::vector_sum(const double* const __restrict a, size_t n)
 	return sum;
 }
 
-double MathUtils::vector_max(const double* const __restrict a, size_t n)
+float MathUtils::vector_max(const float* const __restrict a, size_t n)
 {
-	__m256d max0 = _mm256_set1_pd(std::numeric_limits<double>::lowest());
-	__m256d max1 = _mm256_set1_pd(std::numeric_limits<double>::lowest());
+	__m256 max0 = _mm256_set1_ps(std::numeric_limits<float>::lowest());
+	__m256 max1 = _mm256_set1_ps(std::numeric_limits<float>::lowest());
+	__m256 max2 = _mm256_set1_ps(std::numeric_limits<float>::lowest());
+	__m256 max3 = _mm256_set1_ps(std::numeric_limits<float>::lowest());
 
 	size_t i = 0;
+	for (; i + 32 <= n; i += 32)
+	{
+		max0 = _mm256_max_ps(max0, _mm256_load_ps(&a[i]));
+		max1 = _mm256_max_ps(max1, _mm256_load_ps(&a[i + 8]));
+		max2 = _mm256_max_ps(max2, _mm256_load_ps(&a[i + 16]));
+		max3 = _mm256_max_ps(max3, _mm256_load_ps(&a[i + 24]));
+	}
+
+	max0 = _mm256_max_ps(max0, max1);
+	max2 = _mm256_max_ps(max2, max3);
+	max0 = _mm256_max_ps(max0, max2);
+
 	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg1 = _mm256_loadu_pd(&a[i + 4]);
-
-		max0 = _mm256_max_pd(max0, reg0);
-		max1 = _mm256_max_pd(max1, reg1);
+		max0 = _mm256_max_ps(max0, _mm256_load_ps(&a[i]));
 	}
 
-	__m256d total_max = _mm256_max_pd(max0, max1);
-
-	for (; i + 4 <= n; i += 4)
-	{
-		__m256d reg = _mm256_loadu_pd(&a[i]);
-		total_max = _mm256_max_pd(total_max, reg);
-	}
-
-	double max = max_m256d(total_max);
+	float max = max_m256(max0);
 
 	for (; i < n; ++i)
 	{
@@ -1598,38 +1212,67 @@ double MathUtils::vector_max(const double* const __restrict a, size_t n)
 	return max;
 }
 
-double MathUtils::vector_dot(const double* const __restrict a, const double* const __restrict b, size_t n)
+float MathUtils::vector_min(const float* const __restrict a, size_t n)
 {
-	__m256d acc0 = _mm256_setzero_pd();
-	__m256d acc1 = _mm256_setzero_pd();
+	__m256 min0 = _mm256_set1_ps((std::numeric_limits<float>::max)());
+	__m256 min1 = _mm256_set1_ps((std::numeric_limits<float>::max)());
+	__m256 min2 = _mm256_set1_ps((std::numeric_limits<float>::max)());
+	__m256 min3 = _mm256_set1_ps((std::numeric_limits<float>::max)());
 
 	size_t i = 0;
+	for (; i + 32 <= n; i += 32)
+	{
+		min0 = _mm256_min_ps(min0, _mm256_load_ps(&a[i]));
+		min1 = _mm256_min_ps(min1, _mm256_load_ps(&a[i + 8]));
+		min2 = _mm256_min_ps(min2, _mm256_load_ps(&a[i + 16]));
+		min3 = _mm256_min_ps(min3, _mm256_load_ps(&a[i + 24]));
+	}
+
+	min0 = _mm256_min_ps(min0, min1);
+	min2 = _mm256_min_ps(min2, min3);
+	min0 = _mm256_min_ps(min0, min2);
+
 	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
-		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
-
-		__m256d mul0 = _mm256_mul_pd(reg_a0, reg_b0);
-		__m256d mul1 = _mm256_mul_pd(reg_a1, reg_b1);
-
-		acc0 = _mm256_add_pd(acc0, mul0);
-		acc1 = _mm256_add_pd(acc1, mul1);
+		min0 = _mm256_min_ps(min0, _mm256_load_ps(&a[i]));
 	}
 
-	__m256d total_acc = _mm256_add_pd(acc0, acc1);
+	float min = min_m256(min0);
 
-	for (; i + 4 <= n; i += 4)
+	for (; i < n; ++i)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d reg_b = _mm256_loadu_pd(&b[i]);
-		__m256d mul = _mm256_mul_pd(reg_a, reg_b);
-		total_acc = _mm256_add_pd(total_acc, mul);
+		if (a[i] < min) min = a[i];
 	}
 
-	double dot = sum_m256d(total_acc);
+	return min;
+}
+
+float MathUtils::vector_dot(const float* const __restrict a, const float* const __restrict b, size_t n)
+{
+	__m256 acc0 = _mm256_setzero_ps();
+	__m256 acc1 = _mm256_setzero_ps();
+	__m256 acc2 = _mm256_setzero_ps();
+	__m256 acc3 = _mm256_setzero_ps();
+
+	size_t i = 0;
+	for (; i + 32 <= n; i += 8)
+	{
+		acc0 = _mm256_add_ps(acc0, _mm256_mul_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&b[i])));
+		acc1 = _mm256_add_ps(acc1, _mm256_mul_ps(_mm256_load_ps(&a[i + 8]), _mm256_load_ps(&b[i + 8])));
+		acc2 = _mm256_add_ps(acc2, _mm256_mul_ps(_mm256_load_ps(&a[i + 16]), _mm256_load_ps(&b[i + 16])));
+		acc3 = _mm256_add_ps(acc3, _mm256_mul_ps(_mm256_load_ps(&a[i + 24]), _mm256_load_ps(&b[i + 24])));
+	}
+
+	acc0 = _mm256_add_ps(acc0, acc1);
+	acc2 = _mm256_add_ps(acc2, acc3);
+	acc0 = _mm256_add_ps(acc0, acc2);
+
+	for (; i + 8 <= n; i += 8)
+	{
+		acc0 = _mm256_add_ps(acc0, _mm256_mul_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&b[i])));
+	}
+
+	float dot = sum_m256(acc0);
 
 	for (; i < n; ++i)
 	{
@@ -1639,41 +1282,35 @@ double MathUtils::vector_dot(const double* const __restrict a, const double* con
 	return dot;
 }
 
-double MathUtils::vector_dot(const double* __restrict a, const double* __restrict b, size_t a_off, size_t b_off, size_t n)
+float MathUtils::vector_dot(const float* __restrict a, const float* __restrict b, size_t a_off, size_t b_off, size_t n)
 {
-	const double* const __restrict p_a = &a[a_off];
-	const double* const __restrict p_b = &b[b_off];
+	const float* const __restrict p_a = &a[a_off];
+	const float* const __restrict p_b = &b[b_off];
 
-	__m256d acc0 = _mm256_setzero_pd();
-	__m256d acc1 = _mm256_setzero_pd();
+	__m256 acc0 = _mm256_setzero_ps();
+	__m256 acc1 = _mm256_setzero_ps();
+	__m256 acc2 = _mm256_setzero_ps();
+	__m256 acc3 = _mm256_setzero_ps();
 
 	size_t i = 0;
+	for (; i + 32 <= n; i += 32)
+	{
+		acc0 = _mm256_add_ps(acc0, _mm256_mul_ps(_mm256_load_ps(&p_a[i]), _mm256_load_ps(&p_b[i])));
+		acc1 = _mm256_add_ps(acc1, _mm256_mul_ps(_mm256_load_ps(&p_a[i + 8]), _mm256_load_ps(&p_b[i + 8])));
+		acc2 = _mm256_add_ps(acc2, _mm256_mul_ps(_mm256_load_ps(&p_a[i + 16]), _mm256_load_ps(&p_b[i + 16])));
+		acc3 = _mm256_add_ps(acc3, _mm256_mul_ps(_mm256_load_ps(&p_a[i + 24]), _mm256_load_ps(&p_b[i + 24])));
+	}
+
+	acc0 = _mm256_add_ps(acc0, acc1);
+	acc2 = _mm256_add_ps(acc2, acc3);
+	acc0 = _mm256_add_ps(acc0, acc2);
+
 	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&p_a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&p_a[i + 4]);
-
-		__m256d reg_b0 = _mm256_loadu_pd(&p_b[i]);
-		__m256d reg_b1 = _mm256_loadu_pd(&p_b[i + 4]);
-
-		__m256d mul0 = _mm256_mul_pd(reg_a0, reg_b0);
-		__m256d mul1 = _mm256_mul_pd(reg_a1, reg_b1);
-
-		acc0 = _mm256_add_pd(acc0, mul0);
-		acc1 = _mm256_add_pd(acc1, mul1);
+		acc0 = _mm256_add_ps(acc0, _mm256_mul_ps(_mm256_load_ps(&p_a[i]), _mm256_load_ps(&p_b[i])));
 	}
 
-	__m256d total_acc = _mm256_add_pd(acc0, acc1);
-
-	for (; i + 4 <= n; i += 4)
-	{
-		__m256d reg_a = _mm256_loadu_pd(&p_a[i]);
-		__m256d reg_b = _mm256_loadu_pd(&p_b[i]);
-		__m256d mul = _mm256_mul_pd(reg_a, reg_b);
-		total_acc = _mm256_add_pd(total_acc, mul);
-	}
-
-	double dot = sum_m256d(total_acc);
+	float dot = sum_m256(acc0);
 
 	for (; i < n; ++i)
 	{
@@ -1686,30 +1323,20 @@ double MathUtils::vector_dot(const double* __restrict a, const double* __restric
 /* Vector limiting functions */
 
 // Vectorizes the max of two vectors and writes the result into the provided vector -> c = max(a, b)
-void MathUtils::vector_max(const double* const __restrict a, const double* const __restrict b, double* const __restrict c, size_t n)
+void MathUtils::vector_max(const float* const __restrict a, const float* const __restrict b, float* const __restrict c, size_t n)
 {
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-		
-		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
-		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
-
-		__m256d max0 = _mm256_max_pd(reg_a0, reg_b0);
-		__m256d max1 = _mm256_max_pd(reg_a1, reg_b1);
-
-		_mm256_storeu_pd(&c[i], max0);
-		_mm256_storeu_pd(&c[i + 4], max1);
+		_mm256_store_ps(&c[i], _mm256_max_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&b[i])));
+		_mm256_store_ps(&c[i + 8], _mm256_max_ps(_mm256_load_ps(&a[i + 8]), _mm256_load_ps(&b[i + 8])));
+		_mm256_store_ps(&c[i + 16], _mm256_max_ps(_mm256_load_ps(&a[i + 16]), _mm256_load_ps(&b[i + 16])));
+		_mm256_store_ps(&c[i + 24], _mm256_max_ps(_mm256_load_ps(&a[i + 24]), _mm256_load_ps(&b[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d reg_b = _mm256_loadu_pd(&b[i]);
-		__m256d max = _mm256_max_pd(reg_a, reg_b);
-		_mm256_storeu_pd(&c[i], max);
+		_mm256_store_ps(&c[i], _mm256_max_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&b[i])));
 	}
 
 	for (; i < n; ++i)
@@ -1718,30 +1345,20 @@ void MathUtils::vector_max(const double* const __restrict a, const double* const
 	}
 }
 
-void MathUtils::vector_max(double* const __restrict a, const double* const __restrict b, size_t n)
+void MathUtils::vector_max(float* const __restrict a, const float* const __restrict b, size_t n)
 {
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
-		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
-
-		__m256d max0 = _mm256_max_pd(reg_a0, reg_b0);
-		__m256d max1 = _mm256_max_pd(reg_a1, reg_b1);
-
-		_mm256_storeu_pd(&a[i], max0);
-		_mm256_storeu_pd(&a[i + 4], max1);
+		_mm256_store_ps(&a[i], _mm256_max_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&b[i])));
+		_mm256_store_ps(&a[i + 8], _mm256_max_ps(_mm256_load_ps(&a[i + 8]), _mm256_load_ps(&b[i + 8])));
+		_mm256_store_ps(&a[i + 16], _mm256_max_ps(_mm256_load_ps(&a[i + 16]), _mm256_load_ps(&b[i + 16])));
+		_mm256_store_ps(&a[i + 24], _mm256_max_ps(_mm256_load_ps(&a[i + 24]), _mm256_load_ps(&b[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d reg_b = _mm256_loadu_pd(&b[i]);
-		__m256d max = _mm256_max_pd(reg_a, reg_b);
-		_mm256_storeu_pd(&a[i], max);
+		_mm256_store_ps(&a[i], _mm256_max_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&b[i])));
 	}
 
 	for (; i < n; ++i)
@@ -1750,28 +1367,22 @@ void MathUtils::vector_max(double* const __restrict a, const double* const __res
 	}
 }
 
-void MathUtils::vector_max(const double* const __restrict a, double b, double* const __restrict c, size_t n)
+void MathUtils::vector_max(const float* const __restrict a, float b, float* const __restrict c, size_t n)
 {
-	const __m256d reg_b = _mm256_set1_pd(b);
+	const __m256 reg_b = _mm256_set1_ps(b);
 
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d max0 = _mm256_max_pd(reg_a0, reg_b);
-		__m256d max1 = _mm256_max_pd(reg_a1, reg_b);
-
-		_mm256_storeu_pd(&c[i], max0);
-		_mm256_storeu_pd(&c[i + 4], max1);
+		_mm256_store_ps(&c[i], _mm256_max_ps(_mm256_load_ps(&a[i]), reg_b));
+		_mm256_store_ps(&c[i + 8], _mm256_max_ps(_mm256_load_ps(&a[i + 8]), reg_b));
+		_mm256_store_ps(&c[i + 16], _mm256_max_ps(_mm256_load_ps(&a[i + 16]), reg_b));
+		_mm256_store_ps(&c[i + 24], _mm256_max_ps(_mm256_load_ps(&a[i + 24]), reg_b));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d max = _mm256_max_pd(reg_a, reg_b);
-		_mm256_storeu_pd(&c[i], max);
+		_mm256_store_ps(&c[i], _mm256_max_ps(_mm256_load_ps(&a[i]), reg_b));
 	}
 
 	for (; i < n; ++i)
@@ -1780,28 +1391,22 @@ void MathUtils::vector_max(const double* const __restrict a, double b, double* c
 	}
 }
 
-void MathUtils::vector_max(double* const __restrict a, double b, size_t n)
+void MathUtils::vector_max(float* const __restrict a, float b, size_t n)
 {
-	const __m256d reg_b = _mm256_set1_pd(b);
+	const __m256 reg_b = _mm256_set1_ps(b);
 
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d max0 = _mm256_max_pd(reg_a0, reg_b);
-		__m256d max1 = _mm256_max_pd(reg_a1, reg_b);
-
-		_mm256_storeu_pd(&a[i], max0);
-		_mm256_storeu_pd(&a[i + 4], max1);
+		_mm256_store_ps(&a[i], _mm256_max_ps(_mm256_load_ps(&a[i]), reg_b));
+		_mm256_store_ps(&a[i + 8], _mm256_max_ps(_mm256_load_ps(&a[i + 8]), reg_b));
+		_mm256_store_ps(&a[i + 16], _mm256_max_ps(_mm256_load_ps(&a[i + 16]), reg_b));
+		_mm256_store_ps(&a[i + 24], _mm256_max_ps(_mm256_load_ps(&a[i + 24]), reg_b));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d max = _mm256_max_pd(reg_a, reg_b);
-		_mm256_storeu_pd(&a[i], max);
+		_mm256_store_ps(&a[i], _mm256_max_ps(_mm256_load_ps(&a[i]), reg_b));
 	}
 
 	for (; i < n; ++i)
@@ -1810,30 +1415,20 @@ void MathUtils::vector_max(double* const __restrict a, double b, size_t n)
 	}
 }
 
-void MathUtils::vector_min(const double* const __restrict a, const double* const __restrict b, double* const __restrict c, size_t n)
+void MathUtils::vector_min(const float* const __restrict a, const float* const __restrict b, float* const __restrict c, size_t n)
 {
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
-		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
-
-		__m256d min0 = _mm256_min_pd(reg_a0, reg_b0);
-		__m256d min1 = _mm256_min_pd(reg_a1, reg_b1);
-
-		_mm256_storeu_pd(&c[i], min0);
-		_mm256_storeu_pd(&c[i + 4], min1);
+		_mm256_store_ps(&c[i], _mm256_min_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&b[i])));
+		_mm256_store_ps(&c[i + 8], _mm256_min_ps(_mm256_load_ps(&a[i + 8]), _mm256_load_ps(&b[i + 8])));
+		_mm256_store_ps(&c[i + 16], _mm256_min_ps(_mm256_load_ps(&a[i + 16]), _mm256_load_ps(&b[i + 16])));
+		_mm256_store_ps(&c[i + 24], _mm256_min_ps(_mm256_load_ps(&a[i + 24]), _mm256_load_ps(&b[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d reg_b = _mm256_loadu_pd(&b[i]);
-		__m256d min = _mm256_min_pd(reg_a, reg_b);
-		_mm256_storeu_pd(&c[i], min);
+		_mm256_store_ps(&c[i], _mm256_min_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&b[i])));
 	}
 
 	for (; i < n; ++i)
@@ -1842,30 +1437,20 @@ void MathUtils::vector_min(const double* const __restrict a, const double* const
 	}
 }
 
-void MathUtils::vector_min(double* const __restrict a, const double* const __restrict b, size_t n)
+void MathUtils::vector_min(float* const __restrict a, const float* const __restrict b, size_t n)
 {
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d reg_b0 = _mm256_loadu_pd(&b[i]);
-		__m256d reg_b1 = _mm256_loadu_pd(&b[i + 4]);
-
-		__m256d min0 = _mm256_min_pd(reg_a0, reg_b0);
-		__m256d min1 = _mm256_min_pd(reg_a1, reg_b1);
-
-		_mm256_storeu_pd(&a[i], min0);
-		_mm256_storeu_pd(&a[i + 4], min1);
+		_mm256_store_ps(&a[i], _mm256_min_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&b[i])));
+		_mm256_store_ps(&a[i + 8], _mm256_min_ps(_mm256_load_ps(&a[i + 8]), _mm256_load_ps(&b[i + 8])));
+		_mm256_store_ps(&a[i + 16], _mm256_min_ps(_mm256_load_ps(&a[i + 16]), _mm256_load_ps(&b[i + 16])));
+		_mm256_store_ps(&a[i + 24], _mm256_min_ps(_mm256_load_ps(&a[i + 24]), _mm256_load_ps(&b[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d reg_b = _mm256_loadu_pd(&b[i]);
-		__m256d min = _mm256_min_pd(reg_a, reg_b);
-		_mm256_storeu_pd(&a[i], min);
+		_mm256_store_ps(&a[i], _mm256_min_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&b[i])));
 	}
 
 	for (; i < n; ++i)
@@ -1874,28 +1459,22 @@ void MathUtils::vector_min(double* const __restrict a, const double* const __res
 	}
 }
 
-void MathUtils::vector_min(const double* const __restrict a, double b, double* const __restrict c, size_t n)
+void MathUtils::vector_min(const float* const __restrict a, float b, float* const __restrict c, size_t n)
 {
-	const __m256d reg_b = _mm256_set1_pd(b);
+	const __m256 reg_b = _mm256_set1_ps(b);
 
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d min0 = _mm256_min_pd(reg_a0, reg_b);
-		__m256d min1 = _mm256_min_pd(reg_a1, reg_b);
-
-		_mm256_storeu_pd(&c[i], min0);
-		_mm256_storeu_pd(&c[i + 4], min1);
+		_mm256_store_ps(&c[i], _mm256_min_ps(_mm256_load_ps(&a[i]), reg_b));
+		_mm256_store_ps(&c[i + 8], _mm256_min_ps(_mm256_load_ps(&a[i + 8]), reg_b));
+		_mm256_store_ps(&c[i + 16], _mm256_min_ps(_mm256_load_ps(&a[i + 16]), reg_b));
+		_mm256_store_ps(&c[i + 24], _mm256_min_ps(_mm256_load_ps(&a[i + 24]), reg_b));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d min = _mm256_min_pd(reg_a, reg_b);
-		_mm256_storeu_pd(&c[i], min);
+		_mm256_store_ps(&c[i], _mm256_min_ps(_mm256_load_ps(&a[i]), reg_b));
 	}
 
 	for (; i < n; ++i)
@@ -1904,28 +1483,22 @@ void MathUtils::vector_min(const double* const __restrict a, double b, double* c
 	}
 }
 
-void MathUtils::vector_min(double* const __restrict a, double b, size_t n)
+void MathUtils::vector_min(float* const __restrict a, float b, size_t n)
 {
-	const __m256d reg_b = _mm256_set1_pd(b);
+	const __m256 reg_b = _mm256_set1_ps(b);
 
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d min0 = _mm256_min_pd(reg_a0, reg_b);
-		__m256d min1 = _mm256_min_pd(reg_a1, reg_b);
-
-		_mm256_storeu_pd(&a[i], min0);
-		_mm256_storeu_pd(&a[i + 4], min1);
+		_mm256_store_ps(&a[i], _mm256_min_ps(_mm256_load_ps(&a[i]), reg_b));
+		_mm256_store_ps(&a[i + 8], _mm256_min_ps(_mm256_load_ps(&a[i + 8]), reg_b));
+		_mm256_store_ps(&a[i + 16], _mm256_min_ps(_mm256_load_ps(&a[i + 16]), reg_b));
+		_mm256_store_ps(&a[i + 24], _mm256_min_ps(_mm256_load_ps(&a[i + 24]), reg_b));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d min = _mm256_min_pd(reg_a, reg_b);
-		_mm256_storeu_pd(&a[i], min);
+		_mm256_store_ps(&a[i], _mm256_min_ps(_mm256_load_ps(&a[i]), reg_b));
 	}
 
 	for (; i < n; ++i)
@@ -1934,35 +1507,21 @@ void MathUtils::vector_min(double* const __restrict a, double b, size_t n)
 	}
 }
 
-void MathUtils::vector_clamp(const double* const __restrict a, const double* const __restrict min, const double* const __restrict max,
-	double* const __restrict r, size_t n)
+void MathUtils::vector_clamp(const float* const __restrict a, const float* const __restrict min, const float* const __restrict max,
+	float* const __restrict r, size_t n)
 {
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d reg_min0 = _mm256_loadu_pd(&min[i]);
-		__m256d reg_min1 = _mm256_loadu_pd(&min[i + 4]);
-
-		__m256d reg_max0 = _mm256_loadu_pd(&max[i]);
-		__m256d reg_max1 = _mm256_loadu_pd(&max[i + 4]);
-
-		__m256d clamp0 = _mm256_max_pd(_mm256_min_pd(reg_a0, reg_max0), reg_min0);
-		__m256d clamp1 = _mm256_max_pd(_mm256_min_pd(reg_a1, reg_max1), reg_min1);
-
-		_mm256_storeu_pd(&r[i], clamp0);
-		_mm256_storeu_pd(&r[i + 4], clamp1);
+		_mm256_store_ps(&r[i], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&max[i])), _mm256_load_ps(&min[i])));
+		_mm256_store_ps(&r[i + 8], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i + 8]), _mm256_load_ps(&max[i + 8])), _mm256_load_ps(&min[i + 8])));
+		_mm256_store_ps(&r[i + 16], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i + 16]), _mm256_load_ps(&max[i + 16])), _mm256_load_ps(&min[i + 16])));
+		_mm256_store_ps(&r[i + 24], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i + 24]), _mm256_load_ps(&max[i + 24])), _mm256_load_ps(&min[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d reg_min = _mm256_loadu_pd(&min[i]);
-		__m256d reg_max = _mm256_loadu_pd(&max[i]);
-		__m256d clamp = _mm256_max_pd(_mm256_min_pd(reg_a, reg_max), reg_min);
-		_mm256_storeu_pd(&r[i], clamp);
+		_mm256_store_ps(&r[i], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&max[i])), _mm256_load_ps(&min[i])));
 	}
 
 	for (; i < n; ++i)
@@ -1971,34 +1530,20 @@ void MathUtils::vector_clamp(const double* const __restrict a, const double* con
 	}
 }
 
-void MathUtils::vector_clamp(double* const __restrict a, const double* const __restrict min, const double* const __restrict max, size_t n)
+void MathUtils::vector_clamp(float* const __restrict a, const float* const __restrict min, const float* const __restrict max, size_t n)
 {
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d reg_min0 = _mm256_loadu_pd(&min[i]);
-		__m256d reg_min1 = _mm256_loadu_pd(&min[i + 4]);
-
-		__m256d reg_max0 = _mm256_loadu_pd(&max[i]);
-		__m256d reg_max1 = _mm256_loadu_pd(&max[i + 4]);
-
-		__m256d clamp0 = _mm256_max_pd(_mm256_min_pd(reg_a0, reg_max0), reg_min0);
-		__m256d clamp1 = _mm256_max_pd(_mm256_min_pd(reg_a1, reg_max1), reg_min1);
-
-		_mm256_storeu_pd(&a[i], clamp0);
-		_mm256_storeu_pd(&a[i + 4], clamp1);
+		_mm256_store_ps(&a[i], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&max[i])), _mm256_load_ps(&min[i])));
+		_mm256_store_ps(&a[i + 8], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i + 8]), _mm256_load_ps(&max[i + 8])), _mm256_load_ps(&min[i + 8])));
+		_mm256_store_ps(&a[i + 16], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i + 16]), _mm256_load_ps(&max[i + 16])), _mm256_load_ps(&min[i + 16])));
+		_mm256_store_ps(&a[i + 24], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i + 24]), _mm256_load_ps(&max[i + 24])), _mm256_load_ps(&min[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d reg_min = _mm256_loadu_pd(&min[i]);
-		__m256d reg_max = _mm256_loadu_pd(&max[i]);
-		__m256d clamp = _mm256_max_pd(_mm256_min_pd(reg_a, reg_max), reg_min);
-		_mm256_storeu_pd(&a[i], clamp);
+		_mm256_store_ps(&a[i], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&max[i])), _mm256_load_ps(&min[i])));
 	}
 
 	for (; i < n; ++i)
@@ -2007,33 +1552,23 @@ void MathUtils::vector_clamp(double* const __restrict a, const double* const __r
 	}
 }
 
-void MathUtils::vector_clamp(const double* const __restrict a, double min, const double* const __restrict max,
-	double* const __restrict r, size_t n)
+void MathUtils::vector_clamp(const float* const __restrict a, float min, const float* const __restrict max,
+	float* const __restrict r, size_t n)
 {
-	const __m256d reg_min = _mm256_set1_pd(min);
+	const __m256 reg_min = _mm256_set1_ps(min);
 
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d reg_max0 = _mm256_loadu_pd(&max[i]);
-		__m256d reg_max1 = _mm256_loadu_pd(&max[i + 4]);
-
-		__m256d clamp0 = _mm256_max_pd(_mm256_min_pd(reg_a0, reg_max0), reg_min);
-		__m256d clamp1 = _mm256_max_pd(_mm256_min_pd(reg_a1, reg_max1), reg_min);
-
-		_mm256_storeu_pd(&r[i], clamp0);
-		_mm256_storeu_pd(&r[i + 4], clamp1);
+		_mm256_store_ps(&r[i], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&max[i])), reg_min));
+		_mm256_store_ps(&r[i + 8], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i + 8]), _mm256_load_ps(&max[i + 8])), reg_min));
+		_mm256_store_ps(&r[i + 16], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i + 16]), _mm256_load_ps(&max[i + 16])), reg_min));
+		_mm256_store_ps(&r[i + 24], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i + 24]), _mm256_load_ps(&max[i + 24])), reg_min));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d reg_max = _mm256_loadu_pd(&max[i]);
-		__m256d clamp = _mm256_max_pd(_mm256_min_pd(reg_a, reg_max), reg_min);
-		_mm256_storeu_pd(&r[i], clamp);
+		_mm256_store_ps(&r[i], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&max[i])), reg_min));
 	}
 
 	for (; i < n; ++i)
@@ -2042,32 +1577,22 @@ void MathUtils::vector_clamp(const double* const __restrict a, double min, const
 	}
 }
 
-void MathUtils::vector_clamp(double* const __restrict a, double min, const double* const __restrict max, size_t n)
+void MathUtils::vector_clamp(float* const __restrict a, float min, const float* const __restrict max, size_t n)
 {
-	const __m256d reg_min = _mm256_set1_pd(min);
+	const __m256 reg_min = _mm256_set1_ps(min);
 
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d reg_max0 = _mm256_loadu_pd(&max[i]);
-		__m256d reg_max1 = _mm256_loadu_pd(&max[i + 4]);
-
-		__m256d clamp0 = _mm256_max_pd(_mm256_min_pd(reg_a0, reg_max0), reg_min);
-		__m256d clamp1 = _mm256_max_pd(_mm256_min_pd(reg_a1, reg_max1), reg_min);
-
-		_mm256_storeu_pd(&a[i], clamp0);
-		_mm256_storeu_pd(&a[i + 4], clamp1);
+		_mm256_store_ps(&a[i], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&max[i])), reg_min));
+		_mm256_store_ps(&a[i + 8], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i + 8]), _mm256_load_ps(&max[i + 8])), reg_min));
+		_mm256_store_ps(&a[i + 16], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i + 16]), _mm256_load_ps(&max[i + 16])), reg_min));
+		_mm256_store_ps(&a[i + 24], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i + 24]), _mm256_load_ps(&max[i + 24])), reg_min));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d reg_max = _mm256_loadu_pd(&max[i]);
-		__m256d clamp = _mm256_max_pd(_mm256_min_pd(reg_a, reg_max), reg_min);
-		_mm256_storeu_pd(&a[i], clamp);
+		_mm256_store_ps(&a[i], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i]), _mm256_load_ps(&max[i])), reg_min));
 	}
 
 	for (; i < n; ++i)
@@ -2076,33 +1601,23 @@ void MathUtils::vector_clamp(double* const __restrict a, double min, const doubl
 	}
 }
 
-void MathUtils::vector_clamp(const double* const __restrict a, const double* const __restrict min, double max,
-	double* const __restrict r, size_t n)
+void MathUtils::vector_clamp(const float* const __restrict a, const float* const __restrict min, float max,
+	float* const __restrict r, size_t n)
 {
-	const __m256d reg_max = _mm256_set1_pd(max);
+	const __m256 reg_max = _mm256_set1_ps(max);
 
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d reg_min0 = _mm256_loadu_pd(&min[i]);
-		__m256d reg_min1 = _mm256_loadu_pd(&min[i + 4]);
-
-		__m256d clamp0 = _mm256_max_pd(_mm256_min_pd(reg_a0, reg_max), reg_min0);
-		__m256d clamp1 = _mm256_max_pd(_mm256_min_pd(reg_a1, reg_max), reg_min1);
-
-		_mm256_storeu_pd(&r[i], clamp0);
-		_mm256_storeu_pd(&r[i + 4], clamp1);
+		_mm256_store_ps(&r[i], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i]), reg_max), _mm256_load_ps(&min[i])));
+		_mm256_store_ps(&r[i + 8], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i + 8]), reg_max), _mm256_load_ps(&min[i + 8])));
+		_mm256_store_ps(&r[i + 16], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i + 16]), reg_max), _mm256_load_ps(&min[i + 16])));
+		_mm256_store_ps(&r[i + 24], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i + 24]), reg_max), _mm256_load_ps(&min[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d reg_min = _mm256_loadu_pd(&min[i]);
-		__m256d clamp = _mm256_max_pd(_mm256_min_pd(reg_a, reg_max), reg_min);
-		_mm256_storeu_pd(&r[i], clamp);
+		_mm256_store_ps(&r[i], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i]), reg_max), _mm256_load_ps(&min[i])));
 	}
 
 	for (; i < n; ++i)
@@ -2111,32 +1626,22 @@ void MathUtils::vector_clamp(const double* const __restrict a, const double* con
 	}
 }
 
-void MathUtils::vector_clamp(double* const __restrict a, const double* const __restrict min, double max, size_t n)
+void MathUtils::vector_clamp(float* const __restrict a, const float* const __restrict min, float max, size_t n)
 {
-	const __m256d reg_max = _mm256_set1_pd(max);
+	const __m256 reg_max = _mm256_set1_ps(max);
 
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d reg_min0 = _mm256_loadu_pd(&min[i]);
-		__m256d reg_min1 = _mm256_loadu_pd(&min[i + 4]);
-
-		__m256d clamp0 = _mm256_max_pd(_mm256_min_pd(reg_a0, reg_max), reg_min0);
-		__m256d clamp1 = _mm256_max_pd(_mm256_min_pd(reg_a1, reg_max), reg_min1);
-
-		_mm256_storeu_pd(&a[i], clamp0);
-		_mm256_storeu_pd(&a[i + 4], clamp1);
+		_mm256_store_ps(&a[i], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i]), reg_max), _mm256_load_ps(&min[i])));
+		_mm256_store_ps(&a[i + 8], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i + 8]), reg_max), _mm256_load_ps(&min[i + 8])));
+		_mm256_store_ps(&a[i + 16], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i + 16]), reg_max), _mm256_load_ps(&min[i + 16])));
+		_mm256_store_ps(&a[i + 24], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i + 24]), reg_max), _mm256_load_ps(&min[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d reg_min = _mm256_loadu_pd(&min[i]);
-		__m256d clamp = _mm256_max_pd(_mm256_min_pd(reg_a, reg_max), reg_min);
-		_mm256_storeu_pd(&a[i], clamp);
+		_mm256_store_ps(&a[i], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i]), reg_max), _mm256_load_ps(&min[i])));
 	}
 
 	for (; i < n; ++i)
@@ -2145,29 +1650,23 @@ void MathUtils::vector_clamp(double* const __restrict a, const double* const __r
 	}
 }
 
-void MathUtils::vector_clamp(const double* const __restrict a, double min, double max, double* const __restrict r, size_t n)
+void MathUtils::vector_clamp(const float* const __restrict a, float min, float max, float* const __restrict r, size_t n)
 {
-	const __m256d reg_min = _mm256_set1_pd(min);
-	const __m256d reg_max = _mm256_set1_pd(max);
+	const __m256 reg_min = _mm256_set1_ps(min);
+	const __m256 reg_max = _mm256_set1_ps(max);
 
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d clamp0 = _mm256_max_pd(_mm256_min_pd(reg_a0, reg_max), reg_min);
-		__m256d clamp1 = _mm256_max_pd(_mm256_min_pd(reg_a1, reg_max), reg_min);
-
-		_mm256_storeu_pd(&r[i], clamp0);
-		_mm256_storeu_pd(&r[i + 4], clamp1);
+		_mm256_store_ps(&r[i], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i]), reg_max), reg_min));
+		_mm256_store_ps(&r[i + 8], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i + 8]), reg_max), reg_min));
+		_mm256_store_ps(&r[i + 16], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i + 16]), reg_max), reg_min));
+		_mm256_store_ps(&r[i + 24], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i + 24]), reg_max), reg_min));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d clamp = _mm256_max_pd(_mm256_min_pd(reg_a, reg_max), reg_min);
-		_mm256_storeu_pd(&r[i], clamp);
+		_mm256_store_ps(&r[i], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i]), reg_max), reg_min));
 	}
 
 	for (; i < n; ++i)
@@ -2176,29 +1675,23 @@ void MathUtils::vector_clamp(const double* const __restrict a, double min, doubl
 	}
 }
 
-void MathUtils::vector_clamp(double* const __restrict a, double min, double max, size_t n)
+void MathUtils::vector_clamp(float* const __restrict a, float min, float max, size_t n)
 {
-	const __m256d reg_min = _mm256_set1_pd(min);
-	const __m256d reg_max = _mm256_set1_pd(max);
+	const __m256 reg_min = _mm256_set1_ps(min);
+	const __m256 reg_max = _mm256_set1_ps(max);
 
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d clamp0 = _mm256_max_pd(_mm256_min_pd(reg_a0, reg_max), reg_min);
-		__m256d clamp1 = _mm256_max_pd(_mm256_min_pd(reg_a1, reg_max), reg_min);
-
-		_mm256_storeu_pd(&a[i], clamp0);
-		_mm256_storeu_pd(&a[i + 4], clamp1);
+		_mm256_store_ps(&a[i], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i]), reg_max), reg_min));
+		_mm256_store_ps(&a[i + 8], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i + 8]), reg_max), reg_min));
+		_mm256_store_ps(&a[i + 16], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i + 16]), reg_max), reg_min));
+		_mm256_store_ps(&a[i + 24], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i + 24]), reg_max), reg_min));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d clamp = _mm256_max_pd(_mm256_min_pd(reg_a, reg_max), reg_min);
-		_mm256_storeu_pd(&a[i], clamp);
+		_mm256_store_ps(&a[i], _mm256_max_ps(_mm256_min_ps(_mm256_load_ps(&a[i]), reg_max), reg_min));
 	}
 
 	for (; i < n; ++i)
@@ -2210,112 +1703,70 @@ void MathUtils::vector_clamp(double* const __restrict a, double min, double max,
 /* Vector activation functions */
 
 // Vectorizes the sigmoid function applied to a vector and writes the result into the provided vector -> r = sigmoid(a)
-void MathUtils::vector_sigmoid(const double* const __restrict a, double* const __restrict r, size_t n)
+void MathUtils::vector_sigmoid(const float* const __restrict a, float* const __restrict r, size_t n)
 {
-	const __m256d neg_mask = _mm256_set1_pd(-0.0);
-	const __m256d reg_one = _mm256_set1_pd(1.0);
+	const __m256 neg_mask = _mm256_set1_ps(-0.0f);
+	const __m256 reg_one = _mm256_set1_ps(1.0f);
 
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d neg0 = _mm256_xor_pd(reg_a0, neg_mask);
-		__m256d neg1 = _mm256_xor_pd(reg_a1, neg_mask);
-
-		__m256d exp0 = _mm256_exp_pd(neg0);
-		__m256d exp1 = _mm256_exp_pd(neg1);
-
-		__m256d denom0 = _mm256_add_pd(exp0, reg_one);
-		__m256d denom1 = _mm256_add_pd(exp1, reg_one);
-
-		__m256d sig0 = _mm256_div_pd(reg_one, denom0);
-		__m256d sig1 = _mm256_div_pd(reg_one, denom1);
-
-		_mm256_storeu_pd(&r[i], sig0);
-		_mm256_storeu_pd(&r[i + 4], sig1);
+		_mm256_store_ps(&r[i], _mm256_div_ps(reg_one, _mm256_add_ps(_mm256_exp_ps(_mm256_xor_ps(_mm256_load_ps(&a[i]), neg_mask)), reg_one)));
+		_mm256_store_ps(&r[i + 8], _mm256_div_ps(reg_one, _mm256_add_ps(_mm256_exp_ps(_mm256_xor_ps(_mm256_load_ps(&a[i + 8]), neg_mask)), reg_one)));
+		_mm256_store_ps(&r[i + 16], _mm256_div_ps(reg_one, _mm256_add_ps(_mm256_exp_ps(_mm256_xor_ps(_mm256_load_ps(&a[i + 16]), neg_mask)), reg_one)));
+		_mm256_store_ps(&r[i + 24], _mm256_div_ps(reg_one, _mm256_add_ps(_mm256_exp_ps(_mm256_xor_ps(_mm256_load_ps(&a[i + 24]), neg_mask)), reg_one)));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d neg = _mm256_xor_pd(reg_a, neg_mask);
-		__m256d exp = _mm256_exp_pd(neg);
-		__m256d denom = _mm256_add_pd(exp, reg_one);
-		__m256d sig = _mm256_div_pd(reg_one, denom);
-		_mm256_storeu_pd(&r[i], sig);
+		_mm256_store_ps(&r[i], _mm256_div_ps(reg_one, _mm256_add_ps(_mm256_exp_ps(_mm256_xor_ps(_mm256_load_ps(&a[i]), neg_mask)), reg_one)));
 	}
 
 	for (; i < n; ++i)
 	{
-		r[i] = 1.0 / (1.0 + std::exp(-a[i]));
+		r[i] = 1.0f / (1.0f + std::exp(-a[i]));
 	}
 }
 
-void MathUtils::vector_sigmoid(double* const __restrict a, size_t n)
+void MathUtils::vector_sigmoid(float* const __restrict a, size_t n)
 {
-	const __m256d neg_mask = _mm256_set1_pd(-0.0);
-	const __m256d reg_one = _mm256_set1_pd(1.0);
+	const __m256 neg_mask = _mm256_set1_ps(-0.0f);
+	const __m256 reg_one = _mm256_set1_ps(1.0f);
 
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d neg0 = _mm256_xor_pd(reg_a0, neg_mask);
-		__m256d neg1 = _mm256_xor_pd(reg_a1, neg_mask);
-
-		__m256d exp0 = _mm256_exp_pd(neg0);
-		__m256d exp1 = _mm256_exp_pd(neg1);
-
-		__m256d denom0 = _mm256_add_pd(exp0, reg_one);
-		__m256d denom1 = _mm256_add_pd(exp1, reg_one);
-
-		__m256d sig0 = _mm256_div_pd(reg_one, denom0);
-		__m256d sig1 = _mm256_div_pd(reg_one, denom1);
-
-		_mm256_storeu_pd(&a[i], sig0);
-		_mm256_storeu_pd(&a[i + 4], sig1);
+		_mm256_store_ps(&a[i], _mm256_div_ps(reg_one, _mm256_add_ps(_mm256_exp_ps(_mm256_xor_ps(_mm256_load_ps(&a[i]), neg_mask)), reg_one)));
+		_mm256_store_ps(&a[i + 8], _mm256_div_ps(reg_one, _mm256_add_ps(_mm256_exp_ps(_mm256_xor_ps(_mm256_load_ps(&a[i + 8]), neg_mask)), reg_one)));
+		_mm256_store_ps(&a[i + 16], _mm256_div_ps(reg_one, _mm256_add_ps(_mm256_exp_ps(_mm256_xor_ps(_mm256_load_ps(&a[i + 16]), neg_mask)), reg_one)));
+		_mm256_store_ps(&a[i + 24], _mm256_div_ps(reg_one, _mm256_add_ps(_mm256_exp_ps(_mm256_xor_ps(_mm256_load_ps(&a[i + 24]), neg_mask)), reg_one)));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d neg = _mm256_xor_pd(reg_a, neg_mask);
-		__m256d exp = _mm256_exp_pd(neg);
-		__m256d denom = _mm256_add_pd(exp, reg_one);
-		__m256d sig = _mm256_div_pd(reg_one, denom);
-		_mm256_storeu_pd(&a[i], sig);
+		_mm256_store_ps(&a[i], _mm256_div_ps(reg_one, _mm256_add_ps(_mm256_exp_ps(_mm256_xor_ps(_mm256_load_ps(&a[i]), neg_mask)), reg_one)));
 	}
 
 	for (; i < n; ++i)
 	{
-		a[i] = 1.0 / (1.0 + std::exp(-a[i]));
+		a[i] = 1.0f / (1.0f + std::exp(-a[i]));
 	}
 }
 
-void MathUtils::vector_tanh(const double* const __restrict a, double* const __restrict r, size_t n)
+void MathUtils::vector_tanh(const float* const __restrict a, float* const __restrict r, size_t n)
 {
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d tanh0 = _mm256_tanh_pd(reg_a0);
-		__m256d tanh1 = _mm256_tanh_pd(reg_a1);
-
-		_mm256_storeu_pd(&r[i], tanh0);
-		_mm256_storeu_pd(&r[i + 4], tanh1);
+		_mm256_store_ps(&r[i], _mm256_tanh_ps(_mm256_load_ps(&a[i])));
+		_mm256_store_ps(&r[i + 8], _mm256_tanh_ps(_mm256_load_ps(&a[i + 8])));
+		_mm256_store_ps(&r[i + 16], _mm256_tanh_ps(_mm256_load_ps(&a[i + 16])));
+		_mm256_store_ps(&r[i + 24], _mm256_tanh_ps(_mm256_load_ps(&a[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d tanh = _mm256_tanh_pd(reg_a);
-		_mm256_storeu_pd(&r[i], tanh);
+		_mm256_store_ps(&r[i], _mm256_tanh_ps(_mm256_load_ps(&a[i])));
 	}
 
 	for (; i < n; ++i)
@@ -2324,26 +1775,20 @@ void MathUtils::vector_tanh(const double* const __restrict a, double* const __re
 	}
 }
 
-void MathUtils::vector_tanh(double* const __restrict a, size_t n)
+void MathUtils::vector_tanh(float* const __restrict a, size_t n)
 {
 	size_t i = 0;
-	for (; i + 8 <= n; i += 8)
+	for (; i + 32 <= n; i += 32)
 	{
-		__m256d reg_a0 = _mm256_loadu_pd(&a[i]);
-		__m256d reg_a1 = _mm256_loadu_pd(&a[i + 4]);
-
-		__m256d tanh0 = _mm256_tanh_pd(reg_a0);
-		__m256d tanh1 = _mm256_tanh_pd(reg_a1);
-
-		_mm256_storeu_pd(&a[i], tanh0);
-		_mm256_storeu_pd(&a[i + 4], tanh1);
+		_mm256_store_ps(&a[i], _mm256_tanh_ps(_mm256_load_ps(&a[i])));
+		_mm256_store_ps(&a[i + 8], _mm256_tanh_ps(_mm256_load_ps(&a[i + 8])));
+		_mm256_store_ps(&a[i + 16], _mm256_tanh_ps(_mm256_load_ps(&a[i + 16])));
+		_mm256_store_ps(&a[i + 24], _mm256_tanh_ps(_mm256_load_ps(&a[i + 24])));
 	}
 
-	for (; i + 4 <= n; i += 4)
+	for (; i + 8 <= n; i += 8)
 	{
-		__m256d reg_a = _mm256_loadu_pd(&a[i]);
-		__m256d tanh = _mm256_tanh_pd(reg_a);
-		_mm256_storeu_pd(&a[i], tanh);
+		_mm256_store_ps(&a[i], _mm256_tanh_ps(_mm256_load_ps(&a[i])));
 	}
 
 	for (; i < n; ++i)
@@ -2355,7 +1800,7 @@ void MathUtils::vector_tanh(double* const __restrict a, size_t n)
 /* Matrix operations */
 
 // Computes the matrix multiplication of two vectors and writes the result into the provided vector -> r = a @ b_t
-void MathUtils::matmul_raw(const double* __restrict a, const double* __restrict b_t, double* __restrict r, size_t batch_count,
+void MathUtils::matmul_raw(const float* __restrict a, const float* __restrict b_t, float* __restrict r, size_t batch_count,
 	size_t m, size_t n, size_t p, size_t a_batch_stride, size_t b_t_batch_stride, size_t r_batch_stride, size_t a_off,
 	size_t b_t_off, size_t r_off, bool use_parallel, bool accumulate)
 {
@@ -2371,7 +1816,7 @@ void MathUtils::matmul_raw(const double* __restrict a, const double* __restrict 
 
 			for (size_t j = 0; j < p; ++j)
 			{
-				const double val = vector_dot(a, b_t, a_base, b_t_batch_off + j * n, n);
+				const float val = vector_dot(a, b_t, a_base, b_t_batch_off + j * n, n);
 				if (accumulate) r[r_base + j] += val;
 				else r[r_base + j] = val;
 			}
@@ -2379,7 +1824,7 @@ void MathUtils::matmul_raw(const double* __restrict a, const double* __restrict 
 	}
 }
 
-void MathUtils::matmul_reduce_raw(const double* __restrict a_t, const double* __restrict b_t, double* __restrict r, size_t batch_count,
+void MathUtils::matmul_reduce_raw(const float* __restrict a_t, const float* __restrict b_t, float* __restrict r, size_t batch_count,
 	size_t m, size_t n, size_t p, size_t a_t_batch_stride, size_t b_t_batch_stride, size_t a_t_off, size_t b_t_off, size_t r_off,
 	bool use_parallel, bool accumulate)
 {
@@ -2390,7 +1835,7 @@ void MathUtils::matmul_reduce_raw(const double* __restrict a_t, const double* __
 		const size_t r_off_base = r_off + i * p;
 		for (size_t j = 0; j < p; ++j)
 		{
-			double sum = 0.0;
+			float sum = 0.0;
 
 			const size_t b_t_off_base = b_t_off + j * n;
 			for (size_t batch = 0; batch < batch_count; ++batch)
@@ -2405,7 +1850,7 @@ void MathUtils::matmul_reduce_raw(const double* __restrict a_t, const double* __
 	}
 }
 
-void MathUtils::transpose_matrix(const double* __restrict src, double* __restrict dst, size_t src_off, size_t dst_off,
+void MathUtils::transpose_matrix(const float* __restrict src, float* __restrict dst, size_t src_off, size_t dst_off,
 	size_t rows, size_t cols)
 {
 	for (size_t r = 0; r < rows; ++r)
@@ -2428,7 +1873,7 @@ size_t MathUtils::compute_output_position(size_t b, size_t op, const ConvGeometr
 	return offset;
 }
 
-void MathUtils::im2col(const double* __restrict input, const ConvGeometry& g, double* __restrict input_col, bool use_parallel)
+void MathUtils::im2col(const float* __restrict input, const ConvGeometry& g, float* __restrict input_col, bool use_parallel)
 {
 	#pragma omp parallel for if(use_parallel)
 	for (size_t b = 0; b < g.batches; ++b)
@@ -2448,7 +1893,7 @@ void MathUtils::im2col(const double* __restrict input, const ConvGeometry& g, do
 	}
 }
 
-void MathUtils::col2im(const double* __restrict d_input_col, const ConvGeometry& g, double* __restrict d_input, bool use_parallel)
+void MathUtils::col2im(const float* __restrict d_input_col, const ConvGeometry& g, float* __restrict d_input, bool use_parallel)
 {
 	#pragma omp parallel for if(use_parallel)
 	for (int b = 0; b < g.batches; ++b)
@@ -2468,7 +1913,7 @@ void MathUtils::col2im(const double* __restrict d_input_col, const ConvGeometry&
 	}
 }
 
-void MathUtils::kernels2matmul(const double* __restrict kernels, const ConvGeometry& g, double* __restrict kernels_mat)
+void MathUtils::kernels2matmul(const float* __restrict kernels, const ConvGeometry& g, float* __restrict kernels_mat)
 {
 	for (size_t f = 0; f < g.filter_count; ++f)
 	{
@@ -2481,7 +1926,7 @@ void MathUtils::kernels2matmul(const double* __restrict kernels, const ConvGeome
 	}
 }
 
-void MathUtils::matmul2kernels(const double* __restrict kernels_mat, const ConvGeometry& g, double* __restrict kernels, bool accumulate)
+void MathUtils::matmul2kernels(const float* __restrict kernels_mat, const ConvGeometry& g, float* __restrict kernels, bool accumulate)
 {
 	for (size_t f = 0; f < g.filter_count; ++f)
 	{

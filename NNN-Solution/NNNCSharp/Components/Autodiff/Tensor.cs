@@ -58,7 +58,7 @@ namespace NNNCSharp.Components.Autodiff
         /// <param name="value">Scalar value to fill the new tensor with.</param>
         /// <param name="dims">Dimensions of the new tensor.</param>
         /// <param name="requiresGrad">requiresGrad flag of the new tensor.</param>
-        public Tensor(double value, int[] dims, bool requiresGrad = false)
+        public Tensor(float value, int[] dims, bool requiresGrad = false)
         {
             IntPtr rawHandle = NativeMethods.tensor_create_scalar(value, dims, dims.Length, requiresGrad);
             _handle = new(rawHandle);
@@ -71,7 +71,7 @@ namespace NNNCSharp.Components.Autodiff
         /// <param name="dims">Dimensions of the new tensor.</param>
         /// <param name="requiresGrad">requiresGrad flag of the new tensor.</param>
         /// <returns>New scalar tensor instance.</returns>
-        public static Tensor Scalar(double value, int[] dims, bool requiresGrad = false)
+        public static Tensor Scalar(float value, int[] dims, bool requiresGrad = false)
         {
             return new(value, dims, requiresGrad);
         }
@@ -174,24 +174,24 @@ namespace NNNCSharp.Components.Autodiff
         /// <summary>
         /// Data contained in the tensor.
         /// </summary>
-        public unsafe Span<double> Data
+        public unsafe Span<float> Data
         {
             get
             {
                 IntPtr dataPtr = NativeMethods.tensor_data_ptr(Handle);
-                return new Span<double>((void*)dataPtr, ElementCount);
+                return new Span<float>((void*)dataPtr, ElementCount);
             }
         }
 
         /// <summary>
         /// Gradients contained in the tensor.
         /// </summary>
-        public unsafe Span<double> Grad
+        public unsafe Span<float> Grad
         {
             get
             {
                 IntPtr gradPtr = NativeMethods.tensor_grad_ptr(Handle);
-                return new Span<double>((void*)gradPtr, GradCount);
+                return new Span<float>((void*)gradPtr, GradCount);
             }
         }
 
@@ -200,7 +200,7 @@ namespace NNNCSharp.Components.Autodiff
         /// </summary>
         /// <param name="index">Linear index to access.</param>
         /// <returns>Value at the given linear index.</returns>
-        public double this[int index]
+        public float this[int index]
         {
             get => NativeMethods.tensor_get_at(Handle, index);
             set => NativeMethods.tensor_set_at(Handle, value, index);
@@ -211,7 +211,7 @@ namespace NNNCSharp.Components.Autodiff
         /// </summary>
         /// <param name="indices">Indices to access.</param>
         /// <returns>Value at the given indices.</returns>
-        public double this[params int[] indices]
+        public float this[params int[] indices]
         {
             get => NativeMethods.tensor_get_at_spatial(Handle, indices, indices.Length);
             set => NativeMethods.tensor_set_at_spatial(Handle, value, indices, indices.Length);
@@ -318,7 +318,7 @@ namespace NNNCSharp.Components.Autodiff
         /// <param name="a">Tensor to add.</param>
         /// <param name="b">Scalar to add.</param>
         /// <returns>Result tensor.</returns>
-        public static Tensor operator +(Tensor a, double b)
+        public static Tensor operator +(Tensor a, float b)
         {
             IntPtr h = NativeMethods.tensor_add_scalar(a.Handle, b);
             GC.KeepAlive(a);
@@ -331,7 +331,7 @@ namespace NNNCSharp.Components.Autodiff
         /// <param name="a">Scalar to add.</param>
         /// <param name="b">Tensor to add.</param>
         /// <returns>Result tensor.</returns>
-        public static Tensor operator +(double a, Tensor b)
+        public static Tensor operator +(float a, Tensor b)
         {
             IntPtr h = NativeMethods.tensor_add_scalar(b.Handle, a); // commutative operation - a + b = b + a
             GC.KeepAlive(b);
@@ -358,7 +358,7 @@ namespace NNNCSharp.Components.Autodiff
         /// <param name="a">Tensor to subtract from.</param>
         /// <param name="b">Scalar to subtract.</param>
         /// <returns>Result tensor.</returns>
-        public static Tensor operator -(Tensor a, double b)
+        public static Tensor operator -(Tensor a, float b)
         {
             IntPtr h = NativeMethods.tensor_sub_scalar(a.Handle, b);
             GC.KeepAlive(a);
@@ -371,7 +371,7 @@ namespace NNNCSharp.Components.Autodiff
         /// <param name="a">Scalar to subtract from.</param>
         /// <param name="b">Tensor to subtract.</param>
         /// <returns>Result tensor.</returns>
-        public static Tensor operator -(double a, Tensor b)
+        public static Tensor operator -(float a, Tensor b)
         {
             IntPtr h = NativeMethods.tensor_sub_scalar_left(a, b.Handle);
             GC.KeepAlive(b);
@@ -398,7 +398,7 @@ namespace NNNCSharp.Components.Autodiff
         /// <param name="a">Tensor to multiply.</param>
         /// <param name="b">Scalar to multiply.</param>
         /// <returns>Result tensor.</returns>
-        public static Tensor operator *(Tensor a, double b)
+        public static Tensor operator *(Tensor a, float b)
         {
             IntPtr h = NativeMethods.tensor_mul_scalar(a.Handle, b);
             GC.KeepAlive(a);
@@ -411,7 +411,7 @@ namespace NNNCSharp.Components.Autodiff
         /// <param name="a">Scalar to multiply.</param>
         /// <param name="b">Tensor to multiply.</param>
         /// <returns>Result tensor.</returns>
-        public static Tensor operator *(double a, Tensor b)
+        public static Tensor operator *(float a, Tensor b)
         {
             IntPtr h = NativeMethods.tensor_mul_scalar(b.Handle, a); // commutative operation - a * b = b * a
             GC.KeepAlive(b);
@@ -438,7 +438,7 @@ namespace NNNCSharp.Components.Autodiff
         /// <param name="a">Tensor to divide.</param>
         /// <param name="b">Scalar to divide by.</param>
         /// <returns>Result tensor.</returns>
-        public static Tensor operator /(Tensor a, double b)
+        public static Tensor operator /(Tensor a, float b)
         {
             IntPtr h = NativeMethods.tensor_div_scalar(a.Handle, b);
             GC.KeepAlive(a);
@@ -451,7 +451,7 @@ namespace NNNCSharp.Components.Autodiff
         /// <param name="a">Scalar to divide.</param>
         /// <param name="b">Tensor to divide by.</param>
         /// <returns>Result tensor.</returns>
-        public static Tensor operator /(double a, Tensor b)
+        public static Tensor operator /(float a, Tensor b)
         {
             IntPtr h = NativeMethods.tensor_div_scalar_left(a, b.Handle);
             GC.KeepAlive(b);
@@ -478,7 +478,7 @@ namespace NNNCSharp.Components.Autodiff
         /// <param name="a">Tensor to raise.</param>
         /// <param name="exp">Scalar exponent to raise to.</param>
         /// <returns></returns>
-        public static Tensor Pow(Tensor a, double exp)
+        public static Tensor Pow(Tensor a, float exp)
         {
             IntPtr h = NativeMethods.tensor_pow_scalar(a.Handle, exp);
             GC.KeepAlive(a);
@@ -491,7 +491,7 @@ namespace NNNCSharp.Components.Autodiff
         /// <param name="a">Scalar to raise.</param>
         /// <param name="exp">Tensor exponent to raise to.</param>
         /// <returns>Result tensor.</returns>
-        public static Tensor Pow(double a, Tensor exp)
+        public static Tensor Pow(float a, Tensor exp)
         {
             IntPtr h = NativeMethods.tensor_pow_scalar_left(a, exp.Handle);
             GC.KeepAlive(exp);
@@ -530,7 +530,7 @@ namespace NNNCSharp.Components.Autodiff
         /// <param name="arg">Tensor argument.</param>
         /// <param name="logBase">Scalar base to use.</param>
         /// <returns>Result tensor.</returns>
-        public static Tensor Log(Tensor arg, double logBase)
+        public static Tensor Log(Tensor arg, float logBase)
         {
             IntPtr h = NativeMethods.tensor_log_scalar(arg.Handle, logBase);
             GC.KeepAlive(arg);
@@ -543,7 +543,7 @@ namespace NNNCSharp.Components.Autodiff
         /// <param name="arg">Scalar argument.</param>
         /// <param name="logBase">Tensor base to use.</param>
         /// <returns>Result tensor.</returns>
-        public static Tensor Log(double arg, Tensor logBase)
+        public static Tensor Log(float arg, Tensor logBase)
         {
             IntPtr h = NativeMethods.tensor_log_scalar_left(arg, logBase.Handle);
             GC.KeepAlive(logBase);
@@ -746,7 +746,7 @@ namespace NNNCSharp.Components.Autodiff
         /// <param name="min">Minimum value to clip below.</param>
         /// <param name="max">Maximum value to clip above.</param>
         /// <returns>Clipped tensor.</returns>
-        public static Tensor Clip(Tensor t, double min, double max)
+        public static Tensor Clip(Tensor t, float min, float max)
         {
             IntPtr h = NativeMethods.tensor_clip(t.Handle, min, max);
             GC.KeepAlive(t);
@@ -759,7 +759,7 @@ namespace NNNCSharp.Components.Autodiff
         /// <param name="t">Tensor to apply dropout to.</param>
         /// <param name="dropout">Dropout rate to apply.</param>
         /// <returns>Dropout mask tensor.</returns>
-        public static Tensor GetDenseDropoutMask(Tensor t, double dropout)
+        public static Tensor GetDenseDropoutMask(Tensor t, float dropout)
         {
             var dims = t.Dimensions.ToArray();
             IntPtr h = NativeMethods.tensor_get_dense_dropout_mask(dims, dims.Length, dropout);
@@ -773,7 +773,7 @@ namespace NNNCSharp.Components.Autodiff
         /// <param name="t">Tensor to apply spatial dropout to.</param>
         /// <param name="dropout">Dropout rate to use.</param>
         /// <returns>Spatial dropout mask tensor.</returns>
-        public static Tensor GetSpatialDropoutMask(Tensor t, double dropout)
+        public static Tensor GetSpatialDropoutMask(Tensor t, float dropout)
         {
             var dims = t.Dimensions.ToArray();
             IntPtr h = NativeMethods.tensor_get_spatial_dropout_mask(dims, dims.Length, dropout);
@@ -801,7 +801,7 @@ namespace NNNCSharp.Components.Autodiff
         /// <param name="t">Tensor to apply Leaky ReLU to.</param>
         /// <param name="tau">Tau value to use.</param>
         /// <returns>Result tensor.</returns>
-        public static Tensor LeakyReLU(Tensor t, double tau)
+        public static Tensor LeakyReLU(Tensor t, float tau)
         {
             IntPtr h = NativeMethods.tensor_leaky_relu(t.Handle, tau);
             GC.KeepAlive(t);
@@ -879,7 +879,7 @@ namespace NNNCSharp.Components.Autodiff
         /// <param name="target">Target tensor to use.</param>
         /// <param name="delta">Delta value to use.</param>
         /// <returns>Loss tensor.</returns>
-        public static Tensor Huber(Tensor t, Tensor target, double delta)
+        public static Tensor Huber(Tensor t, Tensor target, float delta)
         {
             IntPtr h = NativeMethods.tensor_huber(t.Handle, target.Handle, delta);
             GC.KeepAlive(t);

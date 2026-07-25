@@ -58,31 +58,31 @@ namespace NNNCSharp.Components.DQNEnvironments
         /// <summary>
         /// Reward for eating an apple.
         /// </summary>
-        const double AppleReward = 20.0;
+        const float AppleReward = 20.0f;
         /// <summary>
         /// Multiplier for the additional apple reward based on snake length.
         /// </summary>
-        const double LengthRewardMult = 1.0;
+        const float LengthRewardMult = 1.0f;
         /// <summary>
         /// Multiplier for the shaped distance to apple reward.
         /// </summary>
-        const double DistRewardMult = 0.2;
+        const float DistRewardMult = 0.2f;
         /// <summary>
         /// Multiplier for the shaped reward based on number of reachable positions.
         /// </summary>
-        const double ReachableRewardMult = 0.4;
+        const float ReachableRewardMult = 0.4f;
         /// <summary>
         /// Penalty for not reaching the next apple in time.
         /// </summary>
-        const double TimeoutPenalty = -1.0;
+        const float TimeoutPenalty = -1.0f;
         /// <summary>
         /// Penalty for colliding with the border or snake body.
         /// </summary>
-        const double CollisionPenalty = -5.0;
+        const float CollisionPenalty = -5.0f;
         /// <summary>
         /// Penalty for each step taken.
         /// </summary>
-        const double StepPenalty = -0.1;
+        const float StepPenalty = -0.1f;
 
         // Utilities
         /// <summary>
@@ -119,11 +119,11 @@ namespace NNNCSharp.Components.DQNEnvironments
         /// </summary>
         struct BoardEncoding
         {
-            public const double Empty = 0.0;
-            public const double Head = 1.0;
-            public const double Body = 2.0;
-            public const double Tail = 3.0;
-            public const double Apple = 4.0;
+            public const float Empty = 0.0f;
+            public const float Head = 1.0f;
+            public const float Body = 2.0f;
+            public const float Tail = 3.0f;
+            public const float Apple = 4.0f;
         }
 
         /// <summary>
@@ -166,14 +166,14 @@ namespace NNNCSharp.Components.DQNEnvironments
                 if (ValidPosition(node.Position))
                 {
                     OneHotEncodeNode(node, contSpan, dirSpan);
-                    state[contentIndices] = 1.0;
-                    state[directionIndices] = 1.0;
+                    state[contentIndices] = 1.0f;
+                    state[directionIndices] = 1.0f;
                 }
 
                 node = node.Child;
             }
 
-            state[ApplePosition.Y, ApplePosition.X, (int)BoardEncodingOneHot.Apple] = 1.0;
+            state[ApplePosition.Y, ApplePosition.X, (int)BoardEncodingOneHot.Apple] = 1.0f;
 
             return state;
         }
@@ -200,14 +200,14 @@ namespace NNNCSharp.Components.DQNEnvironments
 
         public override bool ValidAction(int action, Tensor? state) => true; // no invalid actions
 
-        public override (double reward, Tensor nextState, bool done) Step(int action, int steps)
+        public override (float reward, Tensor nextState, bool done) Step(int action, int steps)
         {
-            if (steps >= MaxSteps) return (0.0, GetNormalizedState(), true); // end episode if step limit exceeded
+            if (steps >= MaxSteps) return (0.0f, GetNormalizedState(), true); // end episode if step limit exceeded
 
             // Calculate distance from agent to apple before moving
-            double xDiff = ApplePosition.X - SnakeHead.Position.X;
-            double yDiff = ApplePosition.Y - SnakeHead.Position.Y;
-            double prevDist = Math.Sqrt(xDiff * xDiff + yDiff * yDiff);
+            float xDiff = ApplePosition.X - SnakeHead.Position.X;
+            float yDiff = ApplePosition.Y - SnakeHead.Position.Y;
+            float prevDist = MathF.Sqrt(xDiff * xDiff + yDiff * yDiff);
 
             var prevState = GetNormalizedState();
 
@@ -217,7 +217,7 @@ namespace NNNCSharp.Components.DQNEnvironments
 
             // Calculate reward of the action
 
-            double reward = StepPenalty; // apply per-step penalty
+            float reward = StepPenalty; // apply per-step penalty
 
             // Add reward for eating the apple
             if (AteApple())
@@ -240,18 +240,18 @@ namespace NNNCSharp.Components.DQNEnvironments
             // Calculate distance from agent to the apple after moving
             xDiff = ApplePosition.X - SnakeHead.Position.X;
             yDiff = ApplePosition.Y - SnakeHead.Position.Y;
-            double newDist = Math.Sqrt(xDiff * xDiff + yDiff * yDiff);
+            float newDist = MathF.Sqrt(xDiff * xDiff + yDiff * yDiff);
 
             reward += DistRewardMult * (prevDist - newDist); // add shaped reward based on change in distance
 
             // Find number of reachable positions
-            double reachable = ReachablePositions(SnakeHead.Position, BlockedCells()) / (double)(GridDims.X * GridDims.Y - SnakeLength);
+            float reachable = ReachablePositions(SnakeHead.Position, BlockedCells()) / (float)(GridDims.X * GridDims.Y - SnakeLength);
             reward += ReachableRewardMult * reachable; // add shaped reward based on number of reachable positions
 
             return (reward, GetNormalizedState(), false);
         }
 
-        public override double TestTrainingProgress(Model agent, int testEpisodes)
+        public override float TestTrainingProgress(Model agent, int testEpisodes)
         {
             int totalLength = 0;
             DrawPlaying = false;
@@ -262,7 +262,7 @@ namespace NNNCSharp.Components.DQNEnvironments
             }
             DrawPlaying = true;
 
-            double averageLength = (double)totalLength / testEpisodes;
+            float averageLength = (float)totalLength / testEpisodes;
             NNNLog.WriteLine($"Agent reached an average length of {averageLength}");
             return averageLength;
         }
@@ -272,7 +272,7 @@ namespace NNNCSharp.Components.DQNEnvironments
             // Extract the state at the given step from the episode
             step = Math.Clamp(step, 0, episode.Experiences.Count);
             int action = step > 0 ? episode.Experiences[step - 1].Action : -1;
-            double reward = step > 0 ? episode.Experiences[step - 1].Reward : 0.0;
+            float reward = step > 0 ? episode.Experiences[step - 1].Reward : 0.0f;
             string dirMoved = action switch
             {
                 (int)Actions.Forward => "Forward",

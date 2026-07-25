@@ -16,7 +16,7 @@ namespace NNNCSharp.Components.Buffers
         /// <summary>
         /// Array representing the sum tree.
         /// </summary>
-        readonly double[] Tree;
+        readonly float[] Tree;
         /// <summary>
         /// Data associated with each sum tree node.
         /// </summary>
@@ -32,12 +32,12 @@ namespace NNNCSharp.Components.Buffers
         /// <summary>
         /// Total priority of all elements stored in the sum tree.
         /// </summary>
-        public double TotalPriority => Tree[0];
+        public float TotalPriority => Tree[0];
 
         public SumTree(int capacity)
         {
             Capacity = capacity;
-            Tree = new double[2 * capacity - 1];
+            Tree = new float[2 * capacity - 1];
             Data = new T[capacity];
         }
 
@@ -46,7 +46,7 @@ namespace NNNCSharp.Components.Buffers
         /// </summary>
         /// <param name="item">Element to add.</param>
         /// <param name="priority">Priority of new element.</param>
-        public void Add(T item, double priority)
+        public void Add(T item, float priority)
         {
             // Add item to main data array
             if (Data[WritePointer] is IDisposable disposable) disposable.Dispose();
@@ -66,10 +66,10 @@ namespace NNNCSharp.Components.Buffers
         /// </summary>
         /// <param name="treeIndex">Index to update the priority of.</param>
         /// <param name="priority">New value of the priority.</param>
-        public void Update(int treeIndex, double priority)
+        public void Update(int treeIndex, float priority)
         {
             // Update priority at index
-            double change = priority - Tree[treeIndex];
+            float change = priority - Tree[treeIndex];
             Tree[treeIndex] = priority;
 
             // Update priority sums of parent nodes
@@ -85,7 +85,7 @@ namespace NNNCSharp.Components.Buffers
         /// </summary>
         /// <param name="value">PER sampling value to use.</param>
         /// <returns>Sum tree index, priority, and element selected via PER sampling.</returns>
-        public (int treeIndex, double priority, T item) Get(double value)
+        public (int treeIndex, float priority, T item) Get(float value)
         {
             int parentIndex = 0;
 

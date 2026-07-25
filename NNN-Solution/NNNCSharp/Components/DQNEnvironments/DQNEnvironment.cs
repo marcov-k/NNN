@@ -73,7 +73,7 @@ namespace NNNCSharp.Components.DQNEnvironments
         /// <param name="action">The action being taken.</param>
         /// <param name="steps">The total number of steps which have been taken.</param>
         /// <returns>Reward from the action, tensor reprsenting the normalized state after the action, and whether the current episode has finished.</returns>
-        public abstract (double reward, Tensor nextState, bool done) Step(int action, int steps);
+        public abstract (float reward, Tensor nextState, bool done) Step(int action, int steps);
 
         /// <summary>
         /// Displays a previous recorded state in the console.
@@ -88,7 +88,7 @@ namespace NNNCSharp.Components.DQNEnvironments
         /// <param name="agent">Agen to test.</param>
         /// <param name="testEpisodes">Number of episodes to test for.</param>
         /// <returns>Performance score of the model.</returns>
-        public abstract double TestTrainingProgress(Model agent, int testEpisodes);
+        public abstract float TestTrainingProgress(Model agent, int testEpisodes);
 
         /// <summary>
         /// Plays a demonstration of the model trained on the environment.

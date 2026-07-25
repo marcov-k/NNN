@@ -6,11 +6,11 @@
 // Functions affecting entire neural network models.
 
 // Clips all parameter gradients based on a maximum norm value.
-void Models::clip_gradients(const std::vector<std::shared_ptr<Tensor>*>& paras, double max_norm)
+void Models::clip_gradients(const std::vector<std::shared_ptr<Tensor>*>& paras, float max_norm)
 {
-	thread_local std::vector<double> scratch1;
+	thread_local std::vector<float> scratch1;
 
-	double total_norm = 0.0;
+	float total_norm = 0.0f;
 	for (std::shared_ptr<Tensor>* para_ptr : paras)
 	{
 		auto& para = *para_ptr;
@@ -22,7 +22,7 @@ void Models::clip_gradients(const std::vector<std::shared_ptr<Tensor>*>& paras, 
 
 	if (total_norm > max_norm)
 	{
-		const double scale = max_norm / (total_norm + 1e-8);
+		const float scale = max_norm / (total_norm + 1e-8f);
 
 		for (std::shared_ptr<Tensor>* para_ptr : paras)
 		{
@@ -32,9 +32,9 @@ void Models::clip_gradients(const std::vector<std::shared_ptr<Tensor>*>& paras, 
 }
 
 void Models::soft_update(const std::vector<std::shared_ptr<Tensor>*>& agent_paras,
-	const std::vector<std::shared_ptr<Tensor>*>& target_paras, double tau, double one_minus_tau)
+	const std::vector<std::shared_ptr<Tensor>*>& target_paras, float tau, float one_minus_tau)
 {
-	thread_local std::vector<double> scratch1;
+	thread_local std::vector<float> scratch1;
 
 	for (size_t i = 0; i < agent_paras.size(); ++i)
 	{

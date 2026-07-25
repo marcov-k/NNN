@@ -19,21 +19,21 @@ namespace NNNCSharp.Components.Buffers
         /// <summary>
         /// Highest current priority of a stored experience.
         /// </summary>
-        double MaxPriority = 1.0;
+        float MaxPriority = 1.0f;
 
         // PER Parameters
         /// <summary>
         /// Sampling alpha value.
         /// </summary>
-        readonly double Alpha; // determines how heavily experiences are prioritized
+        readonly float Alpha; // determines how heavily experiences are prioritized
         /// <summary>
         /// Current importance sampling exponent.
         /// </summary>
-        double Beta = 0.4; // determines how heavily sampling bias is corrected in gradient updates
+        float Beta = 0.4f; // determines how heavily sampling bias is corrected in gradient updates
         /// <summary>
         /// Linear importance sampling exponent increment.
         /// </summary>
-        const double BetaIncrement = 0.001;
+        const float BetaIncrement = 0.001f;
 
         // Public properties
         /// <summary>
@@ -47,7 +47,7 @@ namespace NNNCSharp.Components.Buffers
         /// </summary>
         readonly Random Random = new();
 
-        public ReplayBuffer(int capacity, double alpha = 0.6)
+        public ReplayBuffer(int capacity, float alpha = 0.6f)
         {
             SumTree = new SumTree<Experience>(capacity);
             Alpha = alpha;
@@ -60,7 +60,7 @@ namespace NNNCSharp.Components.Buffers
         public void Add(Experience experience)
         {
             // Assign max priority initially
-            double priority = Math.Pow(MaxPriority, Alpha);
+            float priority = MathF.Pow(MaxPriority, Alpha);
             SumTree.Add(experience, priority);
         }
 
@@ -69,23 +69,23 @@ namespace NNNCSharp.Components.Buffers
         /// </summary>
         /// <param name="batchSize">Number of experiences in the batch.</param>
         /// <returns>List of experiences in the batch, their corresponding sum tree indices, and their PER training weights.</returns>
-        public (List<Experience> batch, int[] indices, double[] weights) GetBatch(int batchSize)
+        public (List<Experience> batch, int[] indices, float[] weights) GetBatch(int batchSize)
         {
             List<Experience> batch = new(batchSize);
             var indices = new int[batchSize];
-            var weights = new double[batchSize];
+            var weights = new float[batchSize];
 
-            double totalPriority = SumTree.TotalPriority;
-            double segment = totalPriority / batchSize;
-            double maxWeight = 0;
+            float totalPriority = SumTree.TotalPriority;
+            float segment = totalPriority / batchSize;
+            float maxWeight = 0;
 
             // PER sample batchSize experiences
             for (int i = 0; i < batchSize; i++)
             {
                 // Calculate PER sampling value
-                double low = segment * i;
-                double high = segment * (i + 1);
-                double sampleVal = low + (Random.NextDouble() * (high - low));
+                float low = segment * i;
+                float high = segment * (i + 1);
+                float sampleVal = low + ((float)Random.NextDouble() * (high - low));
 
                 // Sample next experience
                 var (treeIndex, priority, item) = SumTree.Get(sampleVal);
@@ -99,11 +99,11 @@ namespace NNNCSharp.Components.Buffers
             for (int i = 0; i < batchSize; i++)
             {
                 // Calculate probability of experience being sampled
-                double prob = weights[i] / totalPriority;
-                if (prob == 0) prob = 1e-8;
+                float prob = weights[i] / totalPriority;
+                if (prob == 0) prob = 1e-8f;
 
                 // Calculate weight account for sampling bias
-                double weight = Math.Pow(1.0 / (SumTree.Count * prob), Beta);
+                float weight = MathF.Pow(1.0f / (SumTree.Count * prob), Beta);
                 weights[i] = weight;
                 if (weight > maxWeight) maxWeight = weight;
             }
@@ -118,7 +118,7 @@ namespace NNNCSharp.Components.Buffers
             }
 
             // Increment importance sampling exponent
-            Beta = Math.Min(1.0, Beta + BetaIncrement);
+            Beta = Math.Min(1.0f, Beta + BetaIncrement);
 
             return (batch, indices, weights);
         }
@@ -128,7 +128,7 @@ namespace NNNCSharp.Components.Buffers
         /// </summary>
         /// <param name="indices">Indices of experiences to update.</param>
         /// <param name="priorities">New priority values.</param>
-        public void UpdatePriorities(int[] indices, double[] priorities)
+        public void UpdatePriorities(int[] indices, float[] priorities)
         {
             for (int i = 0; i < indices.Length; i++)
             {
@@ -139,7 +139,7 @@ namespace NNNCSharp.Components.Buffers
                 }
 
                 // Update priority of experience in sum tree
-                double powerPriority = Math.Pow(priorities[i], Alpha);
+                float powerPriority = MathF.Pow(priorities[i], Alpha);
                 SumTree.Update(indices[i], powerPriority);
             }
         }

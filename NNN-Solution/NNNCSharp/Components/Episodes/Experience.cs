@@ -19,7 +19,7 @@ namespace NNNCSharp.Components.Episodes
         /// <summary>
         /// Reward of the selected action.
         /// </summary>
-        public double Reward { get; init; }
+        public float Reward { get; init; }
         /// <summary>
         /// Environment state following the selected action.
         /// </summary>
@@ -31,7 +31,7 @@ namespace NNNCSharp.Components.Episodes
         /// <summary>
         /// Replay priority of the experience - temporal difference error.
         /// </summary>
-        public double Priority { get; set; }
+        public float Priority { get; set; }
 
         /// <summary>
         /// Creates a new experience instance.
@@ -42,14 +42,14 @@ namespace NNNCSharp.Components.Episodes
         /// <param name="nextState">Environment state following the selected action.</param>
         /// <param name="done">Whether the episode terminated.</param>
         /// <param name="priority">Replay priority of the experience - temporal difference error.</param>
-        public Experience(Tensor state, int action, double reward, Tensor nextState, bool done, double priority = 1.0)
+        public Experience(Tensor state, int action, float reward, Tensor nextState, bool done, float priority = 1.0f)
         {
             State = state.Copy();
             Action = action;
             Reward = reward;
             NextState = nextState.Copy();
             Done = done;
-            Priority = Math.Max(priority, 1e-8); // ensure non-zero priority
+            Priority = Math.Max(priority, 1e-8f); // ensure non-zero priority
         }
 
         public void Dispose()

@@ -10,7 +10,7 @@ namespace NNNCSharp.Components.Optimizers
     /// <param name="learningRate">Gradient scaling factor for parameter updates.</param>
     public class SGD: Optimizer
     {
-        public SGD(double learningRate) : base(learningRate) { }
+        public SGD(float learningRate) : base(learningRate) { }
 
         public override void Step(Tensor parameter, int iterations)
         {

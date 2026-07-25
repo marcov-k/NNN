@@ -33,7 +33,7 @@ std::shared_ptr<Tensor> Tensor::add(const std::shared_ptr<Tensor>& a, const std:
 	return result;
 }
 
-std::shared_ptr<Tensor> Tensor::add(const std::shared_ptr<Tensor>& a, double b)
+std::shared_ptr<Tensor> Tensor::add(const std::shared_ptr<Tensor>& a, float b)
 {
 	auto result = get_result_tensor(a, a->_dimensions, a->requires_grad);
 
@@ -85,7 +85,7 @@ std::shared_ptr<Tensor> Tensor::sub(const std::shared_ptr<Tensor>& a, const std:
 	return result;
 }
 
-std::shared_ptr<Tensor> Tensor::sub(const std::shared_ptr<Tensor>& a, double b)
+std::shared_ptr<Tensor> Tensor::sub(const std::shared_ptr<Tensor>& a, float b)
 {
 	auto result = get_result_tensor(a, a->_dimensions, a->requires_grad);
 
@@ -109,7 +109,7 @@ std::shared_ptr<Tensor> Tensor::sub(const std::shared_ptr<Tensor>& a, double b)
 	return result;
 }
 
-std::shared_ptr<Tensor> Tensor::sub(double a, const std::shared_ptr<Tensor>& b)
+std::shared_ptr<Tensor> Tensor::sub(float a, const std::shared_ptr<Tensor>& b)
 {
 	auto result = get_result_tensor(b, b->_dimensions, b->requires_grad);
 
@@ -161,7 +161,7 @@ std::shared_ptr<Tensor> Tensor::mul(const std::shared_ptr<Tensor>& a, const std:
 	return result;
 }
 
-std::shared_ptr<Tensor> Tensor::mul(const std::shared_ptr<Tensor>& a, double b)
+std::shared_ptr<Tensor> Tensor::mul(const std::shared_ptr<Tensor>& a, float b)
 {
 	auto result = get_result_tensor(a, a->_dimensions, a->requires_grad);
 
@@ -205,8 +205,8 @@ std::shared_ptr<Tensor> Tensor::div(const std::shared_ptr<Tensor>& a, const std:
 			{
 				if (!a->requires_grad && !b->requires_grad) return;
 
-				thread_local std::vector<double> scratch1;
-				thread_local std::vector<double> scratch2;
+				thread_local std::vector<float> scratch1;
+				thread_local std::vector<float> scratch2;
 
 				const int element_count = result->element_count();
 				scratch1.resize(element_count);
@@ -229,7 +229,7 @@ std::shared_ptr<Tensor> Tensor::div(const std::shared_ptr<Tensor>& a, const std:
 	return result;
 }
 
-std::shared_ptr<Tensor> Tensor::div(const std::shared_ptr<Tensor>& a, double b)
+std::shared_ptr<Tensor> Tensor::div(const std::shared_ptr<Tensor>& a, float b)
 {
 	auto result = get_result_tensor(a, a->_dimensions, a->requires_grad);
 
@@ -242,7 +242,7 @@ std::shared_ptr<Tensor> Tensor::div(const std::shared_ptr<Tensor>& a, double b)
 		result->_parents.push_back(a);
 
 		// Gradient calculation function -> dr/da = 1 / b
-		const double recip_b = 1.0 / b;
+		const float recip_b = 1.0f / b;
 		result->_backward = [a, recip_b, result]()
 			{
 				if (!a->requires_grad) return;
@@ -254,7 +254,7 @@ std::shared_ptr<Tensor> Tensor::div(const std::shared_ptr<Tensor>& a, double b)
 	return result;
 }
 
-std::shared_ptr<Tensor> Tensor::div(double a, const std::shared_ptr<Tensor>& b)
+std::shared_ptr<Tensor> Tensor::div(float a, const std::shared_ptr<Tensor>& b)
 {
 	auto result = get_result_tensor(b, b->_dimensions, b->requires_grad);
 
@@ -271,8 +271,8 @@ std::shared_ptr<Tensor> Tensor::div(double a, const std::shared_ptr<Tensor>& b)
 			{
 				if (!b->requires_grad) return;
 
-				thread_local std::vector<double> scratch1;
-				thread_local std::vector<double> scratch2;
+				thread_local std::vector<float> scratch1;
+				thread_local std::vector<float> scratch2;
 
 				const int element_count = result->element_count();
 				scratch1.resize(element_count);
@@ -307,8 +307,8 @@ std::shared_ptr<Tensor> Tensor::pow(const std::shared_ptr<Tensor>& a, const std:
 			{
 				if (!a->requires_grad && !exp->requires_grad) return;
 
-				thread_local std::vector<double> scratch1;
-				thread_local std::vector<double> scratch2;
+				thread_local std::vector<float> scratch1;
+				thread_local std::vector<float> scratch2;
 
 				const int element_count = result->element_count();
 				scratch1.resize(element_count);
@@ -316,7 +316,7 @@ std::shared_ptr<Tensor> Tensor::pow(const std::shared_ptr<Tensor>& a, const std:
 
 				if (a->requires_grad)
 				{
-					MathUtils::vector_sub(exp->_data, 1.0, scratch1);
+					MathUtils::vector_sub(exp->_data, 1.0f, scratch1);
 					MathUtils::vector_pow(a->_data, scratch1, scratch2);
 					MathUtils::vector_mul(scratch2, exp->_data);
 					MathUtils::vector_fmadd(a->_grad, scratch2, result->_grad);
@@ -333,7 +333,7 @@ std::shared_ptr<Tensor> Tensor::pow(const std::shared_ptr<Tensor>& a, const std:
 	return result;
 }
 
-std::shared_ptr<Tensor> Tensor::pow(const std::shared_ptr<Tensor>& a, double exp)
+std::shared_ptr<Tensor> Tensor::pow(const std::shared_ptr<Tensor>& a, float exp)
 {
 	auto result = get_result_tensor(a, a->_dimensions, a->requires_grad);
 
@@ -346,12 +346,12 @@ std::shared_ptr<Tensor> Tensor::pow(const std::shared_ptr<Tensor>& a, double exp
 		result->_parents.push_back(a);
 
 		// Gradient calculation function -> dr/da = exp * a^(exp - 1)
-		const double exp_sub = exp - 1.0;
+		const float exp_sub = exp - 1.0f;
 		result->_backward = [a, exp, exp_sub, result]()
 			{
 				if (!a->requires_grad) return;
 
-				thread_local std::vector<double> scratch1;
+				thread_local std::vector<float> scratch1;
 
 				const int element_count = result->element_count();
 				scratch1.resize(element_count);
@@ -365,7 +365,7 @@ std::shared_ptr<Tensor> Tensor::pow(const std::shared_ptr<Tensor>& a, double exp
 	return result;
 }
 
-std::shared_ptr<Tensor> Tensor::pow(double a, const std::shared_ptr<Tensor>& exp)
+std::shared_ptr<Tensor> Tensor::pow(float a, const std::shared_ptr<Tensor>& exp)
 {
 	auto result = get_result_tensor(exp, exp->_dimensions, exp->requires_grad);
 
@@ -378,12 +378,12 @@ std::shared_ptr<Tensor> Tensor::pow(double a, const std::shared_ptr<Tensor>& exp
 		result->_parents.push_back(exp);
 
 		// Gradient calculation function -> dr/dexp = a^exp * ln(a)
-		const double a_ln = std::log(a);
+		const float a_ln = std::log(a);
 		result->_backward = [a_ln, exp, result]()
 			{
 				if (!exp->requires_grad) return;
 
-				thread_local std::vector<double> scratch1;
+				thread_local std::vector<float> scratch1;
 
 				const int element_count = result->element_count();
 				scratch1.resize(element_count);
@@ -440,9 +440,9 @@ std::shared_ptr<Tensor> Tensor::log(const std::shared_ptr<Tensor>& arg, const st
 			{
 				if (!arg->requires_grad && !log_base->requires_grad) return;
 
-				thread_local std::vector<double> scratch1;
-				thread_local std::vector<double> scratch2;
-				thread_local std::vector<double> scratch3;
+				thread_local std::vector<float> scratch1;
+				thread_local std::vector<float> scratch2;
+				thread_local std::vector<float> scratch3;
 
 				const int element_count = result->element_count();
 				scratch1.resize(element_count);
@@ -470,7 +470,7 @@ std::shared_ptr<Tensor> Tensor::log(const std::shared_ptr<Tensor>& arg, const st
 	return result;
 }
 
-std::shared_ptr<Tensor> Tensor::log(const std::shared_ptr<Tensor>& arg, double log_base)
+std::shared_ptr<Tensor> Tensor::log(const std::shared_ptr<Tensor>& arg, float log_base)
 {
 	auto result = get_result_tensor(arg, arg->_dimensions, arg->requires_grad);
 
@@ -483,20 +483,20 @@ std::shared_ptr<Tensor> Tensor::log(const std::shared_ptr<Tensor>& arg, double l
 		result->_parents.push_back(arg);
 
 		// Gradient calculation function -> dr/darg = 1 / (arg * ln(arg))
-		const double base_ln = std::log(log_base);
+		const float base_ln = std::log(log_base);
 		result->_backward = [arg, base_ln, result]()
 			{
 				if (!arg->requires_grad) return;
 
-				thread_local std::vector<double> scratch1;
-				thread_local std::vector<double> scratch2;
+				thread_local std::vector<float> scratch1;
+				thread_local std::vector<float> scratch2;
 
 				const int element_count = result->element_count();
 				scratch1.resize(element_count);
 				scratch2.resize(element_count);
 
 				MathUtils::vector_mul(arg->_data, base_ln, scratch1);
-				MathUtils::vector_div(1.0, scratch1, scratch2);
+				MathUtils::vector_div(1.0f, scratch1, scratch2);
 				MathUtils::vector_fmadd(arg->_grad, scratch2, result->_grad);
 			};
 	}
@@ -504,7 +504,7 @@ std::shared_ptr<Tensor> Tensor::log(const std::shared_ptr<Tensor>& arg, double l
 	return result;
 }
 
-std::shared_ptr<Tensor> Tensor::log(double arg, const std::shared_ptr<Tensor>& log_base)
+std::shared_ptr<Tensor> Tensor::log(float arg, const std::shared_ptr<Tensor>& log_base)
 {
 	auto result = get_result_tensor(log_base, log_base->_dimensions, log_base->requires_grad);
 
@@ -517,13 +517,13 @@ std::shared_ptr<Tensor> Tensor::log(double arg, const std::shared_ptr<Tensor>& l
 		result->_parents.push_back(log_base);
 
 		// Gradient calculation function -> dr/dbase = ln(arg) / (base * ln^2(base))
-		const double arg_ln = std::log(arg);
+		const float arg_ln = std::log(arg);
 		result->_backward = [arg_ln, log_base, result]()
 			{
 				if (!log_base->requires_grad) return;
 
-				thread_local std::vector<double> scratch1;
-				thread_local std::vector<double> scratch2;
+				thread_local std::vector<float> scratch1;
+				thread_local std::vector<float> scratch2;
 
 				const int element_count = result->element_count();
 				scratch1.resize(element_count);
@@ -557,7 +557,7 @@ std::shared_ptr<Tensor> Tensor::ln(const std::shared_ptr<Tensor>& t)
 			{
 				if (!t->requires_grad) return;
 
-				thread_local std::vector<double> scratch1;
+				thread_local std::vector<float> scratch1;
 
 				const int element_count = result->element_count();
 				scratch1.resize(element_count);
@@ -599,7 +599,7 @@ std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const s
 	const bool use_parallel = total_rows > 16 && (long)total_rows * n * p > MATMUL_PARALLEL_THRESHOLD;
 
 	// Transpose b
-	std::vector<double> b_t(b_batched ? b_mat_size * batch_size : b_mat_size);
+	std::vector<float> b_t(b_batched ? b_mat_size * batch_size : b_mat_size);
 	if (b_batched)
 	{
 		for (size_t batch = 0; batch < batch_size; ++batch)
@@ -630,8 +630,8 @@ std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const s
 			{
 				if (!a->requires_grad && !b->requires_grad) return;
 
-				thread_local std::vector<double> d_r_t;
-				thread_local std::vector<double> a_t;
+				thread_local std::vector<float> d_r_t;
+				thread_local std::vector<float> a_t;
 
 				if (a->requires_grad)
 				{
@@ -737,8 +737,8 @@ std::shared_ptr<Tensor> Tensor::convolve(const std::shared_ptr<Tensor>& input, c
 	const auto& owner = input->requires_grad ? input : kernels;
 	auto result = get_result_tensor(owner, result_dims, input->requires_grad || kernels->requires_grad);
 
-	auto kernels_mat = std::make_shared<std::vector<double>>(kernels->element_count());
-	auto input_col = std::make_shared<std::vector<double>>(g.im2col_rows * g.im2col_cols);
+	auto kernels_mat = std::make_shared<std::vector<float>>(kernels->element_count());
+	auto input_col = std::make_shared<std::vector<float>>(g.im2col_rows * g.im2col_cols);
 
 	const bool use_parallel = (long)g.batches * g.out_spatial_size * g.filter_count * g.kernel_volume_size > CONV_PARALLEL_THRESHOLD;
 
@@ -762,8 +762,8 @@ std::shared_ptr<Tensor> Tensor::convolve(const std::shared_ptr<Tensor>& input, c
 				// Compute grad_input = convolve(grad_r, rotated kernels)
 				if (input->requires_grad)
 				{
-					thread_local std::vector<double> d_col;
-					thread_local std::vector<double> kernels_mat_t;
+					thread_local std::vector<float> d_col;
+					thread_local std::vector<float> kernels_mat_t;
 
 					d_col.assign(g.im2col_rows * g.im2col_cols, 0.0);
 					kernels_mat_t.resize(kernels_mat->size());
@@ -779,9 +779,9 @@ std::shared_ptr<Tensor> Tensor::convolve(const std::shared_ptr<Tensor>& input, c
 				// Compute grad_kernels = convolve(input, rotated grad_r)
 				if (kernels->requires_grad)
 				{
-					thread_local std::vector<double> d_out_t;
-					thread_local std::vector<double> input_col_t;
-					thread_local std::vector<double> d_kernels_ft;
+					thread_local std::vector<float> d_out_t;
+					thread_local std::vector<float> input_col_t;
+					thread_local std::vector<float> d_kernels_ft;
 
 					d_out_t.resize(g.filter_count * g.im2col_rows);
 					input_col_t.resize(input_col->size());

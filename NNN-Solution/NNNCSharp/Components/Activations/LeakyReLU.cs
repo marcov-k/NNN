@@ -12,13 +12,13 @@ namespace NNNCSharp.Components.Activations
         /// <summary>
         /// Coefficient for negative inputs.
         /// </summary>
-        double Tau = 0.05;
+        float Tau = 0.05f;
 
         /// <summary>
         /// Creates a new Leaky ReLU activation function instance.
         /// </summary>
         /// <param name="tau">Coefficient for negative inputs.</param>
-        public LeakyReLU(double tau)
+        public LeakyReLU(float tau)
         {
             Tau = tau;
         }
@@ -43,17 +43,17 @@ namespace NNNCSharp.Components.Activations
 
         public override void WriteUniqueData(FileStream stream)
         {
-            FileUtils.WriteDouble(stream, Tau);
+            FileUtils.WriteFloat(stream, Tau);
         }
 
         public override void BuildFromData(FileStream stream)
         {
-            Tau = FileUtils.ReadDouble(stream);
+            Tau = FileUtils.ReadFloat(stream);
         }
 
         public override string PrintActivation(FileStream stream)
         {
-            double tau = FileUtils.ReadDouble(stream);
+            float tau = FileUtils.ReadFloat(stream);
             return $", Tau: {tau}";
         }
     }

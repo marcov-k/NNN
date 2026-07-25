@@ -11,9 +11,9 @@ namespace NNNCSharp.Components.Costs
         /// <summary>
         /// Linear transition threshold.
         /// </summary>
-        readonly double Delta;
+        readonly float Delta;
 
-        public Huber(double delta = 1.0)
+        public Huber(float delta = 1.0f)
         {
             Delta = delta;
         }

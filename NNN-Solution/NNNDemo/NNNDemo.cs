@@ -147,7 +147,7 @@ public class NNNDemo
 
             int predictLabel = Tensor.ArgMax(model.Predict(wrappedImage));
             NNNLog.WriteLine($"\n\nImage index in dataset: {index}\n");
-            DrawMNISTImage(image, label, 0.5);
+            DrawMNISTImage(image, label, 0.5f);
             NNNLog.WriteLine($"Model prediction: {predictLabel}");
 
             if (GetInput("View another image? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.No]) done = true;

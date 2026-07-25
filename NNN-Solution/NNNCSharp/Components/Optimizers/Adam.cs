@@ -18,35 +18,35 @@ namespace NNNCSharp.Components.Optimizers
         /// <summary>
         /// Exponential decay rate of first moment estimates.
         /// </summary>
-        readonly double Beta1;
+        readonly float Beta1;
         /// <summary>
         /// Precalculated 1 - beta1 value.
         /// </summary>
-        readonly double OneMinusBeta1;
+        readonly float OneMinusBeta1;
         /// <summary>
         /// Exponential decay rate of second moment estimates.
         /// </summary>
-        readonly double Beta2;
+        readonly float Beta2;
         /// <summary>
         /// Precalculated 1 - beta2 value.
         /// </summary>
-        readonly double OneMinusBeta2;
+        readonly float OneMinusBeta2;
         /// <summary>
         /// Epsilon value to use.
         /// </summary>
-        readonly double Epsilon;
+        readonly float Epsilon;
         /// <summary>
         /// Weight decay to use.
         /// </summary>
-        readonly double WeightDecay;
+        readonly float WeightDecay;
 
-        public Adam(double learningRate = 0.001, double beta1 = 0.9, double beta2 = 0.999,
-            double epsilon = 1e-8, double weightDecay = 0.0) : base(learningRate)
+        public Adam(float learningRate = 0.001f, float beta1 = 0.9f, float beta2 = 0.999f,
+            float epsilon = 1e-8f, float weightDecay = 0.0f) : base(learningRate)
         {
             Beta1 = beta1;
-            OneMinusBeta1 = 1.0 - beta1;
+            OneMinusBeta1 = 1.0f - beta1;
             Beta2 = beta2;
-            OneMinusBeta2 = 1.0 - beta2;
+            OneMinusBeta2 = 1.0f - beta2;
             Epsilon = epsilon;
             WeightDecay = weightDecay;
         }
@@ -54,14 +54,14 @@ namespace NNNCSharp.Components.Optimizers
         /// <summary>
         /// Dictionary of per-parameter persistent buffers for first and second moments.
         /// </summary>
-        readonly Dictionary<Tensor, (double[] m, double[] v)> _state = new();
+        readonly Dictionary<Tensor, (float[] m, float[] v)> _state = new();
 
         public override void Step(Tensor parameter, int iteration)
         {
             // Create a new persistent moment buffer if necessary
             if (!_state.TryGetValue(parameter, out var moments))
             {
-                moments = (new double[parameter.ElementCount], new double[parameter.ElementCount]);
+                moments = (new float[parameter.ElementCount], new float[parameter.ElementCount]);
                 _state[parameter] = moments;
             }
             var (m, v) = moments;

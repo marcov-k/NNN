@@ -26,29 +26,29 @@ namespace NNNCSharp.Components.Utilities.SaveSystem
         }
 
         /// <summary>
-        /// Writes a 64-bit double to the file stream.
+        /// Writes a 64-bit float to the file stream.
         /// </summary>
         /// <param name="stream">File stream to write to.</param>
-        /// <param name="data">64-bit double to write.</param>
-        public static void WriteDouble(FileStream stream, double data)
+        /// <param name="data">64-bit float to write.</param>
+        public static void WriteFloat(FileStream stream, float data)
         {
             byte[] buffer = BitConverter.GetBytes(data);
             stream.Write(buffer);
         }
 
         /// <summary>
-        /// Writes an array of 64-bit doubles to the file stream.
+        /// Writes an array of 64-bit floats to the file stream.
         /// </summary>
         /// <param name="stream">File stream to write to.</param>
-        /// <param name="data">Array of 64-bit doubles to write.</param>
-        public static void WriteDoubleArray(FileStream stream, double[] data)
+        /// <param name="data">Array of 64-bit floats to write.</param>
+        public static void WriteFloatArray(FileStream stream, float[] data)
         {
             WriteInt32(stream, data.Length); // write array length
 
             // Write array data
             foreach (var elem in data)
             {
-                WriteDouble(stream, elem);
+                WriteFloat(stream, elem);
             }
         }
 
@@ -90,7 +90,7 @@ namespace NNNCSharp.Components.Utilities.SaveSystem
             stream.WriteByte(IDManager.GetLayerID(layer)); // write layer type ID
             stream.WriteByte(IDManager.GetActivationID(layer.Activation)); // write activation type ID
             layer.Activation.WriteUniqueData(stream); // write any activation type-specific data
-            WriteDouble(stream, layer.Dropout); // write layer dropout
+            WriteFloat(stream, layer.Dropout); // write layer dropout
             WriteTensor(stream, layer.Biases); // write layer bias tensor
 
             // Write any data unique to the specific layer type
@@ -134,7 +134,7 @@ namespace NNNCSharp.Components.Utilities.SaveSystem
         {
             WriteInt32Array(stream, data.Dimensions.ToArray());
             WriteBool(stream, data.RequiresGrad);
-            WriteDoubleArray(stream, data.Data.ToArray()); // write linear data array
+            WriteFloatArray(stream, data.Data.ToArray()); // write linear data array
         }
 
         /// <summary>
@@ -162,31 +162,31 @@ namespace NNNCSharp.Components.Utilities.SaveSystem
         }
 
         /// <summary>
-        /// Reads a 64-bit double from the current position in the file stream.
+        /// Reads a 64-bit float from the current position in the file stream.
         /// </summary>
         /// <param name="stream">File stream to read from.</param>
-        /// <returns>64-bit double at the current position in the file stream.</returns>
-        public static double ReadDouble(FileStream stream)
+        /// <returns>64-bit float at the current position in the file stream.</returns>
+        public static float ReadFloat(FileStream stream)
         {
-            Span<byte> buffer = stackalloc byte[sizeof(double)];
+            Span<byte> buffer = stackalloc byte[sizeof(float)];
             stream.Read(buffer);
-            return BitConverter.ToDouble(buffer);
+            return BitConverter.ToSingle(buffer);
         }
 
         /// <summary>
-        /// Reads an array of 64-bit doubles from the current position in the file stream.
+        /// Reads an array of 64-bit floats from the current position in the file stream.
         /// </summary>
         /// <param name="stream">File stream to read from.</param>
-        /// <returns>Array of 64-bit doubles at the current position in the file stream.</returns>
-        public static double[] ReadDoubleArray(FileStream stream)
+        /// <returns>Array of 64-bit floats at the current position in the file stream.</returns>
+        public static float[] ReadFloatArray(FileStream stream)
         {
             int length = ReadInt32(stream); // read array length
 
             // Read array data
-            var data = new double[length];
+            var data = new float[length];
             for (int i = 0; i < length; i++)
             {
-                data[i] = ReadDouble(stream);
+                data[i] = ReadFloat(stream);
             }
 
             return data;
@@ -278,7 +278,7 @@ namespace NNNCSharp.Components.Utilities.SaveSystem
             // Read core tensor data
             var dims = ReadInt32Array(stream);
             bool requiresGrad = ReadBool(stream);
-            var data = ReadDoubleArray(stream);
+            var data = ReadFloatArray(stream);
 
             // Create new tensor instance using read data
             Tensor tensor = new(dims, requiresGrad);
@@ -323,7 +323,7 @@ namespace NNNCSharp.Components.Utilities.SaveSystem
             var dims = ReadInt32Array(stream);
             stream.Position++; // skip RequiresGrad
             int dataLength = ReadInt32(stream);
-            stream.Position += dataLength * sizeof(double); // skip tensor data
+            stream.Position += dataLength * sizeof(float); // skip tensor data
 
             // Write tensor data to a string
             string data = "Dimensions: [";

@@ -79,23 +79,23 @@ namespace NNNCSharp.Components.Trainers
         /// <summary>
         /// Discount factor of future rewards.
         /// </summary>
-        readonly double Discount;
+        readonly float Discount;
         /// <summary>
         /// Current exploration rate of the agent.
         /// </summary>
-        double Exploration;
+        float Exploration;
         /// <summary>
         /// Per-episode exponential decay factor of the exploration rate.
         /// </summary>
-        readonly double ExplorationDecay;
+        readonly float ExplorationDecay;
         /// <summary>
         /// Minimum exploration rate of the agent.
         /// </summary>
-        readonly double MinExploration;
+        readonly float MinExploration;
         /// <summary>
         /// Maximum magnitude of gradients without normalization.
         /// </summary>
-        readonly double MaxNorm;
+        readonly float MaxNorm;
         /// <summary>
         /// Total number of times the agent's parameters have been optimized.
         /// </summary>
@@ -103,11 +103,11 @@ namespace NNNCSharp.Components.Trainers
         /// <summary>
         /// Target model parameter update factor.
         /// </summary>
-        readonly double Tau;
+        readonly float Tau;
         /// <summary>
         /// Precalculated 1 - tau value.
         /// </summary>
-        readonly double OneMinusTau;
+        readonly float OneMinusTau;
 
         // Self-play parameters
         /// <summary>
@@ -135,7 +135,7 @@ namespace NNNCSharp.Components.Trainers
         /// <summary>
         /// Total loss accumulated during the episode.
         /// </summary>
-        double totalLoss = 0.0;
+        float totalLoss = 0.0f;
 
         // Persistent training buffers
         /// <summary>
@@ -156,9 +156,9 @@ namespace NNNCSharp.Components.Trainers
         Tensor? _targetQs;
 
         public DQNTrainer(Model agent, DQNEnvironment environment, Optimizer optimizer, Cost cost, int trainEvery = 4,
-        double discount = 0.995, double exploration = 1.0, double explorationDecay = 0.99, double minExploration = 0.01,
+        float discount = 0.995f, float exploration = 1.0f, float explorationDecay = 0.99f, float minExploration = 0.01f,
         int replayBufferSize = 10000, int batchSize = 64, int agentBufferSize = 5, int opponentCopyRate = 100,
-        int minRandomOpponentEpisodes = 200, double tau = 0.005, double maxGradNorm = 1.0, int minExperiences = 1000)
+        int minRandomOpponentEpisodes = 200, float tau = 0.005f, float maxGradNorm = 1.0f, int minExperiences = 1000)
         {
             Agent = agent;
             TargetModel = agent.Copy();
@@ -177,7 +177,7 @@ namespace NNNCSharp.Components.Trainers
             OpponentCopyRate = opponentCopyRate;
             MinRandomOppEpisodes = minRandomOpponentEpisodes;
             Tau = tau;
-            OneMinusTau = 1.0 - tau;
+            OneMinusTau = 1.0f - tau;
             MaxNorm = maxGradNorm;
             MinExperiences = minExperiences;
         }
@@ -196,8 +196,8 @@ namespace NNNCSharp.Components.Trainers
             bool done;
             bool learnerTurn;
             int action;
-            double reward;
-            double totalReward;
+            float reward;
+            float totalReward;
             int step;
             int trainSteps;
             Tensor nextState;
@@ -210,14 +210,14 @@ namespace NNNCSharp.Components.Trainers
             // Test initial agent performance
             NNNLog.WriteLine("\nEvaluating initial agent performance...");
             var bestAgent = Agent.Copy();
-            double bestScore = Environment.TestTrainingProgress(Agent, testEpisodes);
+            float bestScore = Environment.TestTrainingProgress(Agent, testEpisodes);
 
             for (int e = 0; e < episodes; e++)
             {
                 // Freeze new opponent agent for self-play every OpponentCopyRate episodes
                 if (SelfPlay && ((e + 1) >= MinRandomOppEpisodes) && ((e + 1) % OpponentCopyRate == 0)) AgentBuffer.Add(Agent.Copy());
 
-                totalLoss = 0.0;
+                totalLoss = 0.0f;
                 episodeExperiences.Clear();
                 Environment.Reset();
                 state = Environment.GetNormalizedState();
@@ -284,7 +284,7 @@ namespace NNNCSharp.Components.Trainers
                     NNNLog.WriteLine($"\nAverage time per episode: {MathUtils.RoundToMS(avgElapsed)}");
                     NNNLog.WriteLine($"Estimated time remaining: {MathUtils.RoundToMS(eta)}");
                     NNNLog.WriteLine($"\nEvaluating agent performance...");
-                    double score = Environment.TestTrainingProgress(Agent, testEpisodes);
+                    float score = Environment.TestTrainingProgress(Agent, testEpisodes);
                     if (score > bestScore)
                     {
                         bestAgent.Dispose();
@@ -325,7 +325,7 @@ namespace NNNCSharp.Components.Trainers
         /// <returns>Index of the action to be taken.</returns>
         int PickAgentAction(Tensor state)
         {
-            if (Random.NextDouble() < Exploration) // pick random action for exploration
+            if ((float)Random.NextDouble() < Exploration) // pick random action for exploration
             {
                 return Environment.PickRandomAction();
             }
@@ -395,7 +395,7 @@ namespace NNNCSharp.Components.Trainers
             using (nextAgentQs)
             using (nextTargetQs)
             {
-                targetQs = MaskQValuesDouble(nextAgentQs, nextTargetQs, batch);
+                targetQs = MaskQValuesfloat(nextAgentQs, nextTargetQs, batch);
             }
 
             // Predict Q-Values of actions in the batch
@@ -445,7 +445,7 @@ namespace NNNCSharp.Components.Trainers
         /// <param name="targetQValues">Q-Values predicted by the target model for target Q-Values calculation.</param>
         /// <param name="batch">Experience batch corresponding to the given Q-Values.</param>
         /// <returns>Target Q-Values for each experience in the batch.</returns>
-        Tensor MaskQValuesDouble(Tensor agentQValues, Tensor targetQValues, List<Experience> batch)
+        Tensor MaskQValuesfloat(Tensor agentQValues, Tensor targetQValues, List<Experience> batch)
         {
             // Initialize persistent buffers if not yet initialized
             _targetQs ??= new(new int[] { BatchSize, 1 });
@@ -461,7 +461,7 @@ namespace NNNCSharp.Components.Trainers
             // Calculate target Q-Value for each experience in the batch using the Bellman equation -> Q(s, a) = R(s) + γ * maxQ(s', a')
             for (int i = 0; i < BatchSize; i++)
             {
-                double qTarget = batch[i].Reward; // add immediate reward of the action
+                float qTarget = batch[i].Reward; // add immediate reward of the action
 
                 // Calculate predicted future value of the action
                 if (!batch[i].Done)
@@ -470,11 +470,11 @@ namespace NNNCSharp.Components.Trainers
 
                     // Find the best valid action predicted by the agent for the next state
                     int bestAction = -1;
-                    double bestQ = double.MinValue;
+                    float bestQ = float.MinValue;
                     for (int a = 0; a < actionCount; a++)
                     {
                         if (!Environment.ValidAction(a, _nextState)) continue;
-                        double q = agentQValues[i * actionCount + a];
+                        float q = agentQValues[i * actionCount + a];
                         if (q > bestQ)
                         {
                             bestQ = q;
@@ -484,8 +484,8 @@ namespace NNNCSharp.Components.Trainers
 
                     if (bestAction != -1)
                     {
-                        double evalQ = targetQValues[i * actionCount + bestAction]; // get future value predicted by target model
-                        qTarget += Discount * evalQ * (SelfPlay ? -1.0 : 1.0); // add future value to the target Q-Value using the Bellman equation
+                        float evalQ = targetQValues[i * actionCount + bestAction]; // get future value predicted by target model
+                        qTarget += Discount * evalQ * (SelfPlay ? -1.0f : 1.0f); // add future value to the target Q-Value using the Bellman equation
                     }
                 }
 

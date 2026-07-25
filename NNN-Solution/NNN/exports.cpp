@@ -25,7 +25,7 @@ extern "C"
 		return wrap_handle(std::make_shared<Tensor>());
 	}
 
-	void* tensor_create_scalar(double value, const int* dims, int rank, bool requires_grad)
+	void* tensor_create_scalar(float value, const int* dims, int rank, bool requires_grad)
 	{
 		std::vector<int> dims_vec(dims, dims + rank);
 		return wrap_handle(std::make_shared<Tensor>(value, dims_vec, requires_grad));
@@ -92,32 +92,32 @@ extern "C"
 		return (*tensor_handle)->grad_count();
 	}
 
-	double* tensor_data_ptr(void* handle)
+	float* tensor_data_ptr(void* handle)
 	{
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		return (*tensor_handle)->mutable_data().data();
 	}
 
-	double tensor_get_at(void* handle, int index)
+	float tensor_get_at(void* handle, int index)
 	{
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		return (**tensor_handle)[index];
 	}
 
-	void tensor_set_at(void* handle, double value, int index)
+	void tensor_set_at(void* handle, float value, int index)
 	{
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		(**tensor_handle)[index] = value;
 	}
 
-	double tensor_get_at_spatial(void* handle, const int* indices, int rank)
+	float tensor_get_at_spatial(void* handle, const int* indices, int rank)
 	{
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		std::vector<int> indices_vec(indices, indices + rank);
 		return (*tensor_handle)->at(indices_vec);
 	}
 
-	void tensor_set_at_spatial(void* handle, double value, const int* indices, int rank)
+	void tensor_set_at_spatial(void* handle, float value, const int* indices, int rank)
 	{
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		std::vector<int> indices_vec(indices, indices + rank);
@@ -138,7 +138,7 @@ extern "C"
 		std::copy(indices.begin(), indices.end(), out_indices);
 	}
 
-	double* tensor_grad_ptr(void* handle)
+	float* tensor_grad_ptr(void* handle)
 	{
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		return (*tensor_handle)->mutable_grad().data();
@@ -204,7 +204,7 @@ extern "C"
 		return wrap_handle(Tensor::add(*tensor_handle_a, *tensor_handle_b));
 	}
 
-	void* tensor_add_scalar(void* handle_a, double b)
+	void* tensor_add_scalar(void* handle_a, float b)
 	{
 		auto* tensor_handle_a = static_cast<std::shared_ptr<Tensor>*>(handle_a);
 		return wrap_handle(Tensor::add(*tensor_handle_a, b));
@@ -217,13 +217,13 @@ extern "C"
 		return wrap_handle(Tensor::sub(*tensor_handle_a, *tensor_handle_b));
 	}
 
-	void* tensor_sub_scalar(void* handle_a, double b)
+	void* tensor_sub_scalar(void* handle_a, float b)
 	{
 		auto* tensor_handle_a = static_cast<std::shared_ptr<Tensor>*>(handle_a);
 		return wrap_handle(Tensor::sub(*tensor_handle_a, b));
 	}
 
-	void* tensor_sub_scalar_left(double a, void* handle_b)
+	void* tensor_sub_scalar_left(float a, void* handle_b)
 	{
 		auto* tensor_handle_b = static_cast<std::shared_ptr<Tensor>*>(handle_b);
 		return wrap_handle(Tensor::sub(a, *tensor_handle_b));
@@ -236,7 +236,7 @@ extern "C"
 		return wrap_handle(Tensor::mul(*tensor_handle_a, *tensor_handle_b));
 	}
 
-	void* tensor_mul_scalar(void* handle_a, double b)
+	void* tensor_mul_scalar(void* handle_a, float b)
 	{
 		auto* tensor_handle_a = static_cast<std::shared_ptr<Tensor>*>(handle_a);
 		return wrap_handle(Tensor::mul(*tensor_handle_a, b));
@@ -249,13 +249,13 @@ extern "C"
 		return wrap_handle(Tensor::div(*tensor_handle_a, *tensor_handle_b));
 	}
 
-	void* tensor_div_scalar(void* handle_a, double b)
+	void* tensor_div_scalar(void* handle_a, float b)
 	{
 		auto* tensor_handle_a = static_cast<std::shared_ptr<Tensor>*>(handle_a);
 		return wrap_handle(Tensor::div(*tensor_handle_a, b));
 	}
 
-	void* tensor_div_scalar_left(double a, void* handle_b)
+	void* tensor_div_scalar_left(float a, void* handle_b)
 	{
 		auto* tensor_handle_b = static_cast<std::shared_ptr<Tensor>*>(handle_b);
 		return wrap_handle(Tensor::div(a, *tensor_handle_b));
@@ -268,13 +268,13 @@ extern "C"
 		return wrap_handle(Tensor::pow(*tensor_handle_a, *tensor_handle_exp));
 	}
 
-	void* tensor_pow_scalar(void* handle_a, double exp)
+	void* tensor_pow_scalar(void* handle_a, float exp)
 	{
 		auto* tensor_handle_a = static_cast<std::shared_ptr<Tensor>*>(handle_a);
 		return wrap_handle(Tensor::pow(*tensor_handle_a, exp));
 	}
 
-	void* tensor_pow_scalar_left(double a, void* handle_exp)
+	void* tensor_pow_scalar_left(float a, void* handle_exp)
 	{
 		auto* tensor_handle_exp = static_cast<std::shared_ptr<Tensor>*>(handle_exp);
 		return wrap_handle(Tensor::pow(a, *tensor_handle_exp));
@@ -293,13 +293,13 @@ extern "C"
 		return wrap_handle(Tensor::log(*tensor_handle_arg, *tensor_handle_log_base));
 	}
 
-	void* tensor_log_scalar(void* handle_arg, double log_base)
+	void* tensor_log_scalar(void* handle_arg, float log_base)
 	{
 		auto* tensor_handle_arg = static_cast<std::shared_ptr<Tensor>*>(handle_arg);
 		return wrap_handle(Tensor::log(*tensor_handle_arg, log_base));
 	}
 
-	void* tensor_log_scalar_left(double arg, void* handle_log_base)
+	void* tensor_log_scalar_left(float arg, void* handle_log_base)
 	{
 		auto* tensor_handle_log_base = static_cast<std::shared_ptr<Tensor>*>(handle_log_base);
 		return wrap_handle(Tensor::log(arg, *tensor_handle_log_base));
@@ -392,19 +392,19 @@ extern "C"
 		return wrap_handle(Tensor::wrap_batch(*tensor_handle));
 	}
 
-	void* tensor_clip(void* handle, double min, double max)
+	void* tensor_clip(void* handle, float min, float max)
 	{
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		return wrap_handle(Tensor::clip(*tensor_handle, min, max));
 	}
 
-	void* tensor_get_dense_dropout_mask(const int* dims, int dims_length, double dropout)
+	void* tensor_get_dense_dropout_mask(const int* dims, int dims_length, float dropout)
 	{
 		std::vector<int> dims_vec(dims, dims + dims_length);
 		return wrap_handle(Tensor::get_dense_dropout_mask(dims_vec, dropout));
 	}
 
-	void* tensor_get_spatial_dropout_mask(const int* dims, int dims_length, double dropout)
+	void* tensor_get_spatial_dropout_mask(const int* dims, int dims_length, float dropout)
 	{
 		std::vector<int> dims_vec(dims, dims + dims_length);
 		return wrap_handle(Tensor::get_spatial_dropout_mask(dims_vec, dropout));
@@ -419,7 +419,7 @@ extern "C"
 		return wrap_handle(Tensor::relu(*tensor_handle));
 	}
 
-	void* tensor_leaky_relu(void* handle, double tau)
+	void* tensor_leaky_relu(void* handle, float tau)
 	{
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
 		return wrap_handle(Tensor::leaky_relu(*tensor_handle, tau));
@@ -459,7 +459,7 @@ extern "C"
 		return wrap_handle(Tensor::mse(*tensor_handle_t, *tensor_handle_target));
 	}
 
-	void* tensor_huber(void* handle_t, void* handle_target, double delta)
+	void* tensor_huber(void* handle_t, void* handle_target, float delta)
 	{
 		auto* tensor_handle_t = static_cast<std::shared_ptr<Tensor>*>(handle_t);
 		auto* tensor_handle_target = static_cast<std::shared_ptr<Tensor>*>(handle_target);
@@ -476,18 +476,18 @@ extern "C"
 	/* Optimizers */
 
 	// Performs a Stochastic Gradient Descent optimizer step on the given parameter tensor.
-	void optimizers_sgd(void* handle_para, double lr)
+	void optimizers_sgd(void* handle_para, float lr)
 	{
 		auto* tensor_handle_para = static_cast<std::shared_ptr<Tensor>*>(handle_para);
 		Optimizers::sgd(*tensor_handle_para, lr);
 	}
 
-	void optimizers_adam(void* handle_para, double lr, int iter, double* m, double* v, int moments_count,
-		double beta1, double one_minus_beta1, double beta2, double one_minus_beta2, double epsilon, double weight_decay)
+	void optimizers_adam(void* handle_para, float lr, int iter, float* m, float* v, int moments_count,
+		float beta1, float one_minus_beta1, float beta2, float one_minus_beta2, float epsilon, float weight_decay)
 	{
 		auto* tensor_handle_para = static_cast<std::shared_ptr<Tensor>*>(handle_para);
-		std::span<double> m_span(m, moments_count);
-		std::span<double> v_span(v, moments_count);
+		std::span<float> m_span(m, moments_count);
+		std::span<float> v_span(v, moments_count);
 		Optimizers::adam(*tensor_handle_para, lr, iter, m_span, v_span, beta1, one_minus_beta1, beta2, one_minus_beta2,
 			epsilon, weight_decay);
 	}
@@ -495,7 +495,7 @@ extern "C"
 	/* Models */
 
 	// Clips the gradients of the given parameter tensors using the given max norm.
-	void models_clip_gradients(void** handles, int para_count, double max_norm)
+	void models_clip_gradients(void** handles, int para_count, float max_norm)
 	{
 		std::vector<std::shared_ptr<Tensor>*> paras(para_count);
 		for (int i = 0; i < para_count; ++i)
@@ -505,7 +505,7 @@ extern "C"
 		Models::clip_gradients(paras, max_norm);
 	}
 
-	void models_soft_update(void** handles_agent, void** handles_target, int para_count, double tau, double one_minus_tau)
+	void models_soft_update(void** handles_agent, void** handles_target, int para_count, float tau, float one_minus_tau)
 	{
 		std::vector<std::shared_ptr<Tensor>*> agent_paras(para_count);
 		std::vector<std::shared_ptr<Tensor>*> target_paras(para_count);

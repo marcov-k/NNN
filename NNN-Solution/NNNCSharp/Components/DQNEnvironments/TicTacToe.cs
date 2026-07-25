@@ -44,19 +44,19 @@ namespace NNNCSharp.Components.DQNEnvironments
         /// <summary>
         /// Base reward for a winning action.
         /// </summary>
-        const double WinRewardBase = 2.0;
+        const float WinRewardBase = 2.0f;
         /// <summary>
         /// Base reward for an action which prevents the opponent from winning.
         /// </summary>
-        const double BlockRewardBase = 0.8;
+        const float BlockRewardBase = 0.8f;
         /// <summary>
         /// Base reward for an action which ties the game - optimal outcome if both players play optimally.
         /// </summary>
-        const double DrawRewardBase = 0.15;
+        const float DrawRewardBase = 0.15f;
         /// <summary>
         /// Penalty for actions which disadvantage the agent.
         /// </summary>
-        const double Penalty = 0.0;
+        const float Penalty = 0.0f;
 
         // Utilities
         /// <summary>
@@ -95,9 +95,9 @@ namespace NNNCSharp.Components.DQNEnvironments
             // Reset all positions to empty
             for (int i = 0; i < State.ElementCount - 1; i++)
             {
-                State[i] = 0.0;
+                State[i] = 0.0f;
             }
-            State[9] = 1.0; // set player to move to X
+            State[9] = 1.0f; // set player to move to X
         }
 
         public override int PickAgentAction(Tensor qValues, Tensor? state = null)
@@ -108,7 +108,7 @@ namespace NNNCSharp.Components.DQNEnvironments
             int action = Tensor.ArgMax(qValues);
             while (!ValidAction(action, state) && !BoardFilled(state))
             {
-                qValues[action] = double.MinValue;
+                qValues[action] = float.MinValue;
                 action = Tensor.ArgMax(qValues);
             }
             return action;
@@ -131,16 +131,16 @@ namespace NNNCSharp.Components.DQNEnvironments
             return (action != state.ElementCount - 1) && (state[action] == 0.0); // ensure action index is within valid range and the position at the action index is empty
         }
 
-        public override (double reward, Tensor nextState, bool done) Step(int action, int steps)
+        public override (float reward, Tensor nextState, bool done) Step(int action, int steps)
         {
             if (!ValidAction(action)) throw new ArgumentException("Invalid Action"); // ensure action being taken is valid
 
-            State[action] = State[9] == 1.0 ? 1.0 : -1.0; // fill position at the action index with current player's encoding
+            State[action] = State[9] == 1.0f ? 1.0f : -1.0f; // fill position at the action index with current player's encoding
             var (reward, done) = EvaluateAction(action); // evaluate the reward of the action
 
             // Flip current player
             AgentTurn = !AgentTurn;
-            State[9] *= -1.0;
+            State[9] *= -1.0f;
 
             var nextState = GetNormalizedState();
 
@@ -149,7 +149,7 @@ namespace NNNCSharp.Components.DQNEnvironments
             return (reward, nextState, done);
         }
 
-        public override double TestTrainingProgress(Model agent, int testEpisodes)
+        public override float TestTrainingProgress(Model agent, int testEpisodes)
         {
             int wins = 0;
             int ties = 0;
@@ -160,12 +160,12 @@ namespace NNNCSharp.Components.DQNEnvironments
                 else if (tied) ties++;
             }
 
-            double winPercent = ((double)wins / testEpisodes) * 100.0;
-            double tiePercent = ((double)ties / testEpisodes) * 100.0;
+            float winPercent = ((float)wins / testEpisodes) * 100.0f;
+            float tiePercent = ((float)ties / testEpisodes) * 100.0f;
             NNNLog.WriteLine($"Win percentage vs randomly-acting opponent: {winPercent:F2}");
             NNNLog.WriteLine($"Tie percentage vs randomly-acting opponent: {tiePercent:F2}");
             NNNLog.WriteLine($"Win + tie percentage vs randomly-acting opponent: {(winPercent + tiePercent):F2}");
-            return 2.0 * winPercent + tiePercent;
+            return 2.0f * winPercent + tiePercent;
         }
 
         public override void Render(Episode episode, int step)
@@ -175,7 +175,7 @@ namespace NNNCSharp.Components.DQNEnvironments
             var exp = step == episode.Experiences.Count ? episode.Experiences[step - 1] : episode.Experiences[step];
             var state = exp.NextState;
             int action = step > 0 ? episode.Experiences[step - 1].Action : -1;
-            double reward = step > 0 ? episode.Experiences[step - 1].Reward : 0.0;
+            float reward = step > 0 ? episode.Experiences[step - 1].Reward : 0.0f;
 
             DrawState(state);
 
@@ -206,15 +206,15 @@ namespace NNNCSharp.Components.DQNEnvironments
         /// </summary>
         /// <param name="action">Index of action which was taken.</param>
         /// <returns>Reward of the action and whether the episode has finished.</returns>
-        (double reward, bool won) EvaluateAction(int action)
+        (float reward, bool won) EvaluateAction(int action)
         {
             var relevantOrients = WinOrients.Where(o => o.Contains(action)).ToArray(); // find all winning orientations affected by the action
 
             // Extract position encoding values of all relevant winning orientations
-            double[][] orientValues = new double[relevantOrients.Length][];
+            float[][] orientValues = new float[relevantOrients.Length][];
             for (int orient = 0; orient < relevantOrients.Length; orient++)
             {
-                orientValues[orient] = new double[relevantOrients[orient].Length];
+                orientValues[orient] = new float[relevantOrients[orient].Length];
                 for (int pos = 0; pos < relevantOrients[orient].Length; pos++)
                 {
                     orientValues[orient][pos] = State[relevantOrients[orient][pos]];
@@ -222,15 +222,15 @@ namespace NNNCSharp.Components.DQNEnvironments
             }
 
             // Determine encoding values of current acting player and opponent
-            double ownValue = State[9] == 1.0 ? 1.0 : -1.0;
-            double oppValue = -ownValue;
+            float ownValue = State[9] == 1.0f ? 1.0f : -1.0f;
+            float oppValue = -ownValue;
 
             var advantOrients = orientValues.Where(o => !o.Contains(oppValue)); // find all orientations where the acting player can win
             var blockOrients = orientValues.Where(o => o.Contains(oppValue) && !o.Contains(ownValue)); // find all orientations where the acting player blocked the opponent from winning
             var falseOrients = orientValues.Where(o => o.Contains(ownValue) && o.Contains(oppValue)); // find all orientations where the action had no impact
 
             bool boardFilled = BoardFilled();
-            double reward = boardFilled ? 0.0 : Penalty * falseOrients.Count(); // add penalty per unimpactful orientations
+            float reward = boardFilled ? 0.0f : Penalty * falseOrients.Count(); // add penalty per unimpactful orientations
             bool won = false;
 
             // Calculate reward for orientations where the acting player is closer to winning
@@ -239,9 +239,9 @@ namespace NNNCSharp.Components.DQNEnvironments
                 int ownPositions = orient.Count(p => p == ownValue);
                 reward += ownPositions switch
                 {
-                    2 => 0.1 * WinRewardBase, // small reward for filling 2/3 positions in the orientation
+                    2 => 0.1f * WinRewardBase, // small reward for filling 2/3 positions in the orientation
                     3 => WinRewardBase, // reward for winning the orientation
-                    _ => 0.0
+                    _ => 0.0f
                 };
                 won = won || ownPositions == 3; // track whether acting player has won
             }
@@ -250,10 +250,10 @@ namespace NNNCSharp.Components.DQNEnvironments
             foreach (var orient in blockOrients)
             {
                 int oppPositions = orient.Count(p => p == oppValue);
-                reward += oppPositions == 2 ? BlockRewardBase : 0.0;
+                reward += oppPositions == 2 ? BlockRewardBase : 0.0f;
             }
 
-            reward += (boardFilled && !won) ? DrawRewardBase : 0.0; // add reward if the game has ended with a draw
+            reward += (boardFilled && !won) ? DrawRewardBase : 0.0f; // add reward if the game has ended with a draw
 
             return (reward, won);
         }
@@ -282,7 +282,7 @@ namespace NNNCSharp.Components.DQNEnvironments
                     int action = playerTurn ? GetPlayerAction() : GetAgentAction(agent);
                     if (action == -1) break;
 
-                    State[action] = State[9] == 1.0 ? 1.0 : -1.0; // update board encoding with acting player's action
+                    State[action] = State[9] == 1.0f ? 1.0f : -1.0f; // update board encoding with acting player's action
 
                     // Check whether the acting player has won
                     if (CheckWin())
@@ -294,7 +294,7 @@ namespace NNNCSharp.Components.DQNEnvironments
                     done = BoardFilled();
 
                     // Flip current acting player
-                    State[9] *= -1.0;
+                    State[9] *= -1.0f;
                     playerTurn = !playerTurn;
                 }
 
@@ -368,8 +368,8 @@ namespace NNNCSharp.Components.DQNEnvironments
                 // Fill the position based on its encoding
                 string fill = state[i] switch
                 {
-                    1.0 => " X ",
-                    -1.0 => " O ",
+                    1.0f => " X ",
+                    -1.0f => " O ",
                     _ => "   "
                 };
                 NNNLog.Write(fill);
@@ -390,11 +390,11 @@ namespace NNNCSharp.Components.DQNEnvironments
             {
                 int action = agentTurn ? GetAgentAction(agent) : PickRandomAction();
 
-                State[action] = State[9] == 1.0 ? 1.0 : -1.0;
+                State[action] = State[9] == 1.0f ? 1.0f : -1.0f;
 
                 if (agentTurn && CheckWin()) return (true, false);
 
-                State[9] *= -1.0;
+                State[9] *= -1.0f;
                 agentTurn = !agentTurn;
             }
 

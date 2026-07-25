@@ -44,20 +44,20 @@ public class NNNTrainer
     {
         Model model;
         DQNEnvironment env = new Snake();
-        double exploration = 1.0;
-        double explorationDecay = 0.9999;
-        double minExploration = 0.01;
+        float exploration = 1.0f;
+        float explorationDecay = 0.9999f;
+        float minExploration = 0.01f;
         int trainEvery = 4;
-        double discount = 0.99;
-        Optimizer optimizer = new Adam(0.001);
+        float discount = 0.99f;
+        Optimizer optimizer = new Adam(0.001f);
         Cost cost = new Huber();
         int replayBufferSize = 50000;
         int batchSize = 128;
         int agentBufferSize = 2;
         int opponentCopyRate = 600;
         int minRandomOpponentEpisodes = 600;
-        double tau = 0.001;
-        double maxGradNorm = 1.0;
+        float tau = 0.001f;
+        float maxGradNorm = 1.0f;
         int minExperiences = 2000;
         int episodeMemorySize = 100;
         int testEpisodes = 1;
@@ -67,8 +67,8 @@ public class NNNTrainer
         Console.Clear();
         NNNLog.WriteLine("Welcome to the DQN Training Terminal (Enter Q to quit)");
 
-        double activTau = 0.05;
-        double dropout = 0.1;
+        float activTau = 0.05f;
+        float dropout = 0.1f;
         if (GetInput("Load model from file? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
         {
             // Load model from file
@@ -129,9 +129,9 @@ public class NNNTrainer
         var (testImages, testLabels) = MNISTLoader.GetTestData();
         NNNLog.WriteLine("MNIST dataset loaded");
 
-        double tau = 0.05;
-        double convDropout = 0.15;
-        double denseDropout = 0.5;
+        float tau = 0.05f;
+        float convDropout = 0.15f;
+        float denseDropout = 0.5f;
         Model model;
         if (GetInput("Load model from file? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
         {
@@ -149,11 +149,11 @@ public class NNNTrainer
             ], new([1, 28, 28, 1]));
         }
 
-        Optimizer optimizer = new Adam(0.001, weightDecay: 0.01);
-        double maxGradNorm = 0.5;
+        Optimizer optimizer = new Adam(0.001f, weightDecay: 0.01f);
+        float maxGradNorm = 0.5f;
         Cost cost = new SoftmaxCrossEntropy();
         Trainer trainer = new(model, optimizer, cost, maxGradNorm);
-        double minLRFraction = 0.5;
+        float minLRFraction = 0.5f;
 
         var wrappedImages = new Tensor[testImages.Length];
         for (int i = 0; i < testImages.Length; i++)
@@ -228,7 +228,7 @@ public class NNNTrainer
     /// <param name="testFunc">Function to use to evaluate model performance.</param>
     /// <param name="testLength">Number of times to run the test function per performance test.</param>
     static void StandardTrainingLoop(Trainer trainer, BatchBuffer batchBuffer, int batchSize,
-        Func<Model, int, bool> testFunc, bool decayLR, double minLRFraction, int testLength)
+        Func<Model, int, bool> testFunc, bool decayLR, float minLRFraction, int testLength)
     {
         // Train model until user indicates to stop
         while (true)

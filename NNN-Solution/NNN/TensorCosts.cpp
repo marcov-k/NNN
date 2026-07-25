@@ -23,7 +23,7 @@ std::shared_ptr<Tensor> Tensor::mse(const std::shared_ptr<Tensor>& t, const std:
 			{
 				if (!t->requires_grad) return;
 
-				thread_local std::vector<double> scratch1;
+				thread_local std::vector<float> scratch1;
 
 				const int element_count = result->element_count();
 				scratch1.resize(element_count);
@@ -36,7 +36,7 @@ std::shared_ptr<Tensor> Tensor::mse(const std::shared_ptr<Tensor>& t, const std:
 	return result;
 }
 
-std::shared_ptr<Tensor> Tensor::huber(const std::shared_ptr<Tensor>& t, const std::shared_ptr<Tensor>& target, double delta)
+std::shared_ptr<Tensor> Tensor::huber(const std::shared_ptr<Tensor>& t, const std::shared_ptr<Tensor>& target, float delta)
 {
 	auto result = get_result_tensor(t, t->_dimensions, t->requires_grad);
 
@@ -59,8 +59,8 @@ std::shared_ptr<Tensor> Tensor::huber(const std::shared_ptr<Tensor>& t, const st
 			{
 				if (!t->requires_grad) return;
 
-				thread_local std::vector<double> scratch1;
-				thread_local std::vector<double> scratch2;
+				thread_local std::vector<float> scratch1;
+				thread_local std::vector<float> scratch2;
 
 				const int element_count = result->element_count();
 				scratch1.resize(element_count);
@@ -87,73 +87,83 @@ std::shared_ptr<Tensor> Tensor::softmax_cross_entropy(const std::shared_ptr<Tens
 
 	std::shared_ptr<Tensor> result = get_result_tensor(t, {(int)batches, 1}, t->requires_grad);
 
-	auto probs = std::make_shared<std::vector<double>>(element_count); // allow backward lambda to capture pointer (avoids copy allocation)
+	auto probs = std::make_shared<std::vector<float>>(element_count); // allow backward lambda to capture pointer (avoids copy allocation)
 
-	const double* __restrict t_data = t->_data.data();
-	double* __restrict p_data = probs->data();
-	const double* __restrict y_data = target->_data.data();
-	double* __restrict r_data = result->_data.data();
+	const float* __restrict t_data = t->_data.data();
+	float* __restrict p_data = probs->data();
+	const float* __restrict y_data = target->_data.data();
+	float* __restrict r_data = result->_data.data();
 
 	// Compute Softmax Cross-Entropy loss per batch -> L = -sum(i = 1 to c)[y_i * ln(p_i)]; p_i = e^z_i / sum_c(e^z_c)
 	for (size_t b = 0; b < batches; ++b)
 	{
 		const size_t offset = b * classes;
 
-		const double* __restrict logits = t_data + offset;
-		double* __restrict p = p_data + offset;
+		const float* __restrict logits = t_data + offset;
+		float* __restrict p = p_data + offset;
 
-		const double max_logit = MathUtils::vector_max(logits, classes);
+		const float max_logit = MathUtils::vector_max(logits, classes);
 
-		const __m256d reg_max_logit = _mm256_set1_pd(max_logit);
-		__m256d acc0 = _mm256_setzero_pd();
-		__m256d acc1 = _mm256_setzero_pd();
+		const __m256 reg_max_logit = _mm256_set1_ps(max_logit);
+		__m256 acc0 = _mm256_setzero_ps();
+		__m256 acc1 = _mm256_setzero_ps();
+		__m256 acc2 = _mm256_setzero_ps();
+		__m256 acc3 = _mm256_setzero_ps();
 
 		size_t i = 0;
+		for (; i + 32 <= classes; i += 32)
+		{
+			const __m256 exp0 = _mm256_exp_ps(_mm256_sub_ps(_mm256_load_ps(&logits[i]), reg_max_logit));
+			const __m256 exp1 = _mm256_exp_ps(_mm256_sub_ps(_mm256_load_ps(&logits[i + 8]), reg_max_logit));
+			const __m256 exp2 = _mm256_exp_ps(_mm256_sub_ps(_mm256_load_ps(&logits[i + 16]), reg_max_logit));
+			const __m256 exp3 = _mm256_exp_ps(_mm256_sub_ps(_mm256_load_ps(&logits[i + 24]), reg_max_logit));
+
+			_mm256_store_ps(&p[i], exp0);
+			_mm256_store_ps(&p[i + 8], exp1);
+			_mm256_store_ps(&p[i + 16], exp2);
+			_mm256_store_ps(&p[i + 24], exp3);
+
+			acc0 = _mm256_add_ps(acc0, exp0);
+			acc1 = _mm256_add_ps(acc1, exp1);
+			acc2 = _mm256_add_ps(acc2, exp2);
+			acc3 = _mm256_add_ps(acc3, exp3);
+		}
+
+		acc0 = _mm256_add_ps(acc0, acc1);
+		acc2 = _mm256_add_ps(acc2, acc3);
+		acc0 = _mm256_add_ps(acc0, acc2);
+
 		for (; i + 8 <= classes; i += 8)
 		{
-			__m256d exp0 = _mm256_exp_pd(_mm256_sub_pd(_mm256_loadu_pd(&logits[i]), reg_max_logit));
-			__m256d exp1 = _mm256_exp_pd(_mm256_sub_pd(_mm256_loadu_pd(&logits[i + 4]), reg_max_logit));
-
-			_mm256_storeu_pd(&p[i], exp0);
-			_mm256_storeu_pd(&p[i + 4], exp1);
-
-			acc0 = _mm256_add_pd(acc0, exp0);
-			acc1 = _mm256_add_pd(acc1, exp1);
+			const __m256 exp = _mm256_exp_ps(_mm256_sub_ps(_mm256_load_ps(&logits[i]), reg_max_logit));
+			_mm256_store_ps(&p[i], exp);
+			acc0 = _mm256_add_ps(acc0, exp);
 		}
 
-		__m256d acc = _mm256_add_pd(acc0, acc1);
-
-		for (; i + 4 <= classes; i += 4)
-		{
-			__m256d exp = _mm256_exp_pd(_mm256_sub_pd(_mm256_loadu_pd(&logits[i]), reg_max_logit));
-			_mm256_storeu_pd(&p[i], exp);
-			acc = _mm256_add_pd(acc, exp);
-		}
-
-		double sum_exp = MathUtils::sum_m256d(acc);
+		float sum_exp = MathUtils::sum_m256(acc0);
 
 		for (; i < classes; ++i)
 		{
-			double exp = std::exp(logits[i] - max_logit);
+			float exp = std::exp(logits[i] - max_logit);
 			p[i] = exp;
 			sum_exp += exp;
 		}
 
 		MathUtils::vector_div(p, sum_exp, classes);
 
-		const double* __restrict y = y_data + offset;
+		const float* __restrict y = y_data + offset;
 
 		size_t label = 0;
 		for (size_t j = 0; j < classes; ++j)
 		{
-			if (y[j] > 0.5)
+			if (y[j] > 0.5f)
 			{
 				label = j;
 				break;
 			}
 		}
 
-		double loss = -std::log(p[label] + 1e-12);
+		float loss = -std::log(p[label] + 1e-12f);
 
 		r_data[b] = loss;
 	}
@@ -168,23 +178,23 @@ std::shared_ptr<Tensor> Tensor::softmax_cross_entropy(const std::shared_ptr<Tens
 			{
 				if (!t->requires_grad) return;
 
-				thread_local std::vector<double> scratch1;
+				thread_local std::vector<float> scratch1;
 				scratch1.resize(classes);
 
-				const double* __restrict p_data = probs->data();
-				const double* __restrict y_data = target->_data.data();
-				const double* __restrict r_grad = result->_grad.data();
-				double* __restrict t_grad = t->_grad.data();
+				const float* __restrict p_data = probs->data();
+				const float* __restrict y_data = target->_data.data();
+				const float* __restrict r_grad = result->_grad.data();
+				float* __restrict t_grad = t->_grad.data();
 
 				// Calculate gradient per batch
 				for (size_t b = 0; b < batches; ++b)
 				{
 					const size_t offset = b * classes;
 					
-					const double rg = r_grad[b];
-					const double* __restrict p = p_data + offset;
-					const double* __restrict y = y_data + offset;
-					double* __restrict tg = t_grad + offset;
+					const float rg = r_grad[b];
+					const float* __restrict p = p_data + offset;
+					const float* __restrict y = y_data + offset;
+					float* __restrict tg = t_grad + offset;
 
 					MathUtils::vector_sub(p, y, scratch1.data(), classes);
 					MathUtils::vector_fmadd(tg, scratch1.data(), rg, classes);

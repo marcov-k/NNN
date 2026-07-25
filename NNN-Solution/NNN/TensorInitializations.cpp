@@ -33,15 +33,15 @@ Tensor::Tensor(const std::vector<int> dims, bool req_grad) : _dimensions(dims), 
 		size *= dim;
 	}
 
-	_data.assign(size, 0.0);
+	_data.assign(size, 0.0f);
 	
 	if (requires_grad)
 	{
-		_grad.assign(size, 0.0);
+		_grad.assign(size, 0.0f);
 	}
 }
 
-Tensor::Tensor(double value, const std::vector<int> dims, bool req_grad) : _dimensions(dims), requires_grad(req_grad)
+Tensor::Tensor(float value, const std::vector<int> dims, bool req_grad) : _dimensions(dims), requires_grad(req_grad)
 {
 	_strides = compute_strides(dims);
 
@@ -57,7 +57,7 @@ Tensor::Tensor(double value, const std::vector<int> dims, bool req_grad) : _dime
 
 	if (requires_grad)
 	{
-		_grad.assign(size, 0.0);
+		_grad.assign(size, 0.0f);
 	}
 }
 
@@ -66,11 +66,11 @@ std::shared_ptr<Tensor> Tensor::init_weights(int input_count, int neuron_count)
 	auto weights = std::make_shared<Tensor>(std::vector<int>{input_count, neuron_count}, true);
 
 	// Initialize weight values using He initialization
-	double std_dev = std::sqrt(2.0 / input_count);
+	float std_dev = std::sqrt(2.0f / input_count);
 	const int element_count = weights->element_count();
 	for (int i = 0; i < element_count; ++i)
 	{
-		weights->_data[i] = MathUtils::next_gaussian(0.0, std_dev);
+		weights->_data[i] = MathUtils::next_gaussian(0.0f, std_dev);
 	}
 
 	return weights;
@@ -78,7 +78,7 @@ std::shared_ptr<Tensor> Tensor::init_weights(int input_count, int neuron_count)
 
 std::shared_ptr<Tensor> Tensor::init_biases(int neuron_count)
 {
-	return std::make_shared<Tensor>(0.01, std::vector<int>{neuron_count}, true);
+	return std::make_shared<Tensor>(0.01f, std::vector<int>{neuron_count}, true);
 }
 
 std::shared_ptr<Tensor> Tensor::init_kernels(int filter_count, const std::vector<int>& kernel_dims, int input_channels)
@@ -98,11 +98,11 @@ std::shared_ptr<Tensor> Tensor::init_kernels(int filter_count, const std::vector
 	auto kernels = std::make_shared<Tensor>(dims, true);
 
 	// Initialize kernel values using He initialization
-	double std_dev = std::sqrt(2.0 / fan_in);
+	float std_dev = std::sqrt(2.0f / fan_in);
 	const int element_count = kernels->element_count();
 	for (int i = 0; i < element_count; ++i)
 	{
-		kernels->_data[i] = MathUtils::next_gaussian(0.0, std_dev);
+		kernels->_data[i] = MathUtils::next_gaussian(0.0f, std_dev);
 	}
 
 	return kernels;

@@ -4,21 +4,21 @@
 #include "MathUtils.h"
 
 // Applies a Stochastic Gradient Descent optimizer step to the given parameter.
-void Optimizers::sgd(const std::shared_ptr<Tensor>& para, double lr)
+void Optimizers::sgd(const std::shared_ptr<Tensor>& para, float lr)
 {
 	MathUtils::vector_fnmadd(para->mutable_data(), para->grad(), lr); // p -= grad * lr
 }
 
-void Optimizers::adam(const std::shared_ptr<Tensor>& para, double lr, int iter, std::span<double> m, std::span<double> v,
-	double beta1, double one_minus_beta1, double beta2, double one_minus_beta2, double epsilon, double weight_decay)
+void Optimizers::adam(const std::shared_ptr<Tensor>& para, float lr, int iter, std::span<float> m, std::span<float> v,
+	float beta1, float one_minus_beta1, float beta2, float one_minus_beta2, float epsilon, float weight_decay)
 {
 	// Calculate bias corrections
-	const double bias_corr1 = 1.0 - std::pow(beta1, iter + 1);
-	const double bias_corr2 = 1.0 - std::pow(beta2, iter + 1);
+	const float bias_corr1 = 1.0f - std::pow(beta1, (float)(iter + 1));
+	const float bias_corr2 = 1.0f - std::pow(beta2, (float)(iter + 1));
 
 	// Initialize persistent scratch buffers
-	thread_local std::vector<double> scratch1;
-	thread_local std::vector<double> scratch2;
+	thread_local std::vector<float> scratch1;
+	thread_local std::vector<float> scratch2;
 
 	const int param_count = para->element_count();
 	scratch1.resize(param_count);
@@ -44,9 +44,9 @@ void Optimizers::adam(const std::shared_ptr<Tensor>& para, double lr, int iter, 
 	MathUtils::vector_fnmadd(para->mutable_data(), scratch2, scratch1);
 
 	// Apply AdamW weight decay if needed -> p_t = w_t-1 - lr*wd*w_t-1 - lr(m_hat_t / (sqrt(v_hat_t) + eps))
-	if (weight_decay > 0.0)
+	if (weight_decay > 0.0f)
 	{
-		const double coeff = lr * weight_decay;
+		const float coeff = lr * weight_decay;
 		MathUtils::vector_mul(para->data(), coeff, scratch1);
 		MathUtils::vector_sub(para->mutable_data(), scratch1);
 	}

@@ -13,9 +13,9 @@ public:
 	Optimizers() = delete;
 
 	// Applies a Stochastic Gradient Descent optimizer step to the given parameter.
-	static void sgd(const std::shared_ptr<Tensor>& para, double lr);
+	static void sgd(const std::shared_ptr<Tensor>& para, float lr);
 
 	// Applies an Adam optimizer step to the given parameter.
-	static void adam(const std::shared_ptr<Tensor>& para, double lr, int iter, std::span<double> m, std::span<double> v,
-		double beta1, double one_minus_beta1, double beta2, double one_minus_beta2, double epsilon, double weight_decay);
+	static void adam(const std::shared_ptr<Tensor>& para, float lr, int iter, std::span<float> m, std::span<float> v,
+		float beta1, float one_minus_beta1, float beta2, float one_minus_beta2, float epsilon, float weight_decay);
 };

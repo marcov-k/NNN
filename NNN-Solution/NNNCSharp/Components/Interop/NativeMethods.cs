@@ -41,7 +41,7 @@ namespace NNNCSharp.Components.Interop
         /// <param name="requires_grad">requires_grad flag of the new C++ tensor.</param>
         /// <returns>void* handle of the new C++ tensor instance.</returns>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr tensor_create_scalar(double value, int[] dims, int rank, [MarshalAs(UnmanagedType.I1)] bool requires_grad);
+        internal static extern IntPtr tensor_create_scalar(float value, int[] dims, int rank, [MarshalAs(UnmanagedType.I1)] bool requires_grad);
 
         /// <summary>
         /// Initializes a new C++ weights tensor instance for a layer with the given input and neuron counts.
@@ -132,7 +132,7 @@ namespace NNNCSharp.Components.Interop
         /// Returns a pointer to the start of the data array of the given C++ tensor.
         /// </summary>
         /// <param name="handle">void* handle of the C++ tensor.</param>
-        /// <returns>double* to the start of the data array of the given C++ tensor.</returns>
+        /// <returns>float* to the start of the data array of the given C++ tensor.</returns>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr tensor_data_ptr(IntPtr handle);
 
@@ -143,7 +143,7 @@ namespace NNNCSharp.Components.Interop
         /// <param name="index">Linear index to read from.</param>
         /// <returns>Value at the given linear index.</returns>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern double tensor_get_at(IntPtr handle, int index);
+        internal static extern float tensor_get_at(IntPtr handle, int index);
 
         /// <summary>
         /// Sets the value at the given linear index in the given C++ tensor.
@@ -152,7 +152,7 @@ namespace NNNCSharp.Components.Interop
         /// <param name="value">Value to write.</param>
         /// <param name="index">Linear index to write to.</param>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern void tensor_set_at(IntPtr handle, double value, int index);
+        internal static extern void tensor_set_at(IntPtr handle, float value, int index);
 
         /// <summary>
         /// Returns the value at the given indices in the given C++ tensor.
@@ -162,7 +162,7 @@ namespace NNNCSharp.Components.Interop
         /// <param name="rank">Length of the indices array.</param>
         /// <returns>Values at the given indices.</returns>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern double tensor_get_at_spatial(IntPtr handle, int[] indices, int rank);
+        internal static extern float tensor_get_at_spatial(IntPtr handle, int[] indices, int rank);
 
         /// <summary>
         /// Sets the value at the given indices in the given C++ tensor.
@@ -172,13 +172,13 @@ namespace NNNCSharp.Components.Interop
         /// <param name="indices">Indices to write to.</param>
         /// <param name="rank">Length of the indices array.</param>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern void tensor_set_at_spatial(IntPtr handle, double value, int[] indices, int rank);
+        internal static extern void tensor_set_at_spatial(IntPtr handle, float value, int[] indices, int rank);
 
         /// <summary>
         /// Returns a pointer to the start of gradient array of the given C++ tensor.
         /// </summary>
         /// <param name="handle">void* handle of the C++ tensor.</param>
-        /// <returns>double* to the start of the gradient array of the given C++ tensor.</returns>
+        /// <returns>float* to the start of the gradient array of the given C++ tensor.</returns>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr tensor_grad_ptr(IntPtr handle);
 
@@ -282,7 +282,7 @@ namespace NNNCSharp.Components.Interop
         /// <param name="b">Scalar to add.</param>
         /// <returns>void* handle of the result C++ tensor.</returns>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr tensor_add_scalar(IntPtr handle_a, double b);
+        internal static extern IntPtr tensor_add_scalar(IntPtr handle_a, float b);
 
         /// <summary>
         /// Subtracts the given C++ tensors -> (a (T) - b (T))
@@ -300,7 +300,7 @@ namespace NNNCSharp.Components.Interop
         /// <param name="b">Scalar to subtract.</param>
         /// <returns>void* handle of the result C++ tensor.</returns>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr tensor_sub_scalar(IntPtr handle_a, double b);
+        internal static extern IntPtr tensor_sub_scalar(IntPtr handle_a, float b);
 
         /// <summary>
         /// Subtracts the given scalar and C++ tensor -> (a (S) - b (T))
@@ -309,7 +309,7 @@ namespace NNNCSharp.Components.Interop
         /// <param name="handle_b">void* handle of the C++ tensor.</param>
         /// <returns>void* handle of the result C++ tensor.</returns>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr tensor_sub_scalar_left(double a, IntPtr handle_b);
+        internal static extern IntPtr tensor_sub_scalar_left(float a, IntPtr handle_b);
 
         /// <summary>
         /// Multiplies the given C++ tensors -> (a (T) * b (T))
@@ -327,7 +327,7 @@ namespace NNNCSharp.Components.Interop
         /// <param name="b">Scalar to multiply by.</param>
         /// <returns>void* handle of the result C++ tensor.</returns>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr tensor_mul_scalar(IntPtr handle_a, double b);
+        internal static extern IntPtr tensor_mul_scalar(IntPtr handle_a, float b);
 
         /// <summary>
         /// Divides the given C++ tensors -> (a (T) / b (T))
@@ -345,7 +345,7 @@ namespace NNNCSharp.Components.Interop
         /// <param name="b">Scalar to divide by.</param>
         /// <returns>void* handle of the result C++ tensor.</returns>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr tensor_div_scalar(IntPtr handle_a, double b);
+        internal static extern IntPtr tensor_div_scalar(IntPtr handle_a, float b);
 
         /// <summary>
         /// Divides the given scalar and C++ tensor -> (a (S) / b (T))
@@ -354,7 +354,7 @@ namespace NNNCSharp.Components.Interop
         /// <param name="handle_b">void* handle of the C++ tensor.</param>
         /// <returns>void* handle of the result C++ tensor.</returns>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr tensor_div_scalar_left(double a, IntPtr handle_b);
+        internal static extern IntPtr tensor_div_scalar_left(float a, IntPtr handle_b);
 
         /// <summary>
         /// Raises the given C++ tensor to the given exponent C++ tensor -> (a (T) ^ exp (T))
@@ -372,7 +372,7 @@ namespace NNNCSharp.Components.Interop
         /// <param name="exp">Exponent scalar to raise to.</param>
         /// <returns>void* handle of the result C++ tensor.</returns>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr tensor_pow_scalar(IntPtr handle_a, double exp);
+        internal static extern IntPtr tensor_pow_scalar(IntPtr handle_a, float exp);
 
         /// <summary>
         /// Raises the given scalar to the given exponent C++ tensor -> (a (S) ^ exp (T))
@@ -381,7 +381,7 @@ namespace NNNCSharp.Components.Interop
         /// <param name="handle_exp">void* handle of the exponent C++ tensor.</param>
         /// <returns>void* handle of the result C++ tensor.</returns>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr tensor_pow_scalar_left(double a, IntPtr handle_exp);
+        internal static extern IntPtr tensor_pow_scalar_left(float a, IntPtr handle_exp);
 
         /// <summary>
         /// Raises e to the power of the given C++ tensor -> (e ^ t)
@@ -407,7 +407,7 @@ namespace NNNCSharp.Components.Interop
         /// <param name="log_base">Scalar to use as base.</param>
         /// <returns>viod* handle of the result C++ tensor.</returns>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr tensor_log_scalar(IntPtr handle_arg, double log_base);
+        internal static extern IntPtr tensor_log_scalar(IntPtr handle_arg, float log_base);
 
         /// <summary>
         /// Computes the logarithm with the given C++ tensor base of the given scalar -> (log_baseT(arg (S))
@@ -416,7 +416,7 @@ namespace NNNCSharp.Components.Interop
         /// <param name="handle_log_base">void* handle of the base C++ tensor.</param>
         /// <returns>void* handle of the result C++ tensor.</returns>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr tensor_log_scalar_left(double arg, IntPtr handle_log_base);
+        internal static extern IntPtr tensor_log_scalar_left(float arg, IntPtr handle_log_base);
 
         /// <summary>
         /// Computes the natural logarithm of the given C++ tensor -> (ln(t))
@@ -544,7 +544,7 @@ namespace NNNCSharp.Components.Interop
         /// <param name="max">Maximum value to clip above.</param>
         /// <returns>void* handle of the clipped C++ tensor.</returns>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr tensor_clip(IntPtr handle, double min, double max);
+        internal static extern IntPtr tensor_clip(IntPtr handle, float min, float max);
 
         /// <summary>
         /// Initializes a new mask applying a dense layer dropout to a C++ tensor with the given dimensions.
@@ -554,7 +554,7 @@ namespace NNNCSharp.Components.Interop
         /// <param name="dropout">Dropout rate parameter of the layer.</param>
         /// <returns>void* handle of the dropout mask C++ tensor.</returns>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr tensor_get_dense_dropout_mask(int[] dims, int dims_length, double dropout);
+        internal static extern IntPtr tensor_get_dense_dropout_mask(int[] dims, int dims_length, float dropout);
 
         /// <summary>
         /// Initializes a new mask applying spatial dropout to a C++ tensor with the given dimensions.
@@ -564,7 +564,7 @@ namespace NNNCSharp.Components.Interop
         /// <param name="dropout">Dropout rate parameter of the layer.</param>
         /// <returns>void* handle of the dropout mask C++ tensor.</returns>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr tensor_get_spatial_dropout_mask(int[] dims, int dims_length, double dropout);
+        internal static extern IntPtr tensor_get_spatial_dropout_mask(int[] dims, int dims_length, float dropout);
 
         // Activation functions
 
@@ -583,7 +583,7 @@ namespace NNNCSharp.Components.Interop
         /// <param name="tau">Tau parameter to use.</param>
         /// <returns>void* handle of the result C++ tensor.</returns>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr tensor_leaky_relu(IntPtr handle, double tau);
+        internal static extern IntPtr tensor_leaky_relu(IntPtr handle, float tau);
 
         /// <summary>
         /// Applies the Sigmoid activation function to the given C++ tensor.
@@ -636,7 +636,7 @@ namespace NNNCSharp.Components.Interop
         /// <param name="delta">Delta parameter to use.</param>
         /// <returns>void* handle of the result C++ tensor.</returns>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr tensor_huber(IntPtr handle_t, IntPtr handle_target, double delta);
+        internal static extern IntPtr tensor_huber(IntPtr handle_t, IntPtr handle_target, float delta);
 
         /// <summary>
         /// Computes the per-element Softmax Cross Entropy loss of the given C++ tensor using the given target C++ tensor.
@@ -655,7 +655,7 @@ namespace NNNCSharp.Components.Interop
         /// <param name="handle_para">void* handle of the parameter C++ tensor.</param>
         /// <param name="lr">Learning rate parameter to use.</param>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern void optimizers_sgd(IntPtr handle_para, double lr);
+        internal static extern void optimizers_sgd(IntPtr handle_para, float lr);
 
         /// <summary>
         /// Performs an Adam optimizer step with the given parameters on the given parameter C++ tensor.
@@ -673,8 +673,8 @@ namespace NNNCSharp.Components.Interop
         /// <param name="epsilon">Epsilon value to use.</param>
         /// <param name="weight_decay">Weight decay parameter to use.</param>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern void optimizers_adam(IntPtr handle_para, double lr, int iter, double[] m, double[] v, int moments_count,
-            double beta1, double one_minus_beta1, double beta2, double one_minus_beta2, double epsilon, double weight_decay);
+        internal static extern void optimizers_adam(IntPtr handle_para, float lr, int iter, float[] m, float[] v, int moments_count,
+            float beta1, float one_minus_beta1, float beta2, float one_minus_beta2, float epsilon, float weight_decay);
 
         // Models
 
@@ -685,7 +685,7 @@ namespace NNNCSharp.Components.Interop
         /// <param name="para_count">Length of the parameter handles array.</param>
         /// <param name="max_norm">Max norm parameter to use.</param>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern void models_clip_gradients(IntPtr[] handles, int para_count, double max_norm);
+        internal static extern void models_clip_gradients(IntPtr[] handles, int para_count, float max_norm);
 
         /// <summary>
         /// Applies a soft update to the given target model's parameters based on the given agent model's parameters.
@@ -696,7 +696,7 @@ namespace NNNCSharp.Components.Interop
         /// <param name="tau">Tau parameter to use.</param>
         /// <param name="one_minus_tau">Precalculated 1 - tau parameter to use.</param>
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern void models_soft_update(IntPtr[] handles_agent, IntPtr[] handles_target, int para_count, double tau,
-            double one_minus_tau);
+        internal static extern void models_soft_update(IntPtr[] handles_agent, IntPtr[] handles_target, int para_count, float tau,
+            float one_minus_tau);
     }
 }

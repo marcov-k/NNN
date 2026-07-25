@@ -34,6 +34,38 @@ struct TensorPtrEqual
 	}
 };
 
+template<typename T, size_t Alignment = 32>
+struct AlignedAllocator
+{
+	using value_type = T;
+
+	T* allocate(size_t n)
+	{
+		void* ptr = _aligned_malloc(n * sizeof(T), Alignment);
+		if (!ptr) throw std::bad_alloc();
+		return static_cast<T*>(ptr);
+	}
+
+	void deallocate(T* ptr, size_t) noexcept
+	{
+		_aligned_free(ptr);
+	}
+
+	template<typename U>
+	struct rebind
+	{
+		using other = AlignedAllocator<U, Alignment>;
+	};
+
+	template<typename U>
+	bool operator==(const AlignedAllocator<U, Alignment>&) const noexcept { return true; }
+
+	template<typename U>
+	bool operator!=(const AlignedAllocator<U, Alignment>&) const noexcept { return false; }
+};
+
+using AlignedFloatVector = std::vector<float, AlignedAllocator<float>>;
+
 // Core tensor data structure - implements full autograd graph.
 class Tensor : public std::enable_shared_from_this<Tensor>
 {
@@ -47,7 +79,7 @@ public:
 	Tensor(const std::vector<int> dims, bool req_grad = false);
 
 	// Creates a new tensor instance with the given dimensions and requires_grad flag and fills it with the given scalar value.
-	Tensor(double value, const std::vector<int> dims, bool req_grad = false);
+	Tensor(float value, const std::vector<int> dims, bool req_grad = false);
 
 	// Initializes a new weights tensor instance for a dense layer.
 	static std::shared_ptr<Tensor> init_weights(int input_count, int neuron_count);
@@ -64,25 +96,25 @@ public:
 	/* Indexing/data access */
 
 	// Returns a constant reference to the tensor's data vector.
-	const std::vector<double>& data() const
+	const AlignedFloatVector& data() const
 	{
 		return _data;
 	}
 
 	// Returns a mutable reference to the tensor's data vector.
-	std::vector<double>& mutable_data()
+	AlignedFloatVector& mutable_data()
 	{
 		return _data;
 	}
 
 	// Returns a constant reference to the tensor's gradient vector.
-	const std::vector<double>& grad() const
+	const AlignedFloatVector& grad() const
 	{
 		return _grad;
 	}
 
 	// Returns a mutable reference to the tensor's gradient vector.
-	std::vector<double>& mutable_grad()
+	AlignedFloatVector& mutable_grad()
 	{
 		return _grad;
 	}
@@ -127,16 +159,16 @@ public:
 	static bool log_debug;
 
 	// Returns a mutable reference to the value at the given linear index in the tensor.
-	double& operator[](int index);
+	float& operator[](int index);
 
 	// Returns a constant reference to the value at the given lienar index in the tensor.
-	const double& operator[](int index) const;
+	const float& operator[](int index) const;
 
 	// Returns a mutable reference to the value at the given indices in the tensor.
-	double& at(const std::vector<int>& indices);
+	float& at(const std::vector<int>& indices);
 
 	// Returns a constant reference to the value at the given indices in the tensor.
-	const double& at(const std::vector<int>& indices) const;
+	const float& at(const std::vector<int>& indices) const;
 
 	// Converts indices into a linear index in the tensor.
 	int linear_index(const std::vector<int>& indices) const;
@@ -164,40 +196,40 @@ public:
 	static std::shared_ptr<Tensor> add(const std::shared_ptr<Tensor>& a, const std::shared_ptr<Tensor>& b);
 
 	// Adds a tensor and scalar -> r = a + b
-	static std::shared_ptr<Tensor> add(const std::shared_ptr<Tensor>& a, double b);
+	static std::shared_ptr<Tensor> add(const std::shared_ptr<Tensor>& a, float b);
 
 	// Subtracts two tensors -> r = a - b
 	static std::shared_ptr<Tensor> sub(const std::shared_ptr<Tensor>& a, const std::shared_ptr<Tensor>& b);
 
 	// Subtracts a tensor and scalar -> r = a - b
-	static std::shared_ptr<Tensor> sub(const std::shared_ptr<Tensor>& a, double b);
+	static std::shared_ptr<Tensor> sub(const std::shared_ptr<Tensor>& a, float b);
 
 	// Subtracts a scalar and tensor -> r = a - b
-	static std::shared_ptr<Tensor> sub(double a, const std::shared_ptr<Tensor>& b);
+	static std::shared_ptr<Tensor> sub(float a, const std::shared_ptr<Tensor>& b);
 
 	// Multiplies two tensors -> r = a * b
 	static std::shared_ptr<Tensor> mul(const std::shared_ptr<Tensor>& a, const std::shared_ptr<Tensor>& b);
 
 	// Multiplies a tensor and scalar -> r = a * b
-	static std::shared_ptr<Tensor> mul(const std::shared_ptr<Tensor>& a, double b);
+	static std::shared_ptr<Tensor> mul(const std::shared_ptr<Tensor>& a, float b);
 
 	// Divides two tensors -> r = a / b
 	static std::shared_ptr<Tensor> div(const std::shared_ptr<Tensor>& a, const std::shared_ptr<Tensor>& b);
 
 	// Divides a tensor and scalar -> r = a / b
-	static std::shared_ptr<Tensor> div(const std::shared_ptr<Tensor>& a, double b);
+	static std::shared_ptr<Tensor> div(const std::shared_ptr<Tensor>& a, float b);
 
 	// Divides a scalar and tensor -> r = a / b
-	static std::shared_ptr<Tensor> div(double a, const std::shared_ptr<Tensor>& b);
+	static std::shared_ptr<Tensor> div(float a, const std::shared_ptr<Tensor>& b);
 
 	// Exponentiates two tensors -> r = a ^ exp
 	static std::shared_ptr<Tensor> pow(const std::shared_ptr<Tensor>& a, const std::shared_ptr<Tensor>& exp);
 
 	// Exponentiates a tensor and scalar -> r = a ^ exp
-	static std::shared_ptr<Tensor> pow(const std::shared_ptr<Tensor>& a, double exp);
+	static std::shared_ptr<Tensor> pow(const std::shared_ptr<Tensor>& a, float exp);
 
 	// Exponentiates a scalar and tensor -> r = a ^ exp
-	static std::shared_ptr<Tensor> pow(double a, const std::shared_ptr<Tensor>& exp);
+	static std::shared_ptr<Tensor> pow(float a, const std::shared_ptr<Tensor>& exp);
 
 	// Computes the natural exponentiation of a tensor -> r = e ^ t
 	static std::shared_ptr<Tensor> exp(const std::shared_ptr<Tensor>& t);
@@ -206,10 +238,10 @@ public:
 	static std::shared_ptr<Tensor> log(const std::shared_ptr<Tensor>& arg, const std::shared_ptr<Tensor>& log_base);
 
 	// Computes the logarithm of a tensor and scalar -> r = log_base(arg)
-	static std::shared_ptr<Tensor> log(const std::shared_ptr<Tensor>& arg, double log_base);
+	static std::shared_ptr<Tensor> log(const std::shared_ptr<Tensor>& arg, float log_base);
 
 	// Computes the logarithm of a scalar and tensor -> r = log_base(arg)
-	static std::shared_ptr<Tensor> log(double arg, const std::shared_ptr<Tensor>& log_base);
+	static std::shared_ptr<Tensor> log(float arg, const std::shared_ptr<Tensor>& log_base);
 
 	// Computes the natural logarithm of a tensor -> r = ln(t)
 	static std::shared_ptr<Tensor> ln(const std::shared_ptr<Tensor>& t);
@@ -253,13 +285,13 @@ public:
 	static std::shared_ptr<Tensor> wrap_batch(const std::shared_ptr<Tensor>& t);
 
 	// Clips all the values in a tensor between the given min and max values.
-	static std::shared_ptr<Tensor> clip(const std::shared_ptr<Tensor>& t, double min, double max);
+	static std::shared_ptr<Tensor> clip(const std::shared_ptr<Tensor>& t, float min, float max);
 
 	// Creates a dropout mask with the given dimensions.
-	static std::shared_ptr<Tensor> get_dense_dropout_mask(const std::vector<int>& dims, double dropout);
+	static std::shared_ptr<Tensor> get_dense_dropout_mask(const std::vector<int>& dims, float dropout);
 
 	// Creates a spatial dropout mask with the given dimensions.
-	static std::shared_ptr<Tensor> get_spatial_dropout_mask(const std::vector<int>& dims, double dropout);
+	static std::shared_ptr<Tensor> get_spatial_dropout_mask(const std::vector<int>& dims, float dropout);
 
 	/* Activation functions */
 
@@ -267,7 +299,7 @@ public:
 	static std::shared_ptr<Tensor> relu(const std::shared_ptr<Tensor>& t);
 
 	// Applies the Leaky Rectified Linear Unit function to a tensor.
-	static std::shared_ptr<Tensor> leaky_relu(const std::shared_ptr<Tensor>& t, double tau);
+	static std::shared_ptr<Tensor> leaky_relu(const std::shared_ptr<Tensor>& t, float tau);
 
 	// Applies the Sigmoid function to a tensor.
 	static std::shared_ptr<Tensor> sigmoid(const std::shared_ptr<Tensor>& t);
@@ -287,7 +319,7 @@ public:
 	static std::shared_ptr<Tensor> mse(const std::shared_ptr<Tensor>& t, const std::shared_ptr<Tensor>& target);
 
 	// Computes the pseudo-Huber loss of a tensor based on the given target tensor.
-	static std::shared_ptr<Tensor> huber(const std::shared_ptr<Tensor>& t, const std::shared_ptr<Tensor>& target, double delta);
+	static std::shared_ptr<Tensor> huber(const std::shared_ptr<Tensor>& t, const std::shared_ptr<Tensor>& target, float delta);
 
 	// Computes the Softmax Cross-Entropy loss of a tensor based on the given target tensor (one-hot encoded).
 	static std::shared_ptr<Tensor> softmax_cross_entropy(const std::shared_ptr<Tensor>& t, const std::shared_ptr<Tensor>& target);
@@ -296,9 +328,9 @@ private:
 	/* Internal data */
 
 	// Data vector of the tensor.
-	std::vector<double> _data;
+	AlignedFloatVector _data;
 	// Gradient vector of the tensor.
-	std::vector<double> _grad;
+	AlignedFloatVector _grad;
 	// Dimensions vector of the tensor.
 	std::vector<int> _dimensions;
 	// Strides vector of the tensor.
@@ -361,13 +393,13 @@ inline std::shared_ptr<Tensor> operator+(const std::shared_ptr<Tensor>& a, const
 }
 
 // Adds a tensor and scalar -> r = a + b
-inline std::shared_ptr<Tensor> operator+(const std::shared_ptr<Tensor>& a, double b)
+inline std::shared_ptr<Tensor> operator+(const std::shared_ptr<Tensor>& a, float b)
 {
 	return Tensor::add(a, b);
 }
 
 // Adds a scalar and tensor -> r = a + b
-inline std::shared_ptr<Tensor> operator+(double a, const std::shared_ptr<Tensor>& b)
+inline std::shared_ptr<Tensor> operator+(float a, const std::shared_ptr<Tensor>& b)
 {
 	return Tensor::add(b, a); // computative -> a + b = b + a
 }
@@ -379,13 +411,13 @@ inline std::shared_ptr<Tensor> operator-(const std::shared_ptr<Tensor>& a, const
 }
 
 // Subtracts a tensor and scalar -> r = a - b
-inline std::shared_ptr<Tensor> operator-(const std::shared_ptr<Tensor>& a, double b)
+inline std::shared_ptr<Tensor> operator-(const std::shared_ptr<Tensor>& a, float b)
 {
 	return Tensor::sub(a, b);
 }
 
 // Subtracts a scalar and tensor -> r = a - b
-inline std::shared_ptr<Tensor> operator-(double a, const std::shared_ptr<Tensor>& b)
+inline std::shared_ptr<Tensor> operator-(float a, const std::shared_ptr<Tensor>& b)
 {
 	return Tensor::sub(a, b);
 }
@@ -397,13 +429,13 @@ inline std::shared_ptr<Tensor> operator*(const std::shared_ptr<Tensor>& a, const
 }
 
 // Multiplies a tensor and scalar -> r = a * b
-inline std::shared_ptr<Tensor> operator*(const std::shared_ptr<Tensor>& a, double b)
+inline std::shared_ptr<Tensor> operator*(const std::shared_ptr<Tensor>& a, float b)
 {
 	return Tensor::mul(a, b);
 }
 
 // Multiplies a scalar and tensor -> r = a * b
-inline std::shared_ptr<Tensor> operator*(double a, const std::shared_ptr<Tensor>& b)
+inline std::shared_ptr<Tensor> operator*(float a, const std::shared_ptr<Tensor>& b)
 {
 	return Tensor::mul(b, a);
 }
@@ -415,13 +447,13 @@ inline std::shared_ptr<Tensor> operator/(const std::shared_ptr<Tensor>& a, const
 }
 
 // Divides a tensor and scalar -> r = a / b
-inline std::shared_ptr<Tensor> operator/(const std::shared_ptr<Tensor>& a, double b)
+inline std::shared_ptr<Tensor> operator/(const std::shared_ptr<Tensor>& a, float b)
 {
 	return Tensor::div(a, b);
 }
 
 // Divides a scalar and tensor -> r = a / b
-inline std::shared_ptr<Tensor> operator/(double a, const std::shared_ptr<Tensor>& b)
+inline std::shared_ptr<Tensor> operator/(float a, const std::shared_ptr<Tensor>& b)
 {
 	return Tensor::div(a, b);
 }

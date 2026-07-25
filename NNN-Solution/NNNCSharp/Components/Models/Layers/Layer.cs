@@ -28,7 +28,7 @@ namespace NNNCSharp.Components.Models.Layers
         /// <summary>
         /// Dropout rate of the layer.
         /// </summary>
-        public double Dropout { get; protected set; } = 0.0;
+        public float Dropout { get; protected set; } = 0.0f;
 
         /// <summary>
         /// Parameterless constructor for model reconstruction from save data.
@@ -76,7 +76,7 @@ namespace NNNCSharp.Components.Models.Layers
             Activation = (Activator.CreateInstance(activType) as Activation)!;
             Activation.BuildFromData(stream);
 
-            Dropout = FileUtils.ReadDouble(stream);
+            Dropout = FileUtils.ReadFloat(stream);
             Biases = FileUtils.ReadTensor(stream);
 
             ReadUniqueData(stream);
@@ -98,7 +98,7 @@ namespace NNNCSharp.Components.Models.Layers
             var activType = IDManager.GetActivationByID((byte)stream.ReadByte());
             var activation = Activator.CreateInstance(activType) as Activation;
             string activData = activation!.PrintActivation(stream);
-            double dropout = FileUtils.ReadDouble(stream);
+            float dropout = FileUtils.ReadFloat(stream);
             string biases = $"Bias Tensor: {FileUtils.PrintTensor(stream)}";
             string additionalData = PrintUniqueLayer(stream);
 

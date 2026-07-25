@@ -32,11 +32,11 @@ namespace NNNCSharp.Components.DQNEnvironments
         /// <summary>
         /// Width of the environment's grid.
         /// </summary>
-        readonly double XRange;
+        readonly float XRange;
         /// <summary>
         /// Height of the environment's grid.
         /// </summary>
-        readonly double YRange;
+        readonly float YRange;
 
         // Training parameters
         /// <summary>
@@ -93,11 +93,11 @@ namespace NNNCSharp.Components.DQNEnvironments
 
             // Normalize positions to ~ between -1 and 1 for a symmetrical grid
 
-            double xPos = State[0] / (XRange / 2.0);
-            double yPos = State[1] / (YRange / 2.0);
+            float xPos = State[0] / (XRange / 2.0f);
+            float yPos = State[1] / (YRange / 2.0f);
 
-            double xTarget = State[2] / (XRange / 2.0);
-            double yTarget = State[3] / (YRange / 2.0);
+            float xTarget = State[2] / (XRange / 2.0f);
+            float yTarget = State[3] / (YRange / 2.0f);
 
             (normalized[0], normalized[1], normalized[2], normalized[3]) =
                 (xPos, yPos, xTarget, yTarget);
@@ -130,12 +130,12 @@ namespace NNNCSharp.Components.DQNEnvironments
 
         public override bool ValidAction(int action, Tensor? state) => true; // no invalid actions
 
-        public override (double reward, Tensor nextState, bool done) Step(int action, int steps)
+        public override (float reward, Tensor nextState, bool done) Step(int action, int steps)
         {
             // Calculate distance to target before moving
-            double xDiff = State[2] - State[0];
-            double yDiff = State[3] - State[1];
-            double prevDist = Math.Sqrt(xDiff * xDiff + yDiff * yDiff);
+            float xDiff = State[2] - State[0];
+            float yDiff = State[3] - State[1];
+            float prevDist = MathF.Sqrt(xDiff * xDiff + yDiff * yDiff);
 
             // Move the agent's position based on action mapping
             Move(action);
@@ -143,8 +143,8 @@ namespace NNNCSharp.Components.DQNEnvironments
             // Calculate distance to target after moving
             xDiff = State[2] - State[0];
             yDiff = State[3] - State[1];
-            double newDist = Math.Sqrt(xDiff * xDiff + yDiff * yDiff);
-            double deltaDist = prevDist - newDist; // change in distance to target
+            float newDist = MathF.Sqrt(xDiff * xDiff + yDiff * yDiff);
+            float deltaDist = prevDist - newDist; // change in distance to target
 
             bool reachedTarget = (State[0] == State[2] && State[1] == State[3]);
             bool outOfBounds = (State[0] < Bounds[0]) || (State[0] > Bounds[1]) ||
@@ -154,15 +154,15 @@ namespace NNNCSharp.Components.DQNEnvironments
             bool done = reachedTarget || outOfBounds || outOfSteps;
 
             // Calculate reward for the action
-            double reward = 1.0 * deltaDist; // shaped reward based on change in distance to target
-            reward += reachedTarget ? 10.0 : 0.0; // reward for reaching the target
-            reward -= outOfBounds ? 10.0 : 0.0; // penalty for going out of bounds
-            reward -= outOfSteps ? 2.0 : 0.0; // penalty for exceeding step limit
+            float reward = 1.0f * deltaDist; // shaped reward based on change in distance to target
+            reward += reachedTarget ? 10.0f : 0.0f; // reward for reaching the target
+            reward -= outOfBounds ? 10.0f : 0.0f; // penalty for going out of bounds
+            reward -= outOfSteps ? 2.0f : 0.0f; // penalty for exceeding step limit
 
             return (reward, GetNormalizedState(), done);
         }
 
-        public override double TestTrainingProgress(Model agent, int testEpisodes)
+        public override float TestTrainingProgress(Model agent, int testEpisodes)
         {
             int successes = 0;
             for (int i = 0; i < testEpisodes; i++)
@@ -170,7 +170,7 @@ namespace NNNCSharp.Components.DQNEnvironments
                 if (Run(agent)) successes++;
             }
 
-            double successPercent = ((double)successes / testEpisodes) * 100.0;
+            float successPercent = ((float)successes / testEpisodes) * 100.0f;
             NNNLog.WriteLine($"Agent successfully reached target in {successPercent:F2}% of test episodes");
             return successPercent;
         }
@@ -182,7 +182,7 @@ namespace NNNCSharp.Components.DQNEnvironments
             var exp = step == episode.Experiences.Count ? episode.Experiences[step - 1] : episode.Experiences[step];
             var state = exp.NextState;
             int action = step > 0 ? episode.Experiences[step - 1].Action : -1;
-            double reward = step > 0 ? episode.Experiences[step - 1].Reward : 0.0;
+            float reward = step > 0 ? episode.Experiences[step - 1].Reward : 0.0f;
 
             DrawState(state);
 

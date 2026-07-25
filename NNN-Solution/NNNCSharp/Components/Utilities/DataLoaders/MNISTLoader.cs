@@ -96,7 +96,7 @@ namespace NNNCSharp.Components.Utilities.DataLoaders
 
                 for (int p = 0; p < imageBytes; p++)
                 {
-                    images[i][p] = Extract1ByteInt32(bytes, ref offset) / 255.0; // normalize to range 0-1
+                    images[i][p] = Extract1ByteInt32(bytes, ref offset) / 255.0f; // normalize to range 0-1
                 }
             }
 
@@ -128,7 +128,7 @@ namespace NNNCSharp.Components.Utilities.DataLoaders
             for (int l = 0; l < labelCount; l++)
             {
                 labels[l] = new(new int[] { 10 });
-                labels[l][Extract1ByteInt32(bytes, ref offset)] = 1.0;
+                labels[l][Extract1ByteInt32(bytes, ref offset)] = 1.0f;
             }
 
             return labels;

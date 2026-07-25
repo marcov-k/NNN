@@ -3,7 +3,7 @@
 
 /* Indexing/data access */
 
-double& Tensor::operator[](int index)
+float& Tensor::operator[](int index)
 {
 	// Ensure valid index
 	if (index < 0 || index >= element_count())
@@ -14,7 +14,7 @@ double& Tensor::operator[](int index)
 	return _data[index];
 }
 
-const double& Tensor::operator[](int index) const
+const float& Tensor::operator[](int index) const
 {
 	// Ensure valid index
 	if (index < 0 || index >= element_count())
@@ -25,12 +25,12 @@ const double& Tensor::operator[](int index) const
 	return _data[index];
 }
 
-double& Tensor::at(const std::vector<int>& indices)
+float& Tensor::at(const std::vector<int>& indices)
 {
 	return _data[linear_index(indices)];
 }
 
-const double& Tensor::at(const std::vector<int>& indices) const
+const float& Tensor::at(const std::vector<int>& indices) const
 {
 	return _data[linear_index(indices)];
 }

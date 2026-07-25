@@ -221,7 +221,7 @@ namespace NNNCSharp.Components.Utilities
         /// <param name="image">Image data to draw.</param>
         /// <param name="label">Label of the image.</param>
         /// <param name="renderThreshold">Opacity threshold to draw a pixel at.</param>
-        public static void DrawMNISTImage(Tensor image, Tensor label, double renderThreshold)
+        public static void DrawMNISTImage(Tensor image, Tensor label, float renderThreshold)
         {
             for (int row = 0; row < image.Dimensions[0]; row++)
             {

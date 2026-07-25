@@ -32,9 +32,9 @@ namespace NNNCSharp.Components.Trainers
         /// <summary>
         /// Maximum magnitude of gradients without normalization.
         /// </summary>
-        readonly double MaxGradNorm;
+        readonly float MaxGradNorm;
 
-        public Trainer(Model model, Optimizer optimizer, Cost cost, double maxGradNorm = 1.0)
+        public Trainer(Model model, Optimizer optimizer, Cost cost, float maxGradNorm = 1.0f)
         {
             Model = model;
             Optimizer = optimizer;
@@ -55,7 +55,7 @@ namespace NNNCSharp.Components.Trainers
         /// <param name="testEvery">How many epochs to run between performance tests.</param>
         /// <param name="testLength">How many iterations to run per performance test.</param>
         public void Train(BatchBuffer batchBuffer, int batchSize, int epochs, bool batchAllInputs = true,
-            Func<Model, int, bool>? testFunc = null, bool decayLR = true, double minLRFraction = 0.1, int testEvery = 100,
+            Func<Model, int, bool>? testFunc = null, bool decayLR = true, float minLRFraction = 0.1f, int testEvery = 100,
             int testLength = 1000)
         {
             Stopwatch totalTimer = new();
@@ -63,16 +63,16 @@ namespace NNNCSharp.Components.Trainers
             TimeSpan avgElapsed = new(0);
 
             var bestModel = Model.Copy();
-            double bestAccuracy = double.MinValue;
+            float bestAccuracy = float.MinValue;
 
-            double baseLR = Optimizer.LR;
+            float baseLR = Optimizer.LR;
 
             Tensor[] inputs = new Tensor[1];
             Tensor[] targets = new Tensor[1];
             Tensor predictions;
             Tensor loss;
 
-            double totalLoss;
+            float totalLoss;
 
             totalTimer.Start();
             epochTimer.Start();
@@ -85,7 +85,7 @@ namespace NNNCSharp.Components.Trainers
                 {
                     if (testFunc(Model, i)) successes++;
                 }
-                double successPercent = ((double)successes / testLength) * 100.0;
+                float successPercent = ((float)successes / testLength) * 100.0f;
                 NNNLog.WriteLine($"Model success percentage: {successPercent:F2}%");
             }
 
@@ -93,13 +93,13 @@ namespace NNNCSharp.Components.Trainers
             int optimizerStep = 0;
             for (int e = 0; e < epochs; e++)
             {
-                totalLoss = 0.0;
+                totalLoss = 0.0f;
 
                 if (decayLR)
                 {
-                    double progress = epochs > 1 ? (double)e / (epochs - 1) : 0.0;
-                    double cosFactor = 0.5 * (1.0 + Math.Cos(Math.PI * progress));
-                    double decayRange = 1.0 - minLRFraction;
+                    float progress = epochs > 1 ? (float)e / (epochs - 1) : 0.0f;
+                    float cosFactor = 0.5f * (1.0f + MathF.Cos(MathF.PI * progress));
+                    float decayRange = 1.0f - minLRFraction;
                     Optimizer.LR = baseLR * (minLRFraction + decayRange * cosFactor);
                 }
 
@@ -148,7 +148,7 @@ namespace NNNCSharp.Components.Trainers
                         {
                             if (testFunc(Model, i)) successes++;
                         }
-                        double successPercent = ((double)successes / testLength) * 100.0;
+                        float successPercent = ((float)successes / testLength) * 100.0f;
                         if (successPercent > bestAccuracy)
                         {
                             bestModel.Dispose();
