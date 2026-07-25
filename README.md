@@ -156,11 +156,11 @@ public override bool ValidAction(int action, Tensor? state) {}
 //   The reward/penalty accrued by the action
 //   The normalized form of the environment's state after the action is taken (identical to GetNormalizedState())
 //   Whether the episode has finished
-public override (double reward, Tensor nextState, bool done) Step(int action, int steps) {}
+public override (float reward, Tensor nextState, bool done) Step(int action, int steps) {}
 
 // Run the given number of episodes with the given agent
 // Return a value representing the agent's average performance across the test episodes
-public override double TestTrainingProgress(Model agent, int testEpisodes) {}
+public override float TestTrainingProgress(Model agent, int testEpisodes) {}
 ```
 &emsp;For self-play environments also implement the following methods:
 ```
@@ -200,8 +200,8 @@ Tensor inputFormat = new(new int[] { 1, [your training data dimensions] }); // s
 // Fully connected (Dense) layer with 10 (output) neurons, and no (Linear) activation function
 Model yourModel = new([
   new Conv(8, new int[] { 5, 5 }, new ReLU()),
-  new Conv(16, new int[] { 5, 5 }, new ReLU(), 0.1),
-  new Dense(128, new ReLU(), 0.25),
+  new Conv(16, new int[] { 5, 5 }, new ReLU(), 0.1f),
+  new Dense(128, new ReLU(), 0.25f),
   new Dense(10, new Linear())
   ], inputFormat);
 
@@ -241,9 +241,9 @@ DQNEnvironment yourEnv; // the DQNEnvironment subclass you want to train in
 // Fully connected (Dense) layer 1 (output) neuron per discrete action in your DQNEnvironment, and no (Linear) activation function
 Model yourModel = new([
   new Conv(8, new int[] { 3, 3 }, new ReLU()),
-  new Conv(16, new int[] { 3, 3 }, new ReLU(), 0.05),
-  new Dense(128, new ReLU(), 0.1),
-  new Dense(64, new ReLU(), 0.1),
+  new Conv(16, new int[] { 3, 3 }, new ReLU(), 0.05f),
+  new Dense(128, new ReLU(), 0.1f),
+  new Dense(64, new ReLU(), 0.1f),
   new Dense(yourEnv.ActionCount, new Linear())
   ], yourEnv.StateFormat);
 
@@ -313,11 +313,11 @@ NNNLog.Output = [your target output] (eg. Console.Write, Debug.Log, etc.)
 ```
 Tensor a = new([3])
 {
-    Data = [1.0, 2.0, 3.0]
+    Data = [1.0f, 2.0f, 3.0f]
 };
 Tensor b = new([3])
 {
-    Data = [4.0, 5.0, 6.0]
+    Data = [4.0f, 5.0f, 6.0f]
 };
 Tensor[] inputs = [a, b];
 
@@ -325,7 +325,7 @@ Func<Tensor[], Tensor> testOp = inputs =>
 {
     return inputs[0] + inputs[1];
 };
-Func<Tensor[], double> loss = inputs =>
+Func<Tensor[], float> loss = inputs =>
 {
     var result = inputs[0] + inputs[1];
     return Tensor.Mean(result)[0];
@@ -334,7 +334,7 @@ Func<Tensor[], double> loss = inputs =>
 MathUtils.GradientTest(inputs, testOp, loss);
 ```
 ```
-public static void GradientTest(Tensor[] inputs, Func<Tensor[], Tensor> testOp, Func<Tensor[], double> loss)
+public static void GradientTest(Tensor[] inputs, Func<Tensor[], Tensor> testOp, Func<Tensor[], float> loss)
 {
     var result = testOp(inputs);
     var mean = Tensor.Mean(result);
@@ -346,17 +346,17 @@ public static void GradientTest(Tensor[] inputs, Func<Tensor[], Tensor> testOp, 
         for (int e = 0; e < inputs[input].ElementCount; e++)
         {
             var numerical = NumericalGradient(inputs, input, e, loss);
-            double analytical = inputs[input].Grad[e];
-            double relError = Math.Abs(numerical - analytical) / (Math.Abs(numerical) + 1e-8);
+            float analytical = inputs[input].Grad[e];
+            float relError = Math.Abs(numerical - analytical) / (Math.Abs(numerical) + 1e-8f);
             Console.WriteLine($"inputs[{input}][{e}]: numerical = {numerical}, analytical = {analytical}, relError = {relError}");
         }
     }
 }
 
-static double NumericalGradient(Tensor[] inputs, int inputIndex, int e, Func<Tensor[], double> loss)
+static float NumericalGradient(Tensor[] inputs, int inputIndex, int e, Func<Tensor[], float> loss)
 {
     // Estimate gradient via finite difference
-    double eps = 1e-8;
+    float eps = 1e-8f;
     inputs[inputIndex][e] += eps;
     double lossPlus = loss(inputs);
     inputs[inputIndex][e] -= 2 * eps;
@@ -402,12 +402,12 @@ Model testModel = new([
     new Dense(1, new Linear())
     ], inputFormat);
 Cost testCost = new MSE();
-Optimizer testOptimizer = new Adam(0.01);
+Optimizer testOptimizer = new Adam(0.01f);
 Trainer testTrainer = new(testModel, testOptimizer, testCost);
 
 int maxEpochs = 10000;
 int epochs = 0;
-while (epochs < maxEpochs && testCost.CalculateCost(testModel.Predict(inputs), targets)[0] >= 0.01)
+while (epochs < maxEpochs && testCost.CalculateCost(testModel.Predict(inputs), targets)[0] >= 0.01f)
 {
     testTrainer.Train(inputs, targets, 1);
     epochs++;
@@ -451,9 +451,9 @@ var (trainImages, trainLabels) = MNISTLoader.GetTrainingData();
 var (testImages, testLabels) = MNISTLoader.GetTestData();
 Console.WriteLine("MNIST dataset loaded");
 
-double tau = 0.05;
-double convDropout = 0.15;
-double denseDropout = 0.5;
+float tau = 0.05f;
+float convDropout = 0.15f;
+float denseDropout = 0.5f;
 Model model;
 if (GetInput("Load model from file? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
 {
@@ -471,8 +471,8 @@ else
     ], new([1, 28, 28, 1]));
 }
 
-Optimizer optimizer = new Adam(0.001, weightDecay: 0.01);
-double maxGradNorm = 0.5;
+Optimizer optimizer = new Adam(0.001f, weightDecay: 0.01f);
+float maxGradNorm = 0.5f;
 Cost cost = new SoftmaxCrossEntropy();
 Trainer trainer = new(model, optimizer, cost, maxGradNorm);
 
@@ -521,20 +521,20 @@ Total Time Required for Training and Evaluation: 3:15.919
 ##### Training Hyperparameters:
 ```
 DQNEnvironment env = new TicTacToe();
-double exploration = 1.0;
-double explorationDecay = 0.9995;
-double minExploration = 0.01;
+float exploration = 1.0f;
+float explorationDecay = 0.9995f;
+float minExploration = 0.01f;
 int trainEvery = 1;
-double discount = 0.99;
-Optimizer optimizer = new Adam(0.001);
+float discount = 0.99f;
+Optimizer optimizer = new Adam(0.001f);
 Cost cost = new Huber();
 int replayBufferSize = 10000;
 int batchSize = 128;
 int agentBufferSize = 2;
 int opponentCopyRate = 600;
 int minRandomOpponentEpisodes = 600;
-double tau = 0.01;
-double maxGradNorm = 1.0;
+float tau = 0.01f;
+float maxGradNorm = 1.0f;
 int minExperiences = 2000;
 int episodeMemorySize = 100;
 int testEpisodes = 5000;
@@ -552,8 +552,8 @@ public override void TestTrainingProgress(Model agent, int testEpisodes)
         else if (tied) ties++;
     }
 
-    double winPercent = ((double)wins / testEpisodes) * 100.0;
-    double tiePercent = ((double)ties / testEpisodes) * 100.0;
+    float winPercent = ((float)wins / testEpisodes) * 100.0f;
+    float tiePercent = ((float)ties / testEpisodes) * 100.0f;
     Console.WriteLine($"Win percentage vs randomly-acting opponent: {winPercent:F2}");
     Console.WriteLine($"Tie percentage vs randomly-acting opponent: {tiePercent:F2}");
     Console.WriteLine($"Win + tie percentage vs randomly-acting opponent: {(winPercent + tiePercent):F2}");
@@ -568,11 +568,11 @@ public (bool won, bool tied) PlayRandom(Model agent)
     {
         int action = agentTurn ? GetAgentAction(agent) : PickRandomAction();
 
-        State[action] = State[9] == 1.0 ? 1.0 : -1.0;
+        State[action] = State[9] == 1.0f ? 1.0f : -1.0f;
 
         if (agentTurn && CheckWin()) return (true, false);
 
-        State[9] *= -1.0;
+        State[9] *= -1.0f;
         agentTurn = !agentTurn;
     }
 
@@ -763,7 +763,7 @@ NNN-Solution - Directory (Full project solution)\
 ### Layer Data Format:
 - #### Shared - always comes before type-specific data:
   - Activation ID -> unsigned byte -> ID of the layer's activation function ([see ID list](#activation-ids))
-  - Dropout -> double (8 bytes) -> dropout parameter of the layer
+  - Dropout -> float (4 bytes) -> dropout parameter of the layer
   - Bias -> tensor ([see formatting](#tensor-format)) -> bias parameter of the layer
 
 - #### Dense:
@@ -777,12 +777,12 @@ NNN-Solution - Directory (Full project solution)\
 
 ### Activation Function Data Format - found immediately after Activation ID (for activation functions with parameters):
 - #### Leaky ReLU:
-  - Tau -> double (8 bytes) -> tau parameter of the function
+  - Tau -> float (4 bytes) -> tau parameter of the function
 
 ### Tensor Format:
 - Dimensions -> int32 array ([see formatting](#int32-array-format)) -> dimensions of the tensor
 - RequiresGrad -> boolean ([see formatting](#boolean-format)) -> whether the tensor requires gradients to be calculated
-- Data -> double array ([see formatting](#double-array-format)) -> linear array of the tensor's data values (row-major ordering)
+- Data -> float array ([see formatting](#float-array-format)) -> linear array of the tensor's data values (row-major ordering)
 
 ### String Format (UTF8):
 - Length -> int32 (4 bytes) -> number of characters in the string
@@ -792,9 +792,9 @@ NNN-Solution - Directory (Full project solution)\
 - Length -> int32 (4 bytes) -> number of elements in the array
 - Elements -> int32[Length] (4 bytes each) -> elements in the array
 
-### Double Array Format:
+### Float Array Format:
 - Length -> int32 (4 bytes) -> number of elements in the array
-- Elements -> double[Length] (8 bytes each) -> elements in the array
+- Elements -> float[Length] (4 bytes each) -> elements in the array
 
 ### Boolean Format:
 - 1 byte -> 1 = true, 0 = false
@@ -834,4 +834,3 @@ NNN-Solution - Directory (Full project solution)\
 - Recursive neural networks
 - More DQN training environments
 - Proximal policy optimization (PPO)
-</div>
