@@ -17,22 +17,6 @@ namespace NNNCSharp.Components.Trainers
     /// <summary>
     /// Deep Q-Network (DQN) trainer class.
     /// </summary>
-    /// <param name="agent">DQN agent to be trained.</param>
-    /// <param name="environment">Environment to train in.</param>
-    /// <param name="optimizer">Optimizer to use for parameter updates.</param>
-    /// <param name="cost">Cost function to use for loss calculation.</param>
-    /// <param name="discount">Discount factor for future rewards.</param>
-    /// <param name="exploration">Initial exploration rate of the agent.</param>
-    /// <param name="explorationDecay">Per-episode exponential decay factor of exploration rate.</param>
-    /// <param name="minExploration">Minimum exploration rate of the agent.</param>
-    /// <param name="replayBufferSize">Size of the experience replay buffer.</param>
-    /// <param name="batchSize">Number of experiences in each training batch.</param>
-    /// <param name="agentBufferSize">Size of the opponent agent buffer for self-play environments.</param>
-    /// <param name="opponentCopyRate">Number of episodes between opponent agents being frozen for self-play environments.</param>
-    /// <param name="minRandomOpponentEpisodes">Minimum number of episodes with a randomly acting opponent for self-play environments.</param>
-    /// <param name="tau">Target model parameter update factor.</param>
-    /// <param name="maxGradNorm">Maximum total magnitude of gradients without normalization.</param>
-    /// <param name="minExperiences">Minimum number of experiences before training can begin.</param>
     public class DQNTrainer
     {
         // Agent and environment parameters
@@ -155,6 +139,25 @@ namespace NNNCSharp.Components.Trainers
         /// </summary>
         Tensor? _targetQs;
 
+        /// <summary>
+        /// Creates a new DQN Trainer instance.
+        /// </summary>
+        /// <param name="agent">DQN agent to be trained.</param>
+        /// <param name="environment">Environment to train in.</param>
+        /// <param name="optimizer">Optimizer to use for parameter updates.</param>
+        /// <param name="cost">Cost function to use for loss calculation.</param>
+        /// <param name="discount">Discount factor for future rewards.</param>
+        /// <param name="exploration">Initial exploration rate of the agent.</param>
+        /// <param name="explorationDecay">Per-episode exponential decay factor of exploration rate.</param>
+        /// <param name="minExploration">Minimum exploration rate of the agent.</param>
+        /// <param name="replayBufferSize">Size of the experience replay buffer.</param>
+        /// <param name="batchSize">Number of experiences in each training batch.</param>
+        /// <param name="agentBufferSize">Size of the opponent agent buffer for self-play environments.</param>
+        /// <param name="opponentCopyRate">Number of episodes between opponent agents being frozen for self-play environments.</param>
+        /// <param name="minRandomOpponentEpisodes">Minimum number of episodes with a randomly acting opponent for self-play environments.</param>
+        /// <param name="tau">Target model parameter update factor.</param>
+        /// <param name="maxGradNorm">Maximum total magnitude of gradients without normalization.</param>
+        /// <param name="minExperiences">Minimum number of experiences before training can begin.</param>
         public DQNTrainer(Model agent, DQNEnvironment environment, Optimizer optimizer, Cost cost, int trainEvery = 4,
         float discount = 0.995f, float exploration = 1.0f, float explorationDecay = 0.99f, float minExploration = 0.01f,
         int replayBufferSize = 10000, int batchSize = 64, int agentBufferSize = 5, int opponentCopyRate = 100,
