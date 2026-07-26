@@ -7,7 +7,6 @@ namespace NNNCSharp.Components.Buffers
     /// Generic First-In First-Out buffer.
     /// </summary>
     /// <typeparam name="T">Type of the elements contained in the buffer.</typeparam>
-    /// <param name="maxSize">Maximum size of the buffer.</param>
     public class FIFOBuffer<T>
     {
         /// <summary>
@@ -27,6 +26,10 @@ namespace NNNCSharp.Components.Buffers
         /// </summary>
         public int Count => Buffer.Count;
 
+        /// <summary>
+        /// Creates a new First-In First-Out Buffer instance.
+        /// </summary>
+        /// <param name="maxSize">Maximum size of the buffer.</param>
         public FIFOBuffer(int maxSize)
         {
             MaxSize = maxSize;
