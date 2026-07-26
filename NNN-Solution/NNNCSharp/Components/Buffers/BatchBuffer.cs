@@ -7,8 +7,6 @@ namespace NNNCSharp.Components.Buffers
     /// <summary>
     /// Buffer for creating batches during standard supervised training.
     /// </summary>
-    /// <param name="data">Full training inputs.</param>
-    /// <param name="targets">Full training targets.</param>
     public class BatchBuffer
     {
         /// <summary>
@@ -36,6 +34,11 @@ namespace NNNCSharp.Components.Buffers
         /// </summary>
         Tensor[]? BatchTargets = null;
 
+        /// <summary>
+        /// Creates a new ReplayBuffer instance containing the given training data.
+        /// </summary>
+        /// <param name="data">Complete training inputs.</param>
+        /// <param name="targets">Complete training targets.</param>
         public BatchBuffer(Tensor[] data, Tensor[] targets)
         {
             Data = data;
@@ -94,6 +97,12 @@ namespace NNNCSharp.Components.Buffers
             return (BatchInputs[0], BatchTargets[0]);
         }
 
+        /// <summary>
+        /// Randomly samples the maximum possible number of training batches without repeating inputs.
+        /// </summary>
+        /// <param name="batchSize">Number of input and target pairs to include per batch.</param>
+        /// <returns>Arrays of batched inputs and targets, arranged with corresponding indices.</returns>
+        /// <exception cref="ArgumentOutOfRangeException">Requested batch size exceeds total number of input and target pairs.</exception>
         public (Tensor[] BatchInputs, Tensor[] BatchTargets) GetBatches(int batchSize)
         {
             if (batchSize <= 0 || batchSize > Data.Length) throw new ArgumentOutOfRangeException(nameof(batchSize), "Batch size out of range.");
