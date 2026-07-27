@@ -39,7 +39,7 @@ namespace NNNCSharp.Components.Costs
             var priorities = new double[losses.ElementCount];
             for (int i = 0; i < losses.ElementCount; i++)
             {
-                priorities[i] = Math.Abs(losses[i]) + 1e-8f;
+                priorities[i] = Math.Abs(losses[i]) + 1e-8;
 
                 if (weights != null) losses[i] *= (float)weights[i];
             }
