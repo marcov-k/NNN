@@ -7,9 +7,12 @@ namespace NNNCSharp.Components.Optimizers
     /// <summary>
     /// Stochastic Gradient Descent optimizer.
     /// </summary>
-    /// <param name="learningRate">Gradient scaling factor for parameter updates.</param>
     public class SGD: Optimizer
     {
+        /// <summary>
+        /// Creates a new SGD optimizer instance.
+        /// </summary>
+        /// <param name="learningRate">Gradient scaling factor for parameter updates.</param>
         public SGD(float learningRate) : base(learningRate) { }
 
         public override void Step(Tensor parameter, int iterations)
