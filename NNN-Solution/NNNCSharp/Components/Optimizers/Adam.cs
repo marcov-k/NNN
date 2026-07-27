@@ -43,7 +43,7 @@ namespace NNNCSharp.Components.Optimizers
         /// <param name="beta2">Exponential decay rate of second moment estimates.</param>
         /// <param name="epsilon">Epsilon value to use.</param>
         /// <param name="weightDecay">Weight decay value to use.</param>
-        public Adam(float learningRate = 0.001f, float beta1 = 0.9f, float beta2 = 0.999f,
+        public Adam(float learningRate, float beta1 = 0.9f, float beta2 = 0.999f,
             float epsilon = 1e-8f, float weightDecay = 0.0f) : base(learningRate)
         {
             Beta1 = beta1;
