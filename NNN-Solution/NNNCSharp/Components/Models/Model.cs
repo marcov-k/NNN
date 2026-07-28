@@ -35,7 +35,7 @@ namespace NNNCSharp.Components.Models
 
         // Internal properties
         /// <summary>
-        /// Internal list of all player parameters.
+        /// Internal list of all layer parameters.
         /// </summary>
         List<Tensor>? _parameters;
 
