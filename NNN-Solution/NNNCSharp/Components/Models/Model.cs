@@ -63,7 +63,7 @@ namespace NNNCSharp.Components.Models
         /// Initializes layer parameters to support the given input format.
         /// </summary>
         /// <param name="inputFormat">Tensor representing the expected input format.</param>
-        public void SetUpLayers(Tensor inputFormat)
+        void SetUpLayers(Tensor inputFormat)
         {
             var format = inputFormat.Copy();
 
@@ -123,7 +123,7 @@ namespace NNNCSharp.Components.Models
         /// Clips all of the model's parameters if necessary.
         /// </summary>
         /// <param name="maxNorm">Maximum total magnitude of gradients without clipping.</param>
-        public void ClipGradients(float maxNorm)
+        internal void ClipGradients(float maxNorm)
         {
             var handles = Parameters.Select(p => p.Handle).ToArray();
             NativeMethods.models_clip_gradients(handles, handles.Length, maxNorm);
