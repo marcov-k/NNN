@@ -73,7 +73,7 @@ namespace NNNCSharp.Components.Models.Layers
         /// Writes any layer type-specific data to the file stream.
         /// </summary>
         /// <param name="stream">File stream to write to.</param>
-        public abstract void WriteUniqueData(FileStream stream);
+        internal abstract void WriteUniqueData(FileStream stream);
 
         /// <summary>
         /// Fills the layer instance with data at the current position in the file stream.

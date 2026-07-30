@@ -105,7 +105,7 @@ namespace NNNCSharp.Components.Models.Layers
             return new Dense(NeuronCount, Weights.Copy(), Biases.Copy(), Activation.Copy(), Flatten, Dropout);
         }
 
-        public override void WriteUniqueData(FileStream stream)
+        internal override void WriteUniqueData(FileStream stream)
         {
             FileUtils.WriteInt32(stream, NeuronCount);
             FileUtils.WriteTensor(stream, Weights);

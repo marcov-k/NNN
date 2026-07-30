@@ -116,7 +116,7 @@ namespace NNNCSharp.Components.Models.Layers
             return new Conv(FilterCount, KernelDims.ToArray(), Kernels.Copy(), Biases.Copy(), Activation.Copy(), Dropout);
         }
 
-        public override void WriteUniqueData(FileStream stream)
+        internal override void WriteUniqueData(FileStream stream)
         {
             FileUtils.WriteInt32(stream, FilterCount);
             FileUtils.WriteTensor(stream, Kernels);
