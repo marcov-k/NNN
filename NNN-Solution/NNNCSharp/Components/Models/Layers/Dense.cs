@@ -30,10 +30,10 @@ namespace NNNCSharp.Components.Models.Layers
         /// <param name="neuronCount">Number of neurons in the new layer.</param>
         /// <param name="activation">Activation function of the new layer.</param>
         /// <param name="dropout">Dropout rate of the new layer.</param>
-        public Dense(int neuronCount, Activation activation, bool flatten = false, float dropout = 0.0f) : base(dropout)
+        public Dense(int neuronCount, Activation activation, bool flatten = false, float dropout = 0.0f)
+            : base(activation, dropout)
         {
             NeuronCount = neuronCount;
-            Activation = activation;
             Flatten = flatten;
         }
 
@@ -45,14 +45,14 @@ namespace NNNCSharp.Components.Models.Layers
         /// <param name="biases">Bias tensor of the new layer.</param>
         /// <param name="activation">Activation function of the new layer.</param>
         /// <param name="dropout">Dropout rate of the new layer.</param>
-        public Dense(int neuronCount, Tensor weights, Tensor biases, Activation activation, bool flatten, float dropout) : base(dropout)
+        public Dense(int neuronCount, Tensor weights, Tensor biases, Activation activation, bool flatten, float dropout)
+            : base(activation, dropout)
         {
             NeuronCount = neuronCount;
             Weights.Dispose();
             Weights = weights;
             Biases.Dispose();
             Biases = biases;
-            Activation = activation;
             Flatten = flatten;
         }
 

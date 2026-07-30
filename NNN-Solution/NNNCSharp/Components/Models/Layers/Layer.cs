@@ -33,9 +33,11 @@ namespace NNNCSharp.Components.Models.Layers
         /// <summary>
         /// Creates a new layer instance.
         /// </summary>
+        /// <param name="activation">Activation function of the new layer.</param>
         /// <param name="dropout">Dropout rate of the new layer.</param>
-        public Layer(float dropout = 0.0f)
+        public Layer(Activation activation, float dropout = 0.0f)
         {
+            Activation = activation;
             Dropout = dropout;
         }
 
