@@ -125,6 +125,7 @@ namespace NNNCSharp.Components.Models.Layers
         public virtual void Dispose()
         {
             Biases.Dispose();
+            OutputFormat.Dispose();
         }
     }
 }
