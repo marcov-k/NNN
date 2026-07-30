@@ -52,7 +52,9 @@ namespace NNNCSharp.Components.Models.Layers
         {
             FilterCount = filterCount;
             KernelDims = kernelDims;
+            Kernels.Dispose();
             Kernels = kernels;
+            Biases.Dispose();
             Biases = biases;
             Activation = activation;
             Dropout = dropout;
@@ -68,7 +70,9 @@ namespace NNNCSharp.Components.Models.Layers
         public override void SetUpLayer(Tensor inputFormat)
         {
             // Initialize parameters
+            Kernels.Dispose();
             Kernels = Tensor.InitKernels(FilterCount, KernelDims, inputFormat.Dimensions[^1]);
+            Biases.Dispose();
             Biases = Tensor.InitBiases(FilterCount);
 
             // Compute output dimensions
@@ -79,6 +83,7 @@ namespace NNNCSharp.Components.Models.Layers
                 outputDims[i + 1] = inputFormat.Dimensions[i + 1] - KernelDims[i] + 1;
             }
             outputDims[^1] = FilterCount;
+            OutputFormat.Dispose();
             OutputFormat = new(outputDims);
         }
 
@@ -120,6 +125,7 @@ namespace NNNCSharp.Components.Models.Layers
         protected override void ReadUniqueData(FileStream stream)
         {
             FilterCount = FileUtils.ReadInt32(stream);
+            Kernels.Dispose();
             Kernels = FileUtils.ReadTensor(stream);
             KernelDims = Kernels.Dimensions[1..^1].ToArray();
         }

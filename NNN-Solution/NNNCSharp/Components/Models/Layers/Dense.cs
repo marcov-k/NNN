@@ -48,7 +48,9 @@ namespace NNNCSharp.Components.Models.Layers
         public Dense(int neuronCount, Tensor weights, Tensor biases, Activation activation, bool flatten, float dropout)
         {
             NeuronCount = neuronCount;
+            Weights.Dispose();
             Weights = weights;
+            Biases.Dispose();
             Biases = biases;
             Activation = activation;
             Flatten = flatten;
@@ -64,8 +66,11 @@ namespace NNNCSharp.Components.Models.Layers
 
         public override void SetUpLayer(Tensor inputFormat)
         {
+            Weights.Dispose();
             Weights = Tensor.InitWeights(inputFormat.ElementCount, NeuronCount);
+            Biases.Dispose();
             Biases = Tensor.InitBiases(NeuronCount);
+            OutputFormat.Dispose();
             OutputFormat = new(new int[] { 1, NeuronCount });
         }
 
@@ -110,6 +115,7 @@ namespace NNNCSharp.Components.Models.Layers
         protected override void ReadUniqueData(FileStream stream)
         {
             NeuronCount = FileUtils.ReadInt32(stream);
+            Weights.Dispose();
             Weights = FileUtils.ReadTensor(stream);
             Flatten = FileUtils.ReadBool(stream);
         }

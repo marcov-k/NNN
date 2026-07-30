@@ -86,6 +86,7 @@ namespace NNNCSharp.Components.Models.Layers
             Activation.BuildFromData(stream);
 
             Dropout = FileUtils.ReadFloat(stream);
+            Biases.Dispose();
             Biases = FileUtils.ReadTensor(stream);
 
             ReadUniqueData(stream);
