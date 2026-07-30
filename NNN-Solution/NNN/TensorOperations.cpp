@@ -92,7 +92,7 @@ std::shared_ptr<Tensor> Tensor::sub(const std::shared_ptr<Tensor>& a, float b)
 	// Compute subtraction result
 	MathUtils::vector_sub(a->_data, b, result->_data);
 
-	// Connect result tensor to autograd graph
+	// Connect result tensor to autograd graph if needed
 	if (!inference)
 	{
 		result->_parents.push_back(a);
@@ -453,7 +453,7 @@ std::shared_ptr<Tensor> Tensor::log(const std::shared_ptr<Tensor>& arg, const st
 				if (arg->requires_grad)
 				{
 					MathUtils::vector_mul(arg->_data, scratch1, scratch2);
-					MathUtils::vector_div(1.0, scratch2, scratch3);
+					MathUtils::vector_div(1.0f, scratch2, scratch3);
 					MathUtils::vector_fmadd(arg->_grad, scratch3, result->_grad);
 				}
 				if (log_base->requires_grad)
@@ -561,7 +561,7 @@ std::shared_ptr<Tensor> Tensor::ln(const std::shared_ptr<Tensor>& t)
 
 				const int element_count = result->element_count();
 				scratch1.resize(element_count);
-				MathUtils::vector_div(1.0, t->_data, scratch1);
+				MathUtils::vector_div(1.0f, t->_data, scratch1);
 				MathUtils::vector_fmadd(t->_grad, scratch1, result->_grad);
 			};
 	}
@@ -573,7 +573,7 @@ std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const s
 {
 	// Compute matrix multiplication geometry
 
-	const int rank = a->rank();
+	const size_t rank = (size_t)a->rank();
 	const size_t m = a->_dimensions[rank - 2];
 	const size_t n = a->_dimensions[rank - 1];
 	const size_t p = b->_dimensions[b->_dimensions.size() - 1];
@@ -581,7 +581,7 @@ std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const s
 	const bool b_batched = b->rank() == rank && std::equal(a->_dimensions.begin(), a->_dimensions.end() - 2, b->_dimensions.begin());
 
 	size_t batch_size = 1;
-	for (int i = 0; i < rank - 2; ++i) batch_size *= a->_dimensions[i];
+	for (size_t i = 0; i + 2 < rank; ++i) batch_size *= a->_dimensions[i];
 	const size_t a_mat_size = m * n;
 	const size_t b_mat_size = n * p;
 	const size_t r_mat_size = m * p;
@@ -600,7 +600,7 @@ std::shared_ptr<Tensor> Tensor::matmul(const std::shared_ptr<Tensor>& a, const s
 
 	// Transpose b
 	AlignedFloatVector b_t(b_batched ? b_mat_size * batch_size : b_mat_size);
-	if (b_batched)
+	if (b_batched) // copy data along batch dimension if batched
 	{
 		for (size_t batch = 0; batch < batch_size; ++batch)
 		{
@@ -674,7 +674,7 @@ std::shared_ptr<Tensor> Tensor::convolve(const std::shared_ptr<Tensor>& input, c
 	// Compute convolution geometry
 	ConvGeometry g;
 	g.batches = input->_dimensions[0];
-	g.spatial_rank = kernels->rank() - 2;
+	g.spatial_rank = (size_t)kernels->rank() - 2;
 	g.input_channels = kernels->_dimensions.back();
 	g.filter_count = kernels->_dimensions[0];
 
@@ -696,10 +696,10 @@ std::shared_ptr<Tensor> Tensor::convolve(const std::shared_ptr<Tensor>& input, c
 	g.out_spatial_strides.back() = 1;
 	g.kernel_spatial_strides.resize(g.spatial_rank);
 	g.kernel_spatial_strides.back() = 1;
-	for (int i = (int)g.spatial_rank - 2; i >= 0; --i)
+	for (size_t i = g.spatial_rank - 1; i > 0; --i)
 	{
-		g.out_spatial_strides[i] = g.out_spatial_strides[i + 1] * g.out_dims[i + 1];
-		g.kernel_spatial_strides[i] = g.kernel_spatial_strides[i + 1] * g.kernel_dims[i + 1];
+		g.out_spatial_strides[i - 1] = g.out_spatial_strides[i] * g.out_dims[i];
+		g.kernel_spatial_strides[i - 1] = g.kernel_spatial_strides[i] * g.kernel_dims[i];
 	}
 
 	g.kernel_volume_size = g.kernel_spatial_size * g.input_channels;
@@ -731,7 +731,7 @@ std::shared_ptr<Tensor> Tensor::convolve(const std::shared_ptr<Tensor>& input, c
 	thread_local std::vector<int> result_dims;
 	result_dims.resize(g.spatial_rank + 2);
 	result_dims[0] = (int)g.batches;
-	for (size_t d = 0; d < g.spatial_rank; ++d) result_dims[d + 1] = (int)g.out_dims[d];
+	for (size_t d = 0; d < g.spatial_rank; ++d) result_dims[d + 1] = g.out_dims[d];
 	result_dims.back() = (int)g.filter_count;
 
 	const auto& owner = input->requires_grad ? input : kernels;
@@ -765,7 +765,7 @@ std::shared_ptr<Tensor> Tensor::convolve(const std::shared_ptr<Tensor>& input, c
 					thread_local AlignedFloatVector d_col;
 					thread_local AlignedFloatVector kernels_mat_t;
 
-					d_col.assign(g.im2col_rows * g.im2col_cols, 0.0);
+					d_col.assign(g.im2col_rows * g.im2col_cols, 0.0f);
 					kernels_mat_t.resize(kernels_mat->size());
 
 					MathUtils::transpose_matrix(kernels_mat->data(), kernels_mat_t.data(), 0, 0, g.filter_count, g.im2col_cols);

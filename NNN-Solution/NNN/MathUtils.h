@@ -8,7 +8,7 @@
 
 #include "DataContainers.h"
 
-// Collection of various math and vectorization utility functions.
+// Collection of various math and AVX2 SIMD vectorization utility functions.
 class MathUtils
 {
 public:
@@ -726,7 +726,7 @@ public:
 		size_t m, size_t n, size_t p, size_t a_batch_stride, size_t b_t_batch_stride, size_t r_batch_stride, size_t a_off, size_t b_t_off,
 		size_t r_off, bool use_parallel, bool accumulate);
 
-	// Computes the matrix multiplication of two vectors and accumulates the reuslt into the provided vector.
+	// Computes the matrix multiplication of two vectors and accumulates the result into the provided vector.
 	static void matmul_reduce_raw(const float* __restrict a_t, const float* __restrict b_t, float* __restrict r, size_t batch_count,
 		size_t m, size_t n, size_t p, size_t a_t_batch_stride, size_t b_t_batch_stride, size_t a_t_off, size_t b_t_off, size_t r_off,
 		bool use_parallel, bool accumulate);

@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "MathUtils.h"
 
-// Collection of various math and vectorization utility functions.
+// Collection of various math and AVX2 SIMD vectorization utility functions.
 
 /* Register operations */
 

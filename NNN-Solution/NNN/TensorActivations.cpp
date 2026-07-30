@@ -29,6 +29,7 @@ std::shared_ptr<Tensor> Tensor::relu(const std::shared_ptr<Tensor>& t)
 				const float* const __restrict p_rg = result->_grad.data();
 				const __m256 reg_0 = _mm256_setzero_ps();
 
+				// AVX2 SIMD vectorize gradient calculation
 				size_t i = 0;
 				for (; i + 32 <= n; i += 32)
 				{
@@ -70,6 +71,7 @@ std::shared_ptr<Tensor> Tensor::leaky_relu(const std::shared_ptr<Tensor>& t, flo
 	float* const __restrict p_r = result->_data.data();
 	const __m256 reg_0 = _mm256_setzero_ps();
 
+	// AVX2 SIMD vectorize result calculation
 	size_t i = 0;
 	for (; i + 32 <= n; i += 32)
 	{
@@ -105,8 +107,9 @@ std::shared_ptr<Tensor> Tensor::leaky_relu(const std::shared_ptr<Tensor>& t, flo
 				const __m256 reg_tau = _mm256_set1_ps(tau);
 				const float* const __restrict p_rg = result->_grad.data();
 				const __m256 reg_0 = _mm256_setzero_ps();
-				const __m256 reg_1 = _mm256_set1_ps(1.0);
+				const __m256 reg_1 = _mm256_set1_ps(1.0f);
 
+				// AVX2 SIMD vectorize gradient calculation
 				size_t i = 0;
 				for (; i + 32 <= n; i += 32)
 				{
@@ -152,7 +155,7 @@ std::shared_ptr<Tensor> Tensor::sigmoid(const std::shared_ptr<Tensor>& t)
 
 				const int element_count = result->element_count();
 				scratch1.resize(element_count);
-				MathUtils::vector_sub(1.0, result->_data, scratch1);
+				MathUtils::vector_sub(1.0f, result->_data, scratch1);
 				MathUtils::vector_mul(scratch1, result->_data);
 				MathUtils::vector_fmadd(t->_grad, scratch1, result->_grad);
 			};
@@ -183,7 +186,7 @@ std::shared_ptr<Tensor> Tensor::tanh(const std::shared_ptr<Tensor>& t)
 				const int element_count = result->element_count();
 				scratch1.resize(element_count);
 				MathUtils::vector_sq(result->_data, scratch1);
-				MathUtils::vector_sub(1.0, scratch1);
+				MathUtils::vector_sub(1.0f, scratch1);
 				MathUtils::vector_fmadd(t->_grad, scratch1, result->_grad);
 			};
 	}
@@ -214,6 +217,7 @@ std::shared_ptr<Tensor> Tensor::softmax(const std::shared_ptr<Tensor>& t)
 		__m256 acc2 = _mm256_setzero_ps();
 		__m256 acc3 = _mm256_setzero_ps();
 
+		// AVX2 SIMD vectorize result calculation
 		size_t i = 0;
 		for (; i + 32 <= classes; i += 32)
 		{

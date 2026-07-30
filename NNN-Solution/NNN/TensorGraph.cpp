@@ -8,7 +8,7 @@ void Tensor::restore_grad()
 {
 	if (requires_grad)
 	{
-		_grad.assign(element_count(), 0.0);
+		_grad.assign(element_count(), 0.0f);
 	}
 }
 
@@ -44,7 +44,7 @@ void Tensor::finalize_forward()
 	clear_graph();
 
 	// Prune any unused result tensor allocations - prevent potential memory leaks
-	if (_op_index < (int)_results.size())
+	if ((size_t)_op_index < _results.size())
 	{
 		_results.resize(_op_index);
 	}
@@ -73,6 +73,7 @@ void Tensor::backward()
 
 	if (!_visited.has_value()) _visited.emplace();
 
+	// Build topography for current forward pass
 	auto& topo = *_topo;
 	build_topo(shared_from_this(), topo, *_visited);
 	_visited->clear();
@@ -84,12 +85,12 @@ void Tensor::backward()
 	}
 
 	// Set initial gradient
-	_grad.assign(_grad.size(), 1.0);
+	_grad.assign(_grad.size(), 1.0f);
 
 	// Compute upstream gradient from each node in topography
-	for (int i = (int)topo.size() - 1; i >= 0; i--)
+	for (size_t i = topo.size(); i > 0; --i)
 	{
-		topo[i]->_backward();
+		topo[i - 1]->_backward();
 	}
 
 	// Prune unused result tensor allocations

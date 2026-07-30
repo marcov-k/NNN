@@ -7,13 +7,13 @@
 // Computes the strides of the tensor using the given dimensions.
 std::vector<int> Tensor::compute_strides(const std::vector<int>& dims)
 {
-	int n = (int)dims.size();
+	size_t n = dims.size();
 	std::vector<int> strides(n);
 
 	strides[n - 1] = 1;
-	for (int i = n - 2; i >= 0; i--)
+	for (size_t i = n - 1; i > 0; i--)
 	{
-		strides[i] = strides[i + 1] * dims[i + 1];
+		strides[i - 1] = strides[i] * dims[i];
 	}
 
 	return strides;
@@ -27,10 +27,10 @@ Tensor::Tensor(const std::vector<int> dims, bool req_grad) : _dimensions(dims), 
 
 	// Compute linear size and initialize data and gradient vectors
 
-	int size = 1;
+	size_t size = 1;
 	for (int dim : dims)
 	{
-		size *= dim;
+		size *= (size_t)dim;
 	}
 
 	_data.assign(size, 0.0f);
@@ -47,10 +47,10 @@ Tensor::Tensor(float value, const std::vector<int> dims, bool req_grad) : _dimen
 
 	// Compute linear size and initialize data and gradient vectors
 
-	int size = 1;
+	size_t size = 1;
 	for (int dim : dims)
 	{
-		size *= dim;
+		size *= (size_t)dim;
 	}
 
 	_data.assign(size, value);
@@ -87,11 +87,11 @@ std::shared_ptr<Tensor> Tensor::init_kernels(int filter_count, const std::vector
 	std::vector<int> dims;
 	dims.reserve(kernel_dims.size() + 2);
 	dims.push_back(filter_count);
-	int fan_in = input_channels;
+	size_t fan_in = (size_t)input_channels;
 	for (int dim : kernel_dims)
 	{
 		dims.push_back(dim);
-		fan_in *= dim;
+		fan_in *= (size_t)dim;
 	}
 	dims.push_back(input_channels);
 

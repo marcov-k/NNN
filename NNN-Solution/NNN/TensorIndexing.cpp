@@ -37,15 +37,15 @@ const float& Tensor::at(const std::vector<int>& indices) const
 
 int Tensor::linear_index(const std::vector<int>& indices) const
 {
-	int offset = 0;
+	size_t offset = 0;
 
-	for (int i = 0; i < (int)indices.size(); i++)
+	for (size_t i = 0; i < indices.size(); ++i)
 	{
-		offset += indices[i] * _strides[i];
+		offset += (size_t)indices[i] * (size_t)_strides[i];
 	}
 
 	// Ensure valid index
-	if (offset < 0 || offset >= element_count())
+	if (offset < 0 || offset >= (size_t)element_count())
 	{
 		throw std::out_of_range("Indices out of bounds.");
 	}
@@ -64,7 +64,7 @@ const std::vector<int> Tensor::get_full_indices(int index) const
 	int dimCount = rank();
 
 	std::vector<int> indices(dimCount);
-	for (int i = dimCount - 1; i >= 0; i--)
+	for (int i = dimCount - 1; i >= 0; --i)
 	{
 		indices[i] = index % _dimensions[i];
 		index /= _dimensions[i];

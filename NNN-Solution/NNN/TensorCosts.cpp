@@ -28,7 +28,7 @@ std::shared_ptr<Tensor> Tensor::mse(const std::shared_ptr<Tensor>& t, const std:
 				const int element_count = result->element_count();
 				scratch1.resize(element_count);
 				MathUtils::vector_sub(t->_data, target->_data, scratch1);
-				MathUtils::vector_mul(scratch1, 2.0);
+				MathUtils::vector_mul(scratch1, 2.0f);
 				MathUtils::vector_fmadd(t->_grad, scratch1, result->_grad);
 			};
 	}
@@ -44,9 +44,9 @@ std::shared_ptr<Tensor> Tensor::huber(const std::shared_ptr<Tensor>& t, const st
 	MathUtils::vector_sub(target->_data, t->_data, result->_data);
 	MathUtils::vector_div(result->_data, delta);
 	MathUtils::vector_sq(result->_data);
-	MathUtils::vector_add(result->_data, 1.0);
+	MathUtils::vector_add(result->_data, 1.0f);
 	MathUtils::vector_sqrt(result->_data);
-	MathUtils::vector_sub(result->_data, 1.0);
+	MathUtils::vector_sub(result->_data, 1.0f);
 	MathUtils::vector_mul(result->_data, delta * delta);
 
 	// Connect result tensor to autograd graph if needed
@@ -69,7 +69,7 @@ std::shared_ptr<Tensor> Tensor::huber(const std::shared_ptr<Tensor>& t, const st
 				MathUtils::vector_sub(target->_data, t->_data, scratch1);
 				MathUtils::vector_div(scratch1, delta, scratch2);
 				MathUtils::vector_sq(scratch2);
-				MathUtils::vector_add(scratch2, 1.0);
+				MathUtils::vector_add(scratch2, 1.0f);
 				MathUtils::vector_sqrt(scratch2);
 				MathUtils::vector_div(scratch1, scratch2);
 				MathUtils::vector_fnmadd(t->_grad, scratch1, result->_grad);
@@ -110,6 +110,7 @@ std::shared_ptr<Tensor> Tensor::softmax_cross_entropy(const std::shared_ptr<Tens
 		__m256 acc2 = _mm256_setzero_ps();
 		__m256 acc3 = _mm256_setzero_ps();
 
+		// AVX2 SIMD vectorize result calculation
 		size_t i = 0;
 		for (; i + 32 <= classes; i += 32)
 		{

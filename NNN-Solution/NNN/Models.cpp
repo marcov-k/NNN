@@ -10,6 +10,7 @@ void Models::clip_gradients(const std::vector<std::shared_ptr<Tensor>*>& paras, 
 {
 	thread_local AlignedFloatVector scratch1;
 
+	// Calculate total Euclidean norm of all tensors
 	float total_norm = 0.0f;
 	for (std::shared_ptr<Tensor>* para_ptr : paras)
 	{
@@ -20,6 +21,7 @@ void Models::clip_gradients(const std::vector<std::shared_ptr<Tensor>*>& paras, 
 	}
 	total_norm = std::sqrt(total_norm);
 
+	// Scale gradients to have a total Euclidean norm of max_norm -> scaling factor = max_norm / (total_norm + epsilon)
 	if (total_norm > max_norm)
 	{
 		const float scale = max_norm / (total_norm + 1e-8f);
@@ -36,6 +38,8 @@ void Models::soft_update(const std::vector<std::shared_ptr<Tensor>*>& agent_para
 {
 	thread_local AlignedFloatVector scratch1;
 
+	// Apply soft update (Polyak averaging) to every parameter in the target model ->
+	// target_param = tau * agent_param + (1 - tau) * target_param
 	for (size_t i = 0; i < agent_paras.size(); ++i)
 	{
 		auto& agent_para = *agent_paras[i];

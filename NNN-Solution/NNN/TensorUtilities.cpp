@@ -7,28 +7,28 @@
 // Returns the tensor instance to write the result of the current autograd graph operation into.
 std::shared_ptr<Tensor> Tensor::get_result_tensor(const std::shared_ptr<Tensor>& owner, const std::vector<int>& dims, bool requires_grad)
 {
-	if (!inference)
+	if (!inference) // only reuse result tensor allocations if not in inference mode
 	{
 		owner->prepare_forward();
 
-		const bool new_op = (int)owner->_results.size() <= owner->_op_index;
+		const bool new_op = owner->_results.size() <= (size_t)owner->_op_index;
 
 		std::shared_ptr<Tensor> result;
-		if (new_op) // create new result tensor allocation
+		if (new_op) // create new result tensor allocation if result tensor has not yet been cached for the operation
 		{
 			result = std::make_shared<Tensor>(dims, requires_grad);
 			owner->_results.push_back(result);
 		}
-		else
+		else // attempt to reuse the existing result tensor allocation for the operation
 		{
 			result = owner->_results[owner->_op_index];
 
 			// Ensure existing result tensor allocation dimensions match required dimensions
-			bool shape_mismatch = result->rank() != (int)dims.size();
+			bool shape_mismatch = (size_t)result->rank() != dims.size();
 			if (!shape_mismatch)
 			{
-				const int dims_length = (int)dims.size();
-				for (int i = 0; i < dims_length; ++i)
+				const size_t dims_length = dims.size();
+				for (size_t i = 0; i < dims_length; ++i)
 				{
 					if (result->dimensions()[i] != dims[i])
 					{
@@ -41,7 +41,7 @@ std::shared_ptr<Tensor> Tensor::get_result_tensor(const std::shared_ptr<Tensor>&
 			if (shape_mismatch) // create new result tensor allocation
 			{
 				result = std::make_shared<Tensor>(dims, requires_grad);
-				owner->_results[owner->_op_index] = result;
+				owner->_results[owner->_op_index] = result; // overwrite invalid allocation
 			}
 			else // reuse existing result tensor allocation
 			{
@@ -61,13 +61,13 @@ std::shared_ptr<Tensor> Tensor::get_result_tensor(const std::shared_ptr<Tensor>&
 
 std::shared_ptr<Tensor> Tensor::mask_actions(const std::shared_ptr<Tensor>& q_values, const std::vector<int>& actions)
 {
-	const int batch_size = (int)actions.size();
+	const size_t batch_size = actions.size();
 	const int action_count = q_values->_dimensions.back();
 
-	std::shared_ptr<Tensor> result = get_result_tensor(q_values, std::vector<int>{batch_size, 1}, q_values->requires_grad);
+	std::shared_ptr<Tensor> result = get_result_tensor(q_values, std::vector<int>{(int)batch_size, 1}, q_values->requires_grad);
 
 	// Extract Q Value at action index per batch
-	for (int i = 0; i < batch_size; ++i)
+	for (size_t i = 0; i < batch_size; ++i)
 	{
 		result->_data[i] = q_values->_data[i * action_count + actions[i]];
 	}
@@ -82,7 +82,7 @@ std::shared_ptr<Tensor> Tensor::mask_actions(const std::shared_ptr<Tensor>& q_va
 			{
 				if (!q_values->requires_grad) return;
 
-				for (int i = 0; i < batch_size; ++i)
+				for (size_t i = 0; i < batch_size; ++i)
 				{
 					q_values->_grad[i * action_count + actions[i]] += result->_grad[i];
 				}
@@ -98,7 +98,7 @@ int Tensor::arg_max(const std::shared_ptr<Tensor>& t)
 	float max = t->_data[0];
 
 	const int element_count = t->element_count();
-	for (int i = 1; i < element_count; ++i)
+	for (int i = 1; i < element_count; ++i) // find highest value sequentially
 	{
 		if (t->_data[i] > max)
 		{
@@ -139,7 +139,7 @@ std::shared_ptr<Tensor> Tensor::mean(const std::shared_ptr<Tensor>& t)
 	std::shared_ptr<Tensor> result = get_result_tensor(t, std::vector<int>(1, 1), t->requires_grad); // dims: {1} - scalar result
 
 	// Compute mean of data vector
-	result->_data[0] = MathUtils::vector_sum(t->_data) / t->element_count();
+	result->_data[0] = MathUtils::vector_sum(t->_data) / (float)t->element_count();
 
 	// Connect result tensor to autograd graph if needed
 	if (!inference)
@@ -163,8 +163,8 @@ std::shared_ptr<Tensor> Tensor::transpose(const std::shared_ptr<Tensor>& t, cons
 {
 	// Compute result dimensions
 	std::vector<int> result_dims(t->rank());
-	const int axes_length = (int)axes.size();
-	for (int i = 0; i < axes_length; ++i)
+	const size_t axes_length = axes.size();
+	for (size_t i = 0; i < axes_length; ++i)
 	{
 		result_dims[i] = t->_dimensions[axes[i]];
 	}
@@ -183,7 +183,7 @@ std::shared_ptr<Tensor> Tensor::transpose(const std::shared_ptr<Tensor>& t, cons
 	{
 		t->get_full_indices(i, src_indices.data());
 
-		for (int j = 0; j < axes_length; ++j)
+		for (size_t j = 0; j < axes_length; ++j)
 		{
 			dst_indices[j] = src_indices[axes[j]];
 		}
@@ -196,9 +196,9 @@ std::shared_ptr<Tensor> Tensor::transpose(const std::shared_ptr<Tensor>& t, cons
 	{
 		result->_parents.push_back(t);
 
-		// Precompute inverse permutation order
+		// Precompute inverse permutation order for gradient calculation
 		auto inv_axes = std::make_shared<std::vector<int>>(axes_length);
-		for (int i = 0; i < axes_length; ++i)
+		for (size_t i = 0; i < axes_length; ++i)
 		{
 			inv_axes->operator[](axes[i]) = i;
 		}
@@ -217,7 +217,7 @@ std::shared_ptr<Tensor> Tensor::transpose(const std::shared_ptr<Tensor>& t, cons
 				for (int i = 0; i < element_count; ++i)
 				{
 					result->get_full_indices(i, grad_src_indices.data());
-					for (int j = 0; j < axes_length; ++j)
+					for (size_t j = 0; j < axes_length; ++j)
 					{
 						grad_dst_indices[j] = grad_src_indices[inv_axes->operator[](j)];
 					}
@@ -233,8 +233,8 @@ std::shared_ptr<Tensor> Tensor::transpose(const std::shared_ptr<Tensor>& t)
 {
 	// Default permutation order: reverse all axes
 	std::vector<int> axes(t->rank());
-	const int axes_length = (int)axes.size();
-	for (int i = 0; i < axes_length; ++i)
+	const size_t axes_length = axes.size();
+	for (size_t i = 0; i < axes_length; ++i)
 	{
 		axes[i] = axes_length - i - 1;
 	}
@@ -251,10 +251,10 @@ std::shared_ptr<Tensor> Tensor::broadcast(const std::shared_ptr<Tensor>& t, cons
 	const int stride = t->element_count();
 	const int blocks = result->element_count() / stride;
 
-	// Block-copy input data into result
+	// Block-copy input data into result along each added dimension
 	for (int b = 0; b < blocks; ++b)
 	{
-		std::copy(t->_data.begin(), t->_data.end(), result->_data.begin() + (b * stride));
+		std::copy(t->_data.begin(), t->_data.end(), result->_data.begin() + ((size_t)b * (size_t)stride));
 	}
 
 	// Connect result tensor to autograd graph if needed
@@ -269,7 +269,7 @@ std::shared_ptr<Tensor> Tensor::broadcast(const std::shared_ptr<Tensor>& t, cons
 
 				for (int b = 0; b < blocks; ++b)
 				{
-					MathUtils::vector_add(t->_grad.data(), result->_grad.data() + b * stride, stride);
+					MathUtils::vector_add(t->_grad.data(), result->_grad.data() + (size_t)b * (size_t)stride, (size_t)stride);
 				}
 			};
 	}
@@ -281,7 +281,7 @@ std::shared_ptr<Tensor> Tensor::reshape(const std::shared_ptr<Tensor>& t, const 
 {
 	std::shared_ptr<Tensor> result = get_result_tensor(t, new_dims, t->requires_grad);
 
-	// Copy linear input data into result
+	// Copy linear input data into result - same underlying data layout just with different dimensions
 	std::copy(t->_data.begin(), t->_data.end(), result->_data.begin());
 
 	// Connect result tensor to autograd graph if needed
@@ -317,7 +317,7 @@ std::shared_ptr<Tensor> Tensor::flatten(const std::shared_ptr<Tensor>& t, int st
 std::shared_ptr<Tensor> Tensor::wrap_batch(const std::shared_ptr<Tensor>& t)
 {
 	thread_local std::vector<int> batch_dims;
-	batch_dims.resize(t->rank() + 1);
+	batch_dims.resize((size_t)t->rank() + 1);
 	batch_dims[0] = 1;
 	for (size_t i = 0; i < t->_dimensions.size(); ++i) batch_dims[i + 1] = t->_dimensions[i];
 	auto batch = std::make_shared<Tensor>(batch_dims, false);
@@ -351,6 +351,7 @@ std::shared_ptr<Tensor> Tensor::clip(const std::shared_ptr<Tensor>& t, float min
 				const float* __restrict p_rg = result->_grad.data();
 				const __m256 reg_0 = _mm256_setzero_ps();
 
+				// AVX2 SIMD vectorize gradient calculation
 				size_t i = 0;
 				for (; i + 32 <= n; i += 32)
 				{
@@ -429,11 +430,11 @@ std::shared_ptr<Tensor> Tensor::get_spatial_dropout_mask(const std::vector<int>&
 		// Drop selected channel indices for each spatial position in the current batch
 		for (int s = 0; s < spatial_size; ++s)
 		{
-			int spatial_offset = batch_offset + (s * channels);
+			size_t spatial_offset = (size_t)batch_offset + ((size_t)s * (size_t)channels);
 
 			for (int c = 0; c < channels; ++c)
 			{
-				mask->_data[spatial_offset + c] = channel_vals[c];
+				mask->_data[spatial_offset + (size_t)c] = channel_vals[c];
 			}
 		}
 	}
