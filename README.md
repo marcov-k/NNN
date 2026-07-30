@@ -1,5 +1,5 @@
 # Neural Network Notions
-A neural network framework created from scratch in C# and C++ implementing automatic differentiation, backpropagation, and customizable architectures for neural networks.
+A Unity-compatible neural network framework created from scratch in C# and C++ implementing automatic differentiation, backpropagation, and customizable architectures for neural networks.
 
 ### View the Complete Documentation [Here](https://github.com/marcov-k/NNN/wiki)
 
@@ -15,6 +15,7 @@ A neural network framework created from scratch in C# and C++ implementing autom
 - Powerful C++ backend with C# interop
 - Performance optimizations via SIMD vectorization and parallelization
 - Custom file type for saving trained models (.nnn)
+- Compatible with the Unity game engine
 
 ## Motivation
 I originally intended for this project to simply be my experimentation with implementing the systems described in Seth Weidman's _Deep Learning from Scratch_. However, after seeing my basic neural networks successfully
