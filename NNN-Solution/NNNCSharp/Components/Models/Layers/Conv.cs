@@ -48,7 +48,7 @@ namespace NNNCSharp.Components.Models.Layers
         /// <param name="biases">Bias tensor of the new layer.</param>
         /// <param name="activation">Activation function of the new layer.</param>
         /// <param name="dropout">Dropout rate of the new layer.</param>
-        public Conv(int filterCount, int[] kernelDims, Tensor kernels, Tensor biases, Activation activation, float dropout)
+        public Conv(int filterCount, int[] kernelDims, Tensor kernels, Tensor biases, Activation activation, float dropout) : base(dropout)
         {
             FilterCount = filterCount;
             KernelDims = kernelDims;
@@ -57,7 +57,6 @@ namespace NNNCSharp.Components.Models.Layers
             Biases.Dispose();
             Biases = biases;
             Activation = activation;
-            Dropout = dropout;
         }
 
         /// <summary>
