@@ -28,12 +28,21 @@ namespace NNNCSharp.Components.Models.Layers
         /// <summary>
         /// Dropout rate of the layer.
         /// </summary>
-        public float Dropout { get; protected set; } = 0.0f;
+        public float Dropout { get; protected set; }
 
         /// <summary>
         /// Parameterless constructor for model reconstruction from save data.
         /// </summary>
-        public Layer() { }
+        public Layer() {}
+
+        /// <summary>
+        /// Creates a new layer instance.
+        /// </summary>
+        /// <param name="dropout">Dropout rate of the new layer.</param>
+        public Layer(float dropout = 0.0f)
+        {
+            Dropout = dropout;
+        }
 
         /// <summary>
         /// Initializes the layer's parameters for the given number of inputs.

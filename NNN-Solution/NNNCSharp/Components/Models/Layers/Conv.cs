@@ -32,12 +32,11 @@ namespace NNNCSharp.Components.Models.Layers
         /// <param name="kernelDims">Dimensions of the kernels used by the layer.</param>
         /// <param name="activation">Activation function of the new layer.</param>
         /// <param name="dropout">Dropout rate of the new layer.</param>
-        public Conv(int filterCount, int[] kernelDims, Activation activation, float dropout = 0.0f)
+        public Conv(int filterCount, int[] kernelDims, Activation activation, float dropout = 0.0f) : base(dropout)
         {
             FilterCount = filterCount;
             KernelDims = kernelDims;
             Activation = activation;
-            Dropout = dropout;
         }
 
         /// <summary>

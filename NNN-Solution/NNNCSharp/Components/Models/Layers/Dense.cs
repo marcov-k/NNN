@@ -30,12 +30,11 @@ namespace NNNCSharp.Components.Models.Layers
         /// <param name="neuronCount">Number of neurons in the new layer.</param>
         /// <param name="activation">Activation function of the new layer.</param>
         /// <param name="dropout">Dropout rate of the new layer.</param>
-        public Dense(int neuronCount, Activation activation, bool flatten = false, float dropout = 0.0f)
+        public Dense(int neuronCount, Activation activation, bool flatten = false, float dropout = 0.0f) : base(dropout)
         {
             NeuronCount = neuronCount;
             Activation = activation;
             Flatten = flatten;
-            Dropout = dropout;
         }
 
         /// <summary>
