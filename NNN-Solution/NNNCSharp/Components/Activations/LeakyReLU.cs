@@ -18,7 +18,7 @@ namespace NNNCSharp.Components.Activations
         /// Creates a new Leaky ReLU activation function instance.
         /// </summary>
         /// <param name="tau">Coefficient for negative inputs.</param>
-        public LeakyReLU(float tau)
+        public LeakyReLU(float tau = 0.05f)
         {
             Tau = tau;
         }
