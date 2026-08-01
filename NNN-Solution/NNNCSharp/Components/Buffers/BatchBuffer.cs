@@ -47,6 +47,18 @@ namespace NNNCSharp.Components.Buffers
             TargetDims = targets[0].Dimensions.ToArray();
         }
 
+        ~BatchBuffer() // release all native C++ memory used by the persistent input and target arrays
+        {
+            if (BatchInputs is not null)
+            {
+                foreach (var tensor in BatchInputs) tensor.Dispose();
+            }
+            if (BatchTargets is not null)
+            {
+                foreach (var tensor in BatchTargets) tensor.Dispose();
+            }
+        }
+
         /// <summary>
         /// Randomly selects a training batch from the full training inputs and targets.
         /// </summary>
@@ -67,15 +79,26 @@ namespace NNNCSharp.Components.Buffers
             targetDims[0] = batchSize;
             Array.Copy(TargetDims, 0, targetDims, 1, TargetDims.Length);
 
-            // Allocate persistent batch arrays if not yet allocated
-            if (BatchInputs is null)
+            // Prepare batch tensors
+            if (BatchInputs is null) // allocate persistent input batch array if not yet allocated
             {
                 BatchInputs = new Tensor[1];
                 BatchInputs[0] = new(batchDims);
             }
-            if (BatchTargets is null)
+            else if (!Tensor.DimensionsMatch(BatchInputs[0].Dimensions, batchDims)) // ensure batch tensor has required dimensions
+            {
+                BatchInputs[0].Dispose(); // safely release native C++ memory and allocate new batch tensor
+                BatchInputs[0] = new(batchDims);
+            }
+
+            if (BatchTargets is null) // allocate persistent target batch array if not yet allocated
             {
                 BatchTargets = new Tensor[1];
+                BatchTargets[0] = new(targetDims);
+            }
+            else if (!Tensor.DimensionsMatch(BatchTargets[0].Dimensions, targetDims)) // ensure batch tensor has required dimensions
+            {
+                BatchTargets[0].Dispose(); // safely release native C++ memory and allocate new batch tensor
                 BatchTargets[0] = new(targetDims);
             }
 
@@ -107,6 +130,7 @@ namespace NNNCSharp.Components.Buffers
         {
             if (batchSize <= 0 || batchSize > Data.Length) throw new ArgumentOutOfRangeException(nameof(batchSize), "Batch size out of range.");
 
+            // Shuffle input and target tensors while ensuring corresponding input-target pairs retain identical indices
             var shuffledData = ArrayUtils.GetRandomElements(Data, Data.Length);
             var shuffledTargets = new Tensor[shuffledData.Length];
             for (int i = 0; i < shuffledData.Length; i++)
@@ -114,6 +138,7 @@ namespace NNNCSharp.Components.Buffers
                 shuffledTargets[i] = Targets[shuffledData[i].OriginalIndex];
             }
 
+            // Compute batched input and target dimensions
             var batchInputDims = new int[Data[0].Rank + 1];
             batchInputDims[0] = batchSize;
             Array.Copy(DataDims, 0, batchInputDims, 1, DataDims.Length);
@@ -122,10 +147,12 @@ namespace NNNCSharp.Components.Buffers
             batchTargetDims[0] = batchSize;
             Array.Copy(TargetDims, 0, batchTargetDims, 1, TargetDims.Length);
 
+            // Compute number of full-size batches and length of incomplete tail batch
             int fullBatchCount = Data.Length / batchSize;
             int tailBatchLength = Data.Length % batchSize;
             int batchCount = tailBatchLength > 0 ? fullBatchCount + 1 : fullBatchCount;
 
+            // Compute tail batch input and target dimensions
             var tailBatchInputDims = new int[batchInputDims.Length];
             tailBatchInputDims[0] = tailBatchLength;
             Array.Copy(DataDims, 0, tailBatchInputDims, 1, DataDims.Length);
@@ -134,9 +161,14 @@ namespace NNNCSharp.Components.Buffers
             tailBatchTargetDims[0] = tailBatchLength;
             Array.Copy(TargetDims, 0, tailBatchTargetDims, 1, TargetDims.Length);
 
-            // Allocate persistent batch arrays if not yet allocated
-            if (BatchInputs is null || BatchInputs.Length < batchCount)
+            // Prepare batch tensor arrays
+            if (BatchInputs is null || BatchInputs.Length < batchCount) // allocate persistent input batch array if not yet allocated or incorrect size
             {
+                if (BatchInputs is not null) // safely release native C++ memory from previous batch
+                {
+                    foreach (var input in BatchInputs) input.Dispose();
+                }
+
                 BatchInputs = new Tensor[batchCount];
                 for (int i = 0; i < fullBatchCount; i++)
                 {
@@ -147,8 +179,30 @@ namespace NNNCSharp.Components.Buffers
                     BatchInputs[fullBatchCount] = new(tailBatchInputDims);
                 }
             }
-            if (BatchTargets is null || BatchTargets.Length < batchCount)
+            else if (BatchInputs is not null) // ensure each batch tensor has required dimensions
             {
+                for (int i = 0; i < fullBatchCount; i++)
+                {
+                    if (!Tensor.DimensionsMatch(BatchInputs[i].Dimensions, batchInputDims))
+                    {
+                        BatchInputs[i].Dispose(); // safely release native C++ memory and allocate new batch tensor
+                        BatchInputs[i] = new(batchInputDims);
+                    }
+                }
+                if (tailBatchLength > 0 && !Tensor.DimensionsMatch(BatchInputs[fullBatchCount].Dimensions, tailBatchInputDims))
+                {
+                    BatchInputs[fullBatchCount].Dispose(); // safely release native C++ memory and allocate new batch tensor
+                    BatchInputs[fullBatchCount] = new(tailBatchInputDims);
+                }
+            }
+
+            if (BatchTargets is null || BatchTargets.Length < batchCount) // allocate persistent target batch array if not yet allocated or incorrect size
+            {
+                if (BatchTargets is not null) // safely release native C++ memory from previous batch
+                {
+                    foreach (var target in BatchTargets) target.Dispose();
+                }
+
                 BatchTargets = new Tensor[batchCount];
                 for (int i = 0; i < fullBatchCount; i++)
                 {
@@ -159,7 +213,24 @@ namespace NNNCSharp.Components.Buffers
                     BatchTargets[fullBatchCount] = new(tailBatchTargetDims);
                 }
             }
+            else if (BatchTargets is not null) // ensure each batch tensor has required dimensions
+            {
+                for (int i = 0; i < fullBatchCount; i++)
+                {
+                    if (!Tensor.DimensionsMatch(BatchTargets[i].Dimensions, batchTargetDims))
+                    {
+                        BatchTargets[i].Dispose(); // safely release native C++ memory and allocate new batch tensor
+                        BatchTargets[i] = new(batchTargetDims);
+                    }
+                }
+                if (tailBatchLength > 0 && !Tensor.DimensionsMatch(BatchTargets[fullBatchCount].Dimensions, tailBatchTargetDims))
+                {
+                    BatchTargets[fullBatchCount].Dispose(); // safely release native C++ memory and allocate new batch tensor
+                    BatchTargets[fullBatchCount] = new(tailBatchTargetDims);
+                }
+            }
 
+            // Fill batch input and target tensors
             int itemLength = Data[0].ElementCount;
             int targetLength = Targets[0].ElementCount;
             for (int b = 0; b < fullBatchCount; b++)
@@ -167,8 +238,9 @@ namespace NNNCSharp.Components.Buffers
                 int batchOffset = b * batchSize;
                 for (int i = 0; i < batchSize; i++)
                 {
-                    shuffledData[batchOffset + i].Element.Data[0..itemLength].CopyTo(BatchInputs[b].Data.Slice(i * itemLength, itemLength));
-                    shuffledTargets[batchOffset + i].Data[0..targetLength].CopyTo(BatchTargets[b].Data.Slice(i * targetLength, targetLength));
+                    // Copy data from single input-target pair into corresponding location in batch input/target tensors
+                    shuffledData[batchOffset + i].Element.Data[0..itemLength].CopyTo(BatchInputs![b].Data.Slice(i * itemLength, itemLength));
+                    shuffledTargets[batchOffset + i].Data[0..targetLength].CopyTo(BatchTargets![b].Data.Slice(i * targetLength, targetLength));
                 }
             }
             if (tailBatchLength > 0)
@@ -176,12 +248,13 @@ namespace NNNCSharp.Components.Buffers
                 int batchOffset = fullBatchCount * batchSize;
                 for (int i = 0; i < tailBatchLength; i++)
                 {
-                    shuffledData[batchOffset + i].Element.Data[0..itemLength].CopyTo(BatchInputs[fullBatchCount].Data.Slice(i * itemLength, itemLength));
-                    shuffledTargets[batchOffset + i].Data[0..targetLength].CopyTo(BatchTargets[fullBatchCount].Data.Slice(i * targetLength, targetLength));
+                    // Copy data from single input-target pair into corresponding location in batch input/target tensors
+                    shuffledData[batchOffset + i].Element.Data[0..itemLength].CopyTo(BatchInputs![fullBatchCount].Data.Slice(i * itemLength, itemLength));
+                    shuffledTargets[batchOffset + i].Data[0..targetLength].CopyTo(BatchTargets![fullBatchCount].Data.Slice(i * targetLength, targetLength));
                 }
             }
 
-            return (BatchInputs, BatchTargets);
+            return (BatchInputs!, BatchTargets!);
         }
     }
 }

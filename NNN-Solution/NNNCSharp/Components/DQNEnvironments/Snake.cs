@@ -7,6 +7,7 @@ using static NNNCSharp.Components.Utilities.UIUtils;
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.IO;
 
 namespace NNNCSharp.Components.DQNEnvironments
 {
@@ -160,6 +161,7 @@ namespace NNNCSharp.Components.DQNEnvironments
             int[] directionIndices = new int[3];
             var dirSpan = directionIndices.AsSpan();
 
+            // One-hot encode each part of the snake
             SnakeNode? node = SnakeHead;
             while (node is not null)
             {
@@ -288,8 +290,23 @@ namespace NNNCSharp.Components.DQNEnvironments
         public override void PlayDemo()
         {
             ShowDemoInstructions();
-            var agent = Saver.LoadModel(DemoFileName);
-            Play(agent);
+            try
+            {
+                var agent = Saver.LoadModel(DemoFileName);
+                Play(agent);
+            }
+            catch (FileNotFoundException e)
+            {
+                NNNLog.WriteLine($"Could not load model: {e.Message}");
+                NNNLog.WriteLine("\nPress any key to continue...");
+                Console.ReadKey();
+            }
+            catch (InvalidFileFormatException e)
+            {
+                NNNLog.WriteLine($"Could not load model: {e.Message}");
+                NNNLog.WriteLine("\nPress any key to continue...");
+                Console.ReadKey();
+            }
         }
 
         // Additional environment-specific functionality
@@ -351,6 +368,7 @@ namespace NNNCSharp.Components.DQNEnvironments
         /// </summary>
         void GenerateApple()
         {
+            // Release all native C++ memory used by intermediate tensor instances via 'using'
             using var state = GetBoardState(); // get the current game board
 
             // Find all positions not occupied by the snake
@@ -536,6 +554,8 @@ namespace NNNCSharp.Components.DQNEnvironments
                 while (!Collided())
                 {
                     int action;
+
+                    // Release all native C++ memory used by intermediate tensor instances via 'using'
                     using (var normState = GetNormalizedState())
                     using (var wrapped = Tensor.WrapBatch(normState))
                     using (var predicted = agent.Predict(wrapped))
@@ -573,6 +593,7 @@ namespace NNNCSharp.Components.DQNEnvironments
         /// </summary>
         void DrawSnake()
         {
+            // Release all native C++ memory used by intermediate tensor instances via 'using'
             using var state = GetBoardState(); // get the current state of the board
             NNNLog.WriteLine("Key: A - Apple, H - Snake Head, B - Snake Body, T - Snake Tail\n");
             NNNLog.WriteLine($"Snake Length: {SnakeLength}");

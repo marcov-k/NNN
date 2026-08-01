@@ -17,6 +17,10 @@ namespace NNNCSharp.Components.Interop
             SetHandle(handle);
         }
 
+        /// <summary>
+        /// Releases a the native C++ memory wrapped by the tensor handle.
+        /// </summary>
+        /// <returns>Whether the handle was successfully released.</returns>
         protected override bool ReleaseHandle()
         {
             NativeMethods.tensor_release(handle);

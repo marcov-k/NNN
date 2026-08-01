@@ -200,7 +200,7 @@ std::shared_ptr<Tensor> Tensor::transpose(const std::shared_ptr<Tensor>& t, cons
 		auto inv_axes = std::make_shared<std::vector<int>>(axes_length);
 		for (size_t i = 0; i < axes_length; ++i)
 		{
-			inv_axes->operator[](axes[i]) = i;
+			inv_axes->operator[](axes[i]) = (int)i;
 		}
 
 		// Gradient calculation -> map result gradient to input gradient using inverse permutation order
@@ -236,7 +236,7 @@ std::shared_ptr<Tensor> Tensor::transpose(const std::shared_ptr<Tensor>& t)
 	const size_t axes_length = axes.size();
 	for (size_t i = 0; i < axes_length; ++i)
 	{
-		axes[i] = axes_length - i - 1;
+		axes[i] = (int)axes_length - (int)i - 1;
 	}
 
 	return transpose(t, axes);

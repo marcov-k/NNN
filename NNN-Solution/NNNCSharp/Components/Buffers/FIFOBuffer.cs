@@ -35,18 +35,26 @@ namespace NNNCSharp.Components.Buffers
             MaxSize = maxSize;
         }
 
+        ~FIFOBuffer() // release all native C++ memory used by the buffer if relevant
+        {
+            foreach (var item in Buffer)
+            {
+                if (item is IDisposable disposable) disposable.Dispose();
+            }
+        }
+
         /// <summary>
         /// Appends an element to the end of the buffer.
         /// </summary>
         /// <param name="item">Element to append.</param>
-        public virtual void Add(T item)
+        public void Add(T item)
         {
             if (MaxSize <= 0) return;
 
             if (Count < MaxSize) Buffer.Add(item);
             else
             {
-                if (Buffer[FirstIndex] is IDisposable disposable) disposable.Dispose();
+                if (Buffer[FirstIndex] is IDisposable disposable) disposable.Dispose(); // safely dispose native C++ memory if relevant
                 Buffer[FirstIndex] = item; // replace oldest element
                 FirstIndex = (FirstIndex + 1) % MaxSize; // increment index of oldest element
             }

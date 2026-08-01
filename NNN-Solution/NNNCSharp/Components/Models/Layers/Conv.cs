@@ -53,9 +53,9 @@ namespace NNNCSharp.Components.Models.Layers
         {
             FilterCount = filterCount;
             KernelDims = kernelDims;
-            Kernels.Dispose();
+            Kernels.Dispose(); // release native C++ memory used by default allocation
             Kernels = kernels;
-            Biases.Dispose();
+            Biases.Dispose(); // release native C++ memory used by default allocation
             Biases = biases;
         }
 
@@ -69,9 +69,9 @@ namespace NNNCSharp.Components.Models.Layers
         public override void SetUpLayer(Tensor inputFormat)
         {
             // Initialize parameters
-            Kernels.Dispose();
+            Kernels.Dispose(); // release native C++ memory used by default allocation
             Kernels = Tensor.InitKernels(FilterCount, KernelDims, inputFormat.Dimensions[^1]);
-            Biases.Dispose();
+            Biases.Dispose(); // release native C++ memory used by default allocation
             Biases = Tensor.InitBiases(FilterCount);
 
             // Compute output dimensions
@@ -82,12 +82,15 @@ namespace NNNCSharp.Components.Models.Layers
                 outputDims[i + 1] = inputFormat.Dimensions[i + 1] - KernelDims[i] + 1;
             }
             outputDims[^1] = FilterCount;
-            OutputFormat.Dispose();
+            OutputFormat.Dispose(); // release native C++ memory used by default allocation
             OutputFormat = new(outputDims);
         }
 
         public override Tensor Forward(Tensor input)
         {
+            // Compute convolution and bias addition result
+            // Release all native C++ memory used by intermediate tensor instances via 'using'
+            // (intermediate tensor instances are kept alive by native C++ autograd graph until no longer needed)
             using var conv = Tensor.Convolve(input, Kernels);
             using var biasBroadcast = Tensor.Broadcast(Biases, conv.Dimensions.ToArray());
             using var biasAdd = conv + biasBroadcast;
@@ -97,7 +100,7 @@ namespace NNNCSharp.Components.Models.Layers
             {
                 using var dropoutMask = Tensor.GetSpatialDropoutMask(output, Dropout);
                 var dropoutOutput = output * dropoutMask;
-                output.Dispose();
+                output.Dispose(); // release native C++ memory used by intermediate tensor instance
                 output = dropoutOutput;
             }
 
@@ -124,7 +127,7 @@ namespace NNNCSharp.Components.Models.Layers
         protected override void ReadUniqueData(FileStream stream)
         {
             FilterCount = FileUtils.ReadInt32(stream);
-            Kernels.Dispose();
+            Kernels.Dispose(); // release native C++ memory used by previous allocation
             Kernels = FileUtils.ReadTensor(stream);
             KernelDims = Kernels.Dimensions[1..^1].ToArray();
         }
@@ -154,7 +157,7 @@ namespace NNNCSharp.Components.Models.Layers
             return $"Filters: {filterCount}\n{kernelDimsString}\n{kernelsString}";
         }
 
-        public override void Dispose()
+        public override void Dispose() // release native C++ memory used by shared layer tensor allocations and kernels tensor allocation
         {
             base.Dispose();
             Kernels.Dispose();

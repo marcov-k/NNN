@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using NNNCSharp.Components.Utilities;
+using System.IO;
 
 namespace NNNCSharp.Components.DQNEnvironments
 {
@@ -83,6 +84,11 @@ namespace NNNCSharp.Components.DQNEnvironments
             YRange = yMax - yMin;
             MaxSteps = maxSteps;
             Reset(); // generate the initial state for the first episode
+        }
+
+        ~MovementGrid2D() // release native C++ memory used by the environment's state
+        {
+            State.Dispose();
         }
 
         // Base Environment API overrides
@@ -192,14 +198,29 @@ namespace NNNCSharp.Components.DQNEnvironments
         public override void PlayDemo()
         {
             ShowDemoInstructions();
-            var agent = Saver.LoadModel(DemoFileName);
-            DrawRunning = true;
-            while (true)
+            try
             {
-                Run(agent);
-                if (GetInput("Watch agent navigate again? y/n", new List<string> { userInputs[UserInput.Yes], userInputs[UserInput.No] }) == userInputs[UserInput.No]) break;
+                var agent = Saver.LoadModel(DemoFileName);
+                DrawRunning = true;
+                while (true)
+                {
+                    Run(agent);
+                    if (GetInput("Watch agent navigate again? y/n", new List<string> { userInputs[UserInput.Yes], userInputs[UserInput.No] }) == userInputs[UserInput.No]) break;
+                }
+                DrawRunning = false;
             }
-            DrawRunning = false;
+            catch (FileNotFoundException e)
+            {
+                NNNLog.WriteLine($"Could not load model: {e.Message}");
+                NNNLog.WriteLine("\nPress any key to continue...");
+                Console.ReadKey();
+            }
+            catch (InvalidFileFormatException e)
+            {
+                NNNLog.WriteLine($"Could not load model: {e.Message}");
+                NNNLog.WriteLine("\nPress any key to continue...");
+                Console.ReadKey();
+            }
         }
 
         /// <summary>
@@ -287,6 +308,7 @@ namespace NNNCSharp.Components.DQNEnvironments
         /// <returns>Selected action index.</returns>
         int GetAgentAction(Model agent)
         {
+            // Release all native C++ memory used by intermediate tensor instances via 'using'
             using var normState = GetNormalizedState();
             using var wrapped = Tensor.WrapBatch(normState);
             using var predicted = agent.Predict(wrapped);

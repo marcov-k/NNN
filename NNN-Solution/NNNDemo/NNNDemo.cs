@@ -1,5 +1,6 @@
 ﻿using NNNCSharp.Components.Autodiff;
 using NNNCSharp.Components.DQNEnvironments;
+using NNNCSharp.Components.Models;
 using NNNCSharp.Components.Utilities;
 using NNNCSharp.Components.Utilities.DataLoaders;
 using NNNCSharp.Components.Utilities.SaveSystem;
@@ -134,23 +135,34 @@ public class NNNDemo
         NNNLog.WriteLine("Loaded MNIST test dataset");
 
         NNNLog.WriteLine("\nLoading demo model...");
-        var model = Saver.LoadModel(fileName);
-        NNNLog.WriteLine("Loaded demo model");
-
-        bool done = false;
-        while (!done)
+        try
         {
-            int index = Random.Shared.Next(wrappedImages.Length);
-            var image = images[index];
-            var wrappedImage = wrappedImages[index];
-            var label = labels[index];
+            var model = Saver.LoadModel(fileName);
+            NNNLog.WriteLine("Loaded demo model");
 
-            int predictLabel = Tensor.ArgMax(model.Predict(wrappedImage));
-            NNNLog.WriteLine($"\n\nImage index in dataset: {index}\n");
-            DrawMNISTImage(image, label, 0.5f);
-            NNNLog.WriteLine($"Model prediction: {predictLabel}");
+            bool done = false;
+            while (!done)
+            {
+                int index = Random.Shared.Next(wrappedImages.Length);
+                var image = images[index];
+                var wrappedImage = wrappedImages[index];
+                var label = labels[index];
 
-            if (GetInput("View another image? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.No]) done = true;
+                int predictLabel = Tensor.ArgMax(model.Predict(wrappedImage));
+                NNNLog.WriteLine($"\n\nImage index in dataset: {index}\n");
+                DrawMNISTImage(image, label, 0.5f);
+                NNNLog.WriteLine($"Model prediction: {predictLabel}");
+
+                if (GetInput("View another image? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.No]) done = true;
+            }
+        }
+        catch (FileNotFoundException e)
+        {
+            NNNLog.WriteLine($"Error while loading model: {e.Message}");
+        }
+        catch (InvalidFileFormatException e)
+        {
+            NNNLog.WriteLine($"Error while loading model: {e.Message}");
         }
     }
 }

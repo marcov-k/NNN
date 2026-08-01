@@ -88,7 +88,7 @@ namespace NNNCSharp.Components.Models.Layers
             Activation.BuildFromData(stream);
 
             Dropout = FileUtils.ReadFloat(stream);
-            Biases.Dispose();
+            Biases.Dispose(); // release native C++ memory used by previous allocation
             Biases = FileUtils.ReadTensor(stream);
 
             ReadUniqueData(stream);
@@ -124,6 +124,9 @@ namespace NNNCSharp.Components.Models.Layers
         /// <returns>Readable string of the layer type-specific data.</returns>
         protected abstract string PrintUniqueLayer(FileStream stream);
 
+        /// <summary>
+        /// Releases all native C++ memory used by the instance.
+        /// </summary>
         public virtual void Dispose()
         {
             Biases.Dispose();

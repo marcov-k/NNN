@@ -47,16 +47,18 @@ namespace NNNCSharp.Components.Utilities.SaveSystem
         /// </summary>
         /// <param name="fileName">Name of file to load from.</param>
         /// <returns>Model loaded from the given file.</returns>
+        /// <exception cref="FileNotFoundException">Thrown if a file with the specified name could not be found.</exception>
+        /// <exception cref="InvalidFileFormatException">Thrown if the file had an invalid magic number.</exception>
         public static Model LoadModel(string fileName)
         {
             string filePath = GetFullPath(fileName);
-            if (!File.Exists(filePath)) throw new ArgumentException($"File with name {fileName} not found.");
+            if (!File.Exists(filePath)) throw new FileNotFoundException($"File with name {fileName} not found.");
 
             Model model;
             using FileStream stream = new(filePath, FileMode.Open, FileAccess.Read);
             {
                 int magic = FileUtils.ReadInt32(stream);
-                if (magic != MagicNumber) throw new Exception($"Invalid magic number: found {magic} instead of {MagicNumber}");
+                if (magic != MagicNumber) throw new InvalidFileFormatException($"Invalid file format (magic number): found {magic} instead of {MagicNumber}");
 
                 // Skip the file's description
                 int descLength = FileUtils.ReadInt32(stream);
@@ -100,5 +102,29 @@ namespace NNNCSharp.Components.Utilities.SaveSystem
         {
             if (!Directory.Exists(DirectoryPath)) Directory.CreateDirectory(DirectoryPath);
         }
+    }
+
+    /// <summary>
+    /// Represents an error due to attempting to parse an invalid file format.
+    /// </summary>
+    public class InvalidFileFormatException : Exception
+    {
+        /// <summary>
+        /// Creates a new InvalidFileFormatException instance.
+        /// </summary>
+        public InvalidFileFormatException() : base() { }
+
+        /// <summary>
+        /// Creates a new InvalidFileFormatException instance.
+        /// </summary>
+        /// <param name="message">Error message to display.</param>
+        public InvalidFileFormatException(string message) : base(message) { }
+
+        /// <summary>
+        /// Creates a new InvalidFileFormatException instance.
+        /// </summary>
+        /// <param name="message">Error message to display.</param>
+        /// <param name="innerException">Reference to the inner exception which caused this exception.</param>
+        public InvalidFileFormatException(string message, Exception innerException) : base(message, innerException) { }
     }
 }

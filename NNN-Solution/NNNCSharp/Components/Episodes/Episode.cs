@@ -23,7 +23,10 @@ namespace NNNCSharp.Components.Episodes
             Experiences = experiences.ToList(); // create a new copy of each experience
         }
 
-        public void Dispose()
+        /// <summary>
+        /// Releases all native C++ memory used by the instance.
+        /// </summary>
+        public void Dispose() // release native C++ memory used by each stored Experience instance
         {
             foreach (var exp in Experiences) exp.Dispose();
         }

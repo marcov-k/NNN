@@ -52,6 +52,9 @@ namespace NNNCSharp.Components.Episodes
             Priority = Math.Max(priority, 1e-8f); // ensure non-zero priority
         }
 
+        /// <summary>
+        /// Releases all native C++ memory used by the instance.
+        /// </summary>
         public void Dispose()
         {
             State.Dispose();

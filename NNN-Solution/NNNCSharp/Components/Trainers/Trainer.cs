@@ -69,8 +69,6 @@ namespace NNNCSharp.Components.Trainers
 
             Tensor[] inputs = new Tensor[1];
             Tensor[] targets = new Tensor[1];
-            Tensor predictions;
-            Tensor loss;
 
             float totalLoss;
 
@@ -103,6 +101,8 @@ namespace NNNCSharp.Components.Trainers
                     Optimizer.LR = baseLR * (minLRFraction + decayRange * cosFactor);
                 }
 
+                // Prepare training batch tensors
+                // (releasing of native C++ memory is handled by the BatchBuffer instance)
                 if (batchAllInputs)
                 {
                     (inputs, targets) = batchBuffer.GetBatches(batchSize);
@@ -112,10 +112,12 @@ namespace NNNCSharp.Components.Trainers
                     (inputs[0], targets[0]) = batchBuffer.GetBatch(batchSize);
                 }
 
-                for (int i = 0; i < inputs.Length; i++)
+                for (int i = 0; i < inputs.Length; i++) // train using each batch
                 {
-                    predictions = Model.Forward(inputs[i]);
-                    loss = Cost.CalculateCost(predictions, targets[i]);
+                    // Release all native C++ memory used by intermediate tensor instances via 'using'
+                    // (intermediate tensor instances are kept alive by native C++ autograd graph until no longer needed)
+                    using var predictions = Model.Forward(inputs[i]);
+                    using var loss = Cost.CalculateCost(predictions, targets[i]);
                     totalLoss += loss[0];
                     loss.Backward();
                     Model.ClipGradients(MaxGradNorm);
@@ -151,7 +153,7 @@ namespace NNNCSharp.Components.Trainers
                         float successPercent = ((float)successes / testLength) * 100.0f;
                         if (successPercent > bestAccuracy)
                         {
-                            bestModel.Dispose();
+                            bestModel.Dispose(); // release native C++ memory used by previous best model allocation
                             bestModel = Model.Copy();
                             bestAccuracy = successPercent;
                         }
@@ -162,7 +164,7 @@ namespace NNNCSharp.Components.Trainers
 
             if (decayLR) Optimizer.LR = baseLR;
 
-            Model.Dispose();
+            Model.Dispose(); // release native C++ memory used by model allocation
             Model = bestModel;
             totalTimer.Stop();
             NNNLog.WriteLine($"Total training time: {MathUtils.RoundToMS(totalTimer.Elapsed)}");

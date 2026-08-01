@@ -44,6 +44,14 @@ namespace NNNCSharp.Components.Buffers
             Data = new T[capacity];
         }
 
+        ~SumTree() // release all native C++ memory if relevant
+        {
+            foreach (var item in Data)
+            {
+                if (item is IDisposable disposable) disposable.Dispose();
+            }
+        }
+
         /// <summary>
         /// Adds a new element to the sum tree.
         /// </summary>
@@ -52,7 +60,7 @@ namespace NNNCSharp.Components.Buffers
         public void Add(T item, double priority)
         {
             // Add item to main data array
-            if (Data[WritePointer] is IDisposable disposable) disposable.Dispose();
+            if (Data[WritePointer] is IDisposable disposable) disposable.Dispose(); // safely dispose native C++ memory if relevant
             Data[WritePointer] = item;
 
             // Update sum tree with new priority

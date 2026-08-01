@@ -7,6 +7,7 @@ using static NNNCSharp.Components.Utilities.UIUtils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.IO;
 
 namespace NNNCSharp.Components.DQNEnvironments
 {
@@ -74,6 +75,11 @@ namespace NNNCSharp.Components.DQNEnvironments
         /// Creates a new TicTacToe environment instance.
         /// </summary>
         public TicTacToe() { }
+
+        ~TicTacToe() // release native C++ memory used by the environment's state
+        {
+            State.Dispose();
+        }
 
         // Base Environment API overrides
 
@@ -185,8 +191,23 @@ namespace NNNCSharp.Components.DQNEnvironments
         public override void PlayDemo()
         {
             ShowDemoInstructions();
-            var agent = Saver.LoadModel(DemoFileName);
-            Play(agent);
+            try
+            {
+                var agent = Saver.LoadModel(DemoFileName);
+                Play(agent);
+            }
+            catch (FileNotFoundException e)
+            {
+                NNNLog.WriteLine($"Could not load model: {e.Message}");
+                NNNLog.WriteLine("\nPress any key to continue...");
+                Console.ReadKey();
+            }
+            catch (InvalidFileFormatException e)
+            {
+                NNNLog.WriteLine($"Could not load model: {e.Message}");
+                NNNLog.WriteLine("\nPress any key to continue...");
+                Console.ReadKey();
+            }
         }
 
         // Additional self-play interface API overrides
@@ -194,6 +215,8 @@ namespace NNNCSharp.Components.DQNEnvironments
         public int GetAgentAction(Model agent, Tensor? state = null)
         {
             state ??= State; // assume current environment state if no state is given
+
+            // Release all native C++ memory used by intermediate tensor instances via 'using'
             using var wrapped = Tensor.WrapBatch(state);
             using var predicted = agent.Predict(wrapped);
             return PickAgentAction(predicted, state);

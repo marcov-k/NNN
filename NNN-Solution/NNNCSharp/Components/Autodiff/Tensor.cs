@@ -123,7 +123,7 @@ namespace NNNCSharp.Components.Autodiff
         }
 
         /// <summary>
-        /// Safely disposes the tensor instance.
+        /// Releases the native C++ memory of the tensor.
         /// </summary>
         public void Dispose()
         {
@@ -899,6 +899,26 @@ namespace NNNCSharp.Components.Autodiff
             GC.KeepAlive(t);
             GC.KeepAlive(target);
             return new(h);
+        }
+
+        // Utility functions
+        
+        /// <summary>
+        /// Checks whether two given tensor dimensions spans are identical.
+        /// </summary>
+        /// <param name="a">First dimensions span to compare.</param>
+        /// <param name="b">Second dimensions span to compare.</param>
+        /// <returns>Whether the two given dimensions spans are identical.</returns>
+        public static bool DimensionsMatch(Span<int> a, Span<int> b)
+        {
+            if (a.Length != b.Length) return false;
+
+            for (int i = 0; i < a.Length; i++)
+            {
+                if (a[i] != b[i]) return false;
+            }
+
+            return true;
         }
     }
 }

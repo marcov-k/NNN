@@ -21,6 +21,8 @@ namespace NNNCSharp.Components.Activations
         /// <returns>New instance of the same activation function.</returns>
         public abstract Activation Copy(); // used to ensure function-specific parameters are persisted during copies
 
+        // Override the following functions if the activation function must save/load internal parameters
+
         /// <summary>
         /// Writes any activation type-specific data to the file stream.
         /// </summary>

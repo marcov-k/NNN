@@ -5,7 +5,6 @@ namespace NNNCSharp.Components.Optimizers
     /// <summary>
     /// Base class for optimizers used for updating model parameters.
     /// </summary>
-    /// <param name="learningRate">Gradient scaling factor for parameter updates.</param>
     public abstract class Optimizer
     {
         /// <summary>
@@ -13,6 +12,10 @@ namespace NNNCSharp.Components.Optimizers
         /// </summary>
         public float LR { get; set; }
 
+        /// <summary>
+        /// Creates a new Optimizer instance.
+        /// </summary>
+        /// <param name="learningRate">Gradient scaling factor for parameter updates.</param>
         public Optimizer(float learningRate)
         {
             LR = learningRate;

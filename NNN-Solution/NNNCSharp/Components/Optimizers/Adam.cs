@@ -34,6 +34,10 @@ namespace NNNCSharp.Components.Optimizers
         /// Weight decay to use.
         /// </summary>
         readonly float WeightDecay;
+        /// <summary>
+        /// Dictionary of per-parameter persistent buffers for first and second moments.
+        /// </summary>
+        readonly Dictionary<Tensor, (IntPtr m, IntPtr v)> _state = new();
 
         /// <summary>
         /// Creates a new Adam optimizer instance.
@@ -54,20 +58,25 @@ namespace NNNCSharp.Components.Optimizers
             WeightDecay = weightDecay;
         }
 
-        /// <summary>
-        /// Dictionary of per-parameter persistent buffers for first and second moments.
-        /// </summary>
-        readonly Dictionary<Tensor, (IntPtr m, IntPtr v)> _state = new();
+        ~Adam() // free each moment vector allocation via C++
+        {
+            foreach (var (m, v) in _state.Values)
+            {
+                NativeMethods.free_aligned(m);
+                NativeMethods.free_aligned(v);
+            }
+        }
 
         public override void Step(Tensor parameter, int iteration)
         {
             // Create a new persistent 32-bit aligned moment buffer if necessary
             if (!_state.TryGetValue(parameter, out var moments))
             {
+                // Allocate moment vectors via C++ aligned allocator
                 int byteCount = parameter.ElementCount * sizeof(float);
                 IntPtr m = NativeMethods.alloc_aligned((UIntPtr)byteCount, (UIntPtr)32);
                 IntPtr v = NativeMethods.alloc_aligned((UIntPtr)byteCount, (UIntPtr)32);
-                unsafe
+                unsafe // zero out newly allocated moment vector memory
                 {
                     new Span<byte>((void*)m, byteCount).Clear();
                     new Span<byte>((void*)v, byteCount).Clear();
@@ -79,15 +88,6 @@ namespace NNNCSharp.Components.Optimizers
             NativeMethods.optimizers_adam(parameter.Handle, LR, iteration, moments.m, moments.v, parameter.ElementCount,
                 Beta1, OneMinusBeta1, Beta2, OneMinusBeta2, Epsilon, WeightDecay);
             GC.KeepAlive(parameter);
-        }
-
-        ~Adam()
-        {
-            foreach (var (m, v) in _state.Values)
-            {
-                NativeMethods.free_aligned(m);
-                NativeMethods.free_aligned(v);
-            }
         }
     }
 }

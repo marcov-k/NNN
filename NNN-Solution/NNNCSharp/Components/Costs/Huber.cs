@@ -5,7 +5,6 @@ namespace NNNCSharp.Components.Costs
     /// <summary>
     /// Pseudo-Huber (smoothed) cost function.
     /// </summary>
-    /// <param name="delta">Linear transition threshold.</param>
     public class Huber : Cost
     {
         /// <summary>
@@ -13,6 +12,10 @@ namespace NNNCSharp.Components.Costs
         /// </summary>
         readonly float Delta;
 
+        /// <summary>
+        /// Creates a new pseudo-Huber cost function instance.
+        /// </summary>
+        /// <param name="delta">Linear transition threshold.</param>
         public Huber(float delta = 1.0f)
         {
             Delta = delta;

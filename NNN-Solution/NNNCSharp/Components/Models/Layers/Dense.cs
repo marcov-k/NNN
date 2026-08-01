@@ -49,9 +49,9 @@ namespace NNNCSharp.Components.Models.Layers
             : base(activation, dropout)
         {
             NeuronCount = neuronCount;
-            Weights.Dispose();
+            Weights.Dispose(); // release native C++ memory used by default allocation
             Weights = weights;
-            Biases.Dispose();
+            Biases.Dispose(); // release native C++ memory used by default allocation
             Biases = biases;
             Flatten = flatten;
         }
@@ -65,19 +65,22 @@ namespace NNNCSharp.Components.Models.Layers
 
         public override void SetUpLayer(Tensor inputFormat)
         {
-            Weights.Dispose();
+            Weights.Dispose(); // release native C++ memory used by default allocation
             Weights = Tensor.InitWeights(inputFormat.ElementCount, NeuronCount);
-            Biases.Dispose();
+            Biases.Dispose(); // release native C++ memory used by default allocation
             Biases = Tensor.InitBiases(NeuronCount);
-            OutputFormat.Dispose();
+            OutputFormat.Dispose(); // release native C++ memory used by default allocation
             OutputFormat = new(new int[] { 1, NeuronCount });
         }
 
         public override Tensor Forward(Tensor input)
         {
+            // Compute matrix multiplication and bias addition result
+            // Release all native C++ memory used by intermediate tensor instances via 'using'
+            // (intermediate tensor instances are kept alive by native C++ autograd graph until no longer needed)
             var flatInput = Flatten ? Tensor.Flatten(input, 1) : input;
             using var matmul = flatInput ^ Weights;
-            if (Flatten) flatInput.Dispose();
+            if (Flatten) flatInput.Dispose(); // release native C++ memory used by intermediate flattened input allocation
             using var biasBroadcast = Tensor.Broadcast(Biases, matmul.Dimensions.ToArray());
             using var biasAdd = matmul + biasBroadcast;
             var output = Activation.Forward(biasAdd);
@@ -86,7 +89,7 @@ namespace NNNCSharp.Components.Models.Layers
             {
                 using var dropoutMask = Tensor.GetDenseDropoutMask(output, Dropout);
                 var dropoutOutput = output * dropoutMask;
-                output.Dispose();
+                output.Dispose(); // release native C++ memory used by intermediate tensor instance
                 output = dropoutOutput;
             }
 
@@ -126,8 +129,8 @@ namespace NNNCSharp.Components.Models.Layers
             bool flatten = FileUtils.ReadBool(stream);
             return $"Neurons: {neuronCount}\n{weights}\nFlatten: {flatten}";
         }
-
-        public override void Dispose()
+        
+        public override void Dispose() // release native C++ memory used by shared layer tensor allocations and kernels tensor allocation
         {
             base.Dispose();
             Weights.Dispose();

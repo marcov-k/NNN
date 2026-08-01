@@ -160,7 +160,10 @@ namespace NNNCSharp.Components.Models
             return new(layers);
         }
 
-        public void Dispose()
+        /// <summary>
+        /// Releases all native C++ memory used by the instance.
+        /// </summary>
+        public void Dispose() // release native C++ memory used by each layer
         {
             foreach (var layer in Layers) layer.Dispose();
         }

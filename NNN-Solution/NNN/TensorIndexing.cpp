@@ -50,7 +50,7 @@ int Tensor::linear_index(const std::vector<int>& indices) const
 		throw std::out_of_range("Indices out of bounds.");
 	}
 
-	return offset;
+	return (int)offset;
 }
 
 const std::vector<int> Tensor::get_full_indices(int index) const

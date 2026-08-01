@@ -34,7 +34,7 @@ public class NNNTrainer
 
         NNNLog.WriteLine("\nPress any key to quit...");
         Console.ReadKey();
-        System.Environment.Exit(0);
+        Environment.Exit(0);
     }
 
     /// <summary>

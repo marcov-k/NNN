@@ -2,6 +2,9 @@
 
 namespace NNNCSharp.Components.Costs
 {
+    /// <summary>
+    /// Softmax Cross-Entropy cost function.
+    /// </summary>
     public class SoftmaxCrossEntropy : Cost
     {
         public override Tensor CalculateCost(Tensor predictions, Tensor target)

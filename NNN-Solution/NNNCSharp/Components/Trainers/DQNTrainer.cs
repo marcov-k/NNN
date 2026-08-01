@@ -245,6 +245,7 @@ namespace NNNCSharp.Components.Trainers
                     if (learnerTurn) ReplayBuffer.Add(new(state, action, reward, nextState, done));
                     episodeExperiences.Add(new(trueState, action, reward, trueNextState, done));
 
+                    // Release native C++ memory used by unnormalized state allocations
                     trueState.Dispose();
                     trueNextState.Dispose();
 
@@ -254,7 +255,7 @@ namespace NNNCSharp.Components.Trainers
                         trainSteps++;
                     }
 
-                    state.Dispose();
+                    state.Dispose(); // release native C++ memory used by previous state allocation
                     state = nextState;
                 }
 
@@ -290,7 +291,7 @@ namespace NNNCSharp.Components.Trainers
                     float score = Environment.TestTrainingProgress(Agent, testEpisodes);
                     if (score > bestScore)
                     {
-                        bestAgent.Dispose();
+                        bestAgent.Dispose(); // release native C++ memory used by previous best agent allocation
                         bestAgent = Agent.Copy();
                         bestScore = score;
                     }
@@ -298,7 +299,7 @@ namespace NNNCSharp.Components.Trainers
                 stopwatch.Restart();
             }
 
-            Agent.Dispose();
+            Agent.Dispose(); // release native C++ memory used by agent allocation
             Agent = bestAgent;
             totalStopwatch.Stop();
             NNNLog.WriteLine($"Total Training Duration: {MathUtils.RoundToMS(totalStopwatch.Elapsed):g}");
@@ -334,6 +335,8 @@ namespace NNNCSharp.Components.Trainers
             }
             else // pick action based on predicted Q-Values
             {
+                // Release all native C++ memory used by intermediate tensor instances via 'using'
+                // (intermediate tensor instances are kept alive by native C++ autograd graph until no longer needed)
                 using var wrapped = Tensor.WrapBatch(state);
                 using var predicted = Agent.Forward(wrapped);
                 return Environment.PickAgentAction(predicted);
@@ -386,6 +389,8 @@ namespace NNNCSharp.Components.Trainers
             // Predict future values of actions
             Tensor nextAgentQs, nextTargetQs, targetQs, predictedQs, loss;
 
+            // Release all native C++ memory used by intermediate tensor instances via 'using'
+            // (intermediate tensor instances are kept alive by native C++ autograd graph until no longer needed)
             using (var nextAgentQsRaw = Agent.Predict(_nextBatch)) // select actions for experience's next states
             using (var nextTargetQsRaw = TargetModel.Predict(_nextBatch)) // predict Q-Values of actions
             {
