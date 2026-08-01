@@ -421,165 +421,62 @@ Console.ReadKey();
 
 ### MNIST Dataset
 #### Specifications:
-Architecture: Conv(8 filters, 5x5 kernel) -> Conv(16 filters, 5x5 kernel, 0.2 dropout) -> 128 (0.5 dropout) -> 10 (Leaky ReLU, Leaky ReLU, Leaky ReLU, Linear)\
+Architecture: Conv(8 filters, 5x5 kernel) -> Conv(16 filters, 5x5 kernel, 0.2 dropout) -> 128 (0.5 dropout) -> 10; (Leaky ReLU, Leaky ReLU, Leaky ReLU, Linear)\
 Loss Function: Softmax Cross-Entropy\
 Optimizer: Adam (0.01 weight decay)\
 Initial Learning Rate: 0.001 (with decay)\
-Final Learning Rate: 0.0001\
-Total Time Required for Training and Evaluation: 2:01:01.393\
+Final Learning Rate: 0.0005\
+Maximum Gradient Norm: 1.0\
+Total Time Required for Training and Evaluation: 21:32.018\
 Training Inputs: Standard 60,000 training image dataset\
-Testing Inputs: Standard 10,000 testing image dataset
+Testing Inputs: Standard 10,000 testing image dataset\
+CPU Used: AMD Ryzen 7 5700U\
+RAM Used: 16.0 GB DDR4 with speed 3200 MT/s
 #### Training Results:
 | Epochs | Accuracy |
 |--------|----------|
-| 0* | 9.82% |
-| 5 | 95.30% |
-| 10 | 96.00% |
-| 15 | 96.36% |
-| 20 | 95.98% |
-| 25 | 96.80% |
-| 30 | 96.85% |
-| 35 | 97.16% |
-| 40 | 96.94% |
-| 45 | 97.26% |
-| 50 | 97.42% |
+| 0* | 7.44% |
+| 1 | 98.42% |
+| 2 | 98.52% |
+| 3 | 98.84% |
+| 4 | 99.07% |
+| 5 | 99.00% |
+| 6 | 98.98% |
+| 7 | 99.07% |
+| 8 | 99.18% |
+| 9 | 99.21% |
+| 10 | 99.12% |
 
 *Accuracy prior to any training being done
-#### Code Used for Testing:
-```
-Console.WriteLine("Loading MNIST dataset...");
-var (trainImages, trainLabels) = MNISTLoader.GetTrainingData();
-var (testImages, testLabels) = MNISTLoader.GetTestData();
-Console.WriteLine("MNIST dataset loaded");
-
-float tau = 0.05f;
-float convDropout = 0.15f;
-float denseDropout = 0.5f;
-Model model;
-if (GetInput("Load model from file? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
-{
-    // Load model from file
-    string fileName = GetFileName();
-    model = Saver.LoadModel(fileName);
-}
-else
-{
-    model = new([
-        new Conv(8, [5, 5], new LeakyReLU(tau)),
-        new Conv(16, [5, 5], new LeakyReLU(tau), convDropout),
-        new Dense(128, new LeakyReLU(tau), denseDropout),
-        new Dense(10, new Linear())
-    ], new([1, 28, 28, 1]));
-}
-
-Optimizer optimizer = new Adam(0.001f, weightDecay: 0.01f);
-float maxGradNorm = 0.5f;
-Cost cost = new SoftmaxCrossEntropy();
-Trainer trainer = new(model, optimizer, cost, maxGradNorm);
-
-var wrappedImages = new Tensor[testImages.Length];
-for (int i = 0; i < testImages.Length; i++)
-{
-    wrappedImages[i] = Tensor.WrapBatch(testImages[i]);
-}
-
-Func<Model, int, bool> testFunc = (model, i) =>
-{
-    var predicts = model.Predict(wrappedImages[i]);
-    return Tensor.ArgMax(predicts) == Tensor.ArgMax(testLabels[i]);
-};
-
-BatchBuffer batchBuffer = new(trainImages, trainLabels);
-int batchSize = 128;
-int testLength = testLabels.Length;
-```
 
 ### Tic-Tac-Toe (DQN + Self-Play)
 #### Specifications:
-Architecture: 256 -> 256 -> 128 -> 9 (Leaky ReLU -> Leaky ReLU -> Leaky ReLU -> Linear)\
-Loss Function: Pseudo-Huber\
-Optimizer: Adam\
+Architecture: 256 -> 256 -> 128 -> 9; (Leaky ReLU -> Leaky ReLU -> Leaky ReLU -> Linear)\
+Loss Function: Pseudo-Huber (delta = 1)\
+Optimizer: Adam (0 weight decay)\
 Learning Rate: 0.001\
+Discount Factor: 0.95\
+Max Gradient Norm: 1.0\
 Games per Performance Test: 5000\
 Opponent for Performance Tests: Randomly-Acting\
-Total Time Required for Training and Evaluation: 3:15.919
+Total Time Required for Training and Evaluation: 00:59.381\
+CPU Used: AMD Ryzen 7 5700U\
+RAM Used: 16.0 GB DDR4 with speed 3200 MT/s
 #### Training Results:
 | Training Episodes | Win Rate | Tie Rate | Win + Tie Rate |
 |-------------------|----------|----------|----------------|
-| 200* | 42.06% | 30.32% | 72.38% |
-| 400* | 42.18% | 30.14% | 72.32% |
-| 600* | 92.04% | 6.08% | 98.12% |
-| 800 | 93.94% | 5.20% | 99.14% |
-| 1000 | 93.16% | 5.50% | 98.66% |
-| 1200 | 94.20% | 5.14% | 99.34% |
-| 1400 | 92.96% | 6.18% | 99.14% |
-| 1600 | 95.60% | 4.26% | 99.86% |
-| 1800 | 95.24% | 4.54% | 99.78% |
-| 2000 | 94.60% | 5.40% | 100.00% |
+| 200* | 54.20% | 20.32% | 74.52% |
+| 400* | 53.18% | 20.26% | 73.44% |
+| 600* | 89.54% | 7.48% | 97.02% |
+| 800 | 91.42% | 6.20% | 97.62% |
+| 1000 | 93.58% | 4.98% | 98.56% |
+| 1200 | 93.54% | 5.96% | 99.50% |
+| 1400 | 93.36% | 5.32% | 98.68% |
+| 1600 | 93.66% | 5.86% | 99.52% |
+| 1800 | 93.04% | 6.18% | 99.22% |
+| 2000 | 94.32% | 5.68% | 100.00% |
 
 *Note that the majority of the first 600 episodes were used to collect initial experiences without training
-#### Code Used for Testing:
-##### Training Hyperparameters:
-```
-DQNEnvironment env = new TicTacToe();
-float exploration = 1.0f;
-float explorationDecay = 0.9995f;
-float minExploration = 0.01f;
-int trainEvery = 1;
-float discount = 0.99f;
-Optimizer optimizer = new Adam(0.001f);
-Cost cost = new Huber();
-int replayBufferSize = 10000;
-int batchSize = 128;
-int agentBufferSize = 2;
-int opponentCopyRate = 600;
-int minRandomOpponentEpisodes = 600;
-float tau = 0.01f;
-float maxGradNorm = 1.0f;
-int minExperiences = 2000;
-int episodeMemorySize = 100;
-int testEpisodes = 5000;
-```
-##### Performance Evaluation (in Tic-Tac-Toe Environment):
-```
-public override void TestTrainingProgress(Model agent, int testEpisodes)
-{
-    int wins = 0;
-    int ties = 0;
-    for (int e = 0; e < testEpisodes; e++)
-    {
-        var (won, tied) = PlayRandom(agent);
-        if (won) wins++;
-        else if (tied) ties++;
-    }
-
-    float winPercent = ((float)wins / testEpisodes) * 100.0f;
-    float tiePercent = ((float)ties / testEpisodes) * 100.0f;
-    Console.WriteLine($"Win percentage vs randomly-acting opponent: {winPercent:F2}");
-    Console.WriteLine($"Tie percentage vs randomly-acting opponent: {tiePercent:F2}");
-    Console.WriteLine($"Win + tie percentage vs randomly-acting opponent: {(winPercent + tiePercent):F2}");
-}
-
-public (bool won, bool tied) PlayRandom(Model agent)
-{
-    Reset();
-
-    bool agentTurn = Random.Next(2) == 1;
-    while (!CheckWin() && !BoardFilled())
-    {
-        int action = agentTurn ? GetAgentAction(agent) : PickRandomAction();
-
-        State[action] = State[9] == 1.0f ? 1.0f : -1.0f;
-
-        if (agentTurn && CheckWin()) return (true, false);
-
-        State[9] *= -1.0f;
-        agentTurn = !agentTurn;
-    }
-
-    return (false, !CheckWin() && BoardFilled());
-}
-```
 
 ## Architecture
 ### Tensor
