@@ -1,5 +1,4 @@
 ﻿using NNNCSharp.Components.Autodiff;
-using System.IO;
 
 namespace NNNCSharp.Components.Activations
 {
@@ -20,11 +19,5 @@ namespace NNNCSharp.Components.Activations
         /// </summary>
         /// <returns>New Tanh activation function instance.</returns>
         public override Activation Copy() => new Tanh();
-
-        internal override void WriteUniqueData(FileStream stream) { }
-
-        public override void BuildFromData(FileStream stream) { }
-
-        public override string PrintActivation(FileStream stream) => string.Empty;
     }
 }

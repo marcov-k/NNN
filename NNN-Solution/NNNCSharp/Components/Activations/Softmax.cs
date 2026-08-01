@@ -1,5 +1,4 @@
 ﻿using NNNCSharp.Components.Autodiff;
-using System.IO;
 
 namespace NNNCSharp.Components.Activations
 {
@@ -20,11 +19,5 @@ namespace NNNCSharp.Components.Activations
         /// </summary>
         /// <returns>New Softmax activation function instance.</returns>
         public override Activation Copy() => new Softmax();
-
-        internal override void WriteUniqueData(FileStream stream) { }
-
-        public override void BuildFromData(FileStream stream) { }
-
-        public override string PrintActivation(FileStream stream) => string.Empty;
     }
 }

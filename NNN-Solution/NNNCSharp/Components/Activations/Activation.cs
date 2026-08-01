@@ -25,19 +25,19 @@ namespace NNNCSharp.Components.Activations
         /// Writes any activation type-specific data to the file stream.
         /// </summary>
         /// <param name="stream">File stream to write to.</param>
-        internal abstract void WriteUniqueData(FileStream stream);
+        internal virtual void WriteUniqueData(FileStream stream) { }
 
         /// <summary>
         /// Fills the activation instance with data at the current position in the file stream.
         /// </summary>
         /// <param name="stream">File stream to read from.</param>
-        public abstract void BuildFromData(FileStream stream);
+        public virtual void BuildFromData(FileStream stream) { }
 
         /// <summary>
         /// Converts any activation type-specific data from the file stream into a readable string.
         /// </summary>
         /// <param name="stream">File stream to read from.</param>
         /// <returns>Readable string of the activation type-specific data.</returns>
-        public abstract string PrintActivation(FileStream stream);
+        public virtual string PrintActivation(FileStream stream) => string.Empty;
     }
 }
