@@ -25,7 +25,7 @@ namespace NNNCSharp.Components.Activations
         /// Writes any activation type-specific data to the file stream.
         /// </summary>
         /// <param name="stream">File stream to write to.</param>
-        public abstract void WriteUniqueData(FileStream stream);
+        internal abstract void WriteUniqueData(FileStream stream);
 
         /// <summary>
         /// Fills the activation instance with data at the current position in the file stream.

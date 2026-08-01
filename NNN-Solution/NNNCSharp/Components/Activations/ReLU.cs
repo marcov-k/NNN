@@ -21,7 +21,7 @@ namespace NNNCSharp.Components.Activations
         /// <returns>New ReLU activation function instance.</returns>
         public override Activation Copy() => new ReLU();
 
-        public override void WriteUniqueData(FileStream stream) { }
+        internal override void WriteUniqueData(FileStream stream) { }
 
         public override void BuildFromData(FileStream stream) { }
 

@@ -41,7 +41,7 @@ namespace NNNCSharp.Components.Activations
         /// <returns>New Leaky ReLU activation function instance with the same Tau value.</returns>
         public override Activation Copy() => new LeakyReLU(Tau);
 
-        public override void WriteUniqueData(FileStream stream)
+        internal override void WriteUniqueData(FileStream stream)
         {
             FileUtils.WriteFloat(stream, Tau);
         }
