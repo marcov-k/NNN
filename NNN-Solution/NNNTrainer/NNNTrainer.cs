@@ -79,9 +79,9 @@ public class NNNTrainer
         {
             // Create a new model
             model = new([
+                new Dense(256, new LeakyReLU(activTau)),
+                new Dense(256, new LeakyReLU(activTau)),
                 new Dense(128, new LeakyReLU(activTau)),
-                new Dense(128, new LeakyReLU(activTau)),
-                new Dense(64, new LeakyReLU(activTau)),
                 new Dense(env.ActionCount, new Linear())
             ], env.StateFormat);
         }
@@ -129,7 +129,7 @@ public class NNNTrainer
         NNNLog.WriteLine("MNIST dataset loaded");
 
         float tau = 0.05f;
-        float convDropout = 0.15f;
+        float convDropout = 0.2f;
         float denseDropout = 0.5f;
         Model model;
         if (GetInput("Load model from file? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
@@ -149,7 +149,7 @@ public class NNNTrainer
         }
 
         Optimizer optimizer = new Adam(0.001f, weightDecay: 0.01f);
-        float maxGradNorm = 0.5f;
+        float maxGradNorm = 1.0f;
         Cost cost = new SoftmaxCrossEntropy();
         Trainer trainer = new(model, optimizer, cost, maxGradNorm);
         float minLRFraction = 0.5f;
