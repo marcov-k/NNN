@@ -128,7 +128,7 @@ namespace NNNCSharp.Components.DQNEnvironments
         /// </summary>
         /// <param name="agents">Buffer of all stored opponent agents.</param>
         /// <returns>Index of the action taken by the opponent.</returns>
-        public int PickOpponentAction(FIFOBuffer<Model> agents)
+        internal int PickOpponentAction(FIFOBuffer<Model> agents)
         {
             if (agents.Count != OpponentCount) UpdateOpponentIndex(agents.Count); // update opponent data if buffer expanded
 
