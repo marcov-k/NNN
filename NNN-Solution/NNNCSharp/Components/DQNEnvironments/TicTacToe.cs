@@ -404,7 +404,7 @@ namespace NNNCSharp.Components.DQNEnvironments
         /// </summary>
         /// <param name="agent">Agent to use.</param>
         /// <returns>Whether the agent won or tied.</returns>
-        public (bool won, bool tied) PlayRandom(Model agent)
+        internal (bool won, bool tied) PlayRandom(Model agent)
         {
             Reset();
 
