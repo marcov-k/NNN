@@ -30,7 +30,7 @@ namespace NNNCSharp.Components.DQNEnvironments
         /// <summary>
         /// State encoding the positions of the board and current player to move.
         /// </summary>
-        public Tensor State { get; init; } = new(new int[] { 10 }); // positions index 0-8, index 9 - current player to move: 1 -> X, 0 -> empty, -1 -> O
+        readonly Tensor State = new(new int[] { 10 }); // positions index 0-8, index 9 - current player to move: 1 -> X, 0 -> empty, -1 -> O
         /// <summary>
         /// Array of all possible winning position index combinations.
         /// </summary>
