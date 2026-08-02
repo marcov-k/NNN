@@ -20,7 +20,7 @@ namespace NNNCSharp.Components.Episodes
         /// <param name="experiences">List of experiences within the episode.</param>
         public Episode(List<Experience> experiences)
         {
-            Experiences = experiences.ToList(); // create a new copy of each experience
+            Experiences = experiences.ToList();
         }
 
         /// <summary>
