@@ -284,7 +284,7 @@ namespace NNNCSharp.Components.Autodiff
         /// <summary>
         /// Begins a new forward pass in the C++ autograd engine.
         /// </summary>
-        public static void BeginForward() => NativeMethods.tensor_begin_forward();
+        internal static void BeginForward() => NativeMethods.tensor_begin_forward();
 
         /// <summary>
         /// Clears the autograd graph connections of the given tensor.
