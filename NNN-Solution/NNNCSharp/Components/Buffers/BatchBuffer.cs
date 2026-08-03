@@ -126,7 +126,7 @@ namespace NNNCSharp.Components.Buffers
         /// <param name="batchSize">Number of input and target pairs to include per batch.</param>
         /// <returns>Arrays of batched inputs and targets, arranged with corresponding indices.</returns>
         /// <exception cref="ArgumentOutOfRangeException">Requested batch size exceeds total number of input and target pairs.</exception>
-        public (Tensor[] BatchInputs, Tensor[] BatchTargets) GetBatches(int batchSize)
+        public (Tensor[] batchInputs, Tensor[] batchTargets) GetBatches(int batchSize)
         {
             if (batchSize <= 0 || batchSize > Data.Length) throw new ArgumentOutOfRangeException(nameof(batchSize), "Batch size out of range.");
 
