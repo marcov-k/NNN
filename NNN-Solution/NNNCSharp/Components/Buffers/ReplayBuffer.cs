@@ -7,8 +7,6 @@ namespace NNNCSharp.Components.Buffers
     /// <summary>
     /// PER replay buffer class.
     /// </summary>
-    /// <param name="capacity">Maximum size of the replay buffer.</param>
-    /// <param name="alpha">Alpha value to use during sampling.</param>
     public class ReplayBuffer
     {
         // Internal data
@@ -47,6 +45,11 @@ namespace NNNCSharp.Components.Buffers
         /// </summary>
         readonly Random Random = new();
 
+        /// <summary>
+        /// Creates a new ReplayBuffer instance.
+        /// </summary>
+        /// <param name="capacity">Maximum size of the replay buffer.</param>
+        /// <param name="alpha">Alpha value to use during sampling.</param>
         public ReplayBuffer(int capacity, double alpha = 0.6)
         {
             SumTree = new SumTree<Experience>(capacity);
