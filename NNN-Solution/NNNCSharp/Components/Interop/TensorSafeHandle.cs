@@ -11,14 +11,14 @@ namespace NNNCSharp.Components.Interop
         /// <summary>
         /// Creates a new SafeHandle wrapper around the given tensor instance handle.
         /// </summary>
-        /// <param name="handle">The void* handle of the tensor instance to wrap.</param>
+        /// <param name="handle">void* handle of the tensor instance to wrap.</param>
         public TensorSafeHandle(IntPtr handle) : base(true)
         {
             SetHandle(handle);
         }
 
         /// <summary>
-        /// Releases a the native C++ memory wrapped by the tensor handle.
+        /// Releases the native C++ memory wrapped by the tensor handle.
         /// </summary>
         /// <returns>Whether the handle was successfully released.</returns>
         protected override bool ReleaseHandle()
