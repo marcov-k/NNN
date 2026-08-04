@@ -337,7 +337,7 @@ std::shared_ptr<Tensor> Tensor::clip(const std::shared_ptr<Tensor>& t, float min
 	{
 		result->_parents.push_back(t);
 
-		// Gradient calculation function -> dr/dt = 1 (min < t < max); 0 (t < min, t > max)
+		// Gradient calculation function -> dr/dt = 1 (min <= t <= max); 0 (t < min, t > max)
 		result->_backward = [t, result, min, max]()
 			{
 				if (!t->requires_grad) return;
