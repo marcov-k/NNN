@@ -148,7 +148,7 @@ std::shared_ptr<Tensor> Tensor::mul(const std::shared_ptr<Tensor>& a, const std:
 		result->_parents.push_back(a);
 		result->_parents.push_back(b);
 
-		// Gradient calculation function -> dr/da = b; dr/db = 1
+		// Gradient calculation function -> dr/da = b; dr/db = a
 		result->_backward = [a, b, result]()
 			{
 				if (!a->requires_grad && !b->requires_grad) return;
