@@ -34,7 +34,7 @@ struct TensorPtrEqual
 	}
 };
 
-// 32-bit aligned vector allocator.
+// 32-byte aligned vector allocator.
 template<typename T>
 struct AlignedAllocator
 {

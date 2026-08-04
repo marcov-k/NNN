@@ -69,7 +69,7 @@ namespace NNNCSharp.Components.Optimizers
 
         public override void Step(Tensor parameter, int iteration)
         {
-            // Create a new persistent 32-bit aligned moment buffer if necessary
+            // Create a new persistent 32-byte aligned moment buffer if necessary
             if (!_state.TryGetValue(parameter, out var moments))
             {
                 // Allocate moment vectors via C++ aligned allocator
