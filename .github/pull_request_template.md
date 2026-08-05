@@ -10,5 +10,5 @@ Brief Description.
 Describe how the changes were tested.
 
 **Checklist**
-- [] Builds successfully
-- [] No unnecessary dependencies added
+- [ ] Builds successfully
+- [ ] No unnecessary dependencies added
