@@ -185,6 +185,14 @@ namespace NNNCSharp.Components.Trainers
             MinExperiences = minExperiences;
         }
 
+        ~DQNTrainer() // release all native C++ memory used by the trainer
+        {
+            _currentBatch?.Dispose();
+            _nextBatch?.Dispose();
+            _nextState?.Dispose();
+            _targetQs?.Dispose();
+        }
+
         /// <summary>
         /// Trains the agent for a given number of episodes.
         /// </summary>
@@ -403,7 +411,7 @@ namespace NNNCSharp.Components.Trainers
             using (nextAgentQs)
             using (nextTargetQs)
             {
-                targetQs = MaskQValuesfloat(nextAgentQs, nextTargetQs, batch);
+                targetQs = MaskQValuesDouble(nextAgentQs, nextTargetQs, batch);
             }
 
             // Predict Q-Values of actions in the batch
@@ -453,7 +461,7 @@ namespace NNNCSharp.Components.Trainers
         /// <param name="targetQValues">Q-Values predicted by the target model for target Q-Values calculation.</param>
         /// <param name="batch">Experience batch corresponding to the given Q-Values.</param>
         /// <returns>Target Q-Values for each experience in the batch.</returns>
-        Tensor MaskQValuesfloat(Tensor agentQValues, Tensor targetQValues, List<Experience> batch)
+        Tensor MaskQValuesDouble(Tensor agentQValues, Tensor targetQValues, List<Experience> batch)
         {
             // Initialize persistent buffers if not yet initialized
             _targetQs ??= new(new int[] { BatchSize, 1 });
@@ -493,7 +501,7 @@ namespace NNNCSharp.Components.Trainers
                     if (bestAction != -1)
                     {
                         float evalQ = targetQValues[i * actionCount + bestAction]; // get future value predicted by target model
-                        qTarget += Discount * evalQ * (SelfPlay ? -1.0f : 1.0f); // add future value to the target Q-Value using the Bellman equation
+                        qTarget += Discount * evalQ * (SelfPlay ? -1.0f : 1.0f); // add future value to the target Q-Value using the Bellman equation - negate if self-play to emulate mini-max algorithm
                     }
                 }
 
