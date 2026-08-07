@@ -65,7 +65,7 @@ namespace NNNCSharp.Components.DQNEnvironments
         /// <param name="action">Index of the action being checked.</param>
         /// <param name="state">Optional tensor representing the state if context differs from the environment's current state.</param>
         /// <returns>Whether the action is valid in the given state.</returns>
-        public abstract bool ValidAction(int action, Tensor? state);
+        public abstract bool ValidAction(int action, Tensor? state = null);
 
         /// <summary>
         /// Performs a single step in the environment.

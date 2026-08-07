@@ -134,7 +134,7 @@ namespace NNNCSharp.Components.DQNEnvironments
 
         public override int PickRandomAction() => Random.Next(ActionCount); // no invalid actions - return random action index
 
-        public override bool ValidAction(int action, Tensor? state) => true; // no invalid actions
+        public override bool ValidAction(int action, Tensor? state = null) => true; // no invalid actions
 
         public override (float reward, Tensor nextState, bool done) Step(int action, int steps)
         {
