@@ -297,7 +297,7 @@ namespace NNNCSharp.Components.Trainers
                     NNNLog.WriteLine($"Estimated time remaining: {MathUtils.RoundToMS(eta)}");
                     NNNLog.WriteLine($"\nEvaluating agent performance...");
                     float score = Environment.TestTrainingProgress(Agent, testEpisodes);
-                    if (score > bestScore)
+                    if (score >= bestScore)
                     {
                         bestAgent.Dispose(); // release native C++ memory used by previous best agent allocation
                         bestAgent = Agent.Copy();

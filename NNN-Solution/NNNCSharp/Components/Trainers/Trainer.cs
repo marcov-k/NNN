@@ -151,7 +151,7 @@ namespace NNNCSharp.Components.Trainers
                             if (testFunc(Model, i)) successes++;
                         }
                         float successPercent = ((float)successes / testLength) * 100.0f;
-                        if (successPercent > bestAccuracy)
+                        if (successPercent >= bestAccuracy)
                         {
                             bestModel.Dispose(); // release native C++ memory used by previous best model allocation
                             bestModel = Model.Copy();
