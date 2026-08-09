@@ -33,6 +33,10 @@ namespace NNNCSharp.Components.Trainers
         /// Maximum magnitude of gradients without normalization.
         /// </summary>
         readonly float MaxGradNorm;
+        /// <summary>
+        /// Whether a model is currently being trained.
+        /// </summary>
+        bool Training = false;
 
         public Trainer(Model model, Optimizer optimizer, Cost cost, float maxGradNorm = 1.0f)
         {
@@ -58,6 +62,8 @@ namespace NNNCSharp.Components.Trainers
             Func<Model, int, bool>? testFunc = null, bool decayLR = true, float minLRFraction = 0.1f, int testEvery = 100,
             int testLength = 1000)
         {
+            Training = true;
+
             Stopwatch totalTimer = new();
             Stopwatch epochTimer = new();
             TimeSpan avgElapsed = new(0);
@@ -82,6 +88,11 @@ namespace NNNCSharp.Components.Trainers
                 for (int i = 0; i < testLength; i++)
                 {
                     if (testFunc(Model, i)) successes++;
+                    if (!Training)
+                    {
+                        FinalizeTraining(bestModel);
+                        return;
+                    }
                 }
                 float successPercent = ((float)successes / testLength) * 100.0f;
                 NNNLog.WriteLine($"Model success percentage: {successPercent:F2}%");
@@ -91,6 +102,12 @@ namespace NNNCSharp.Components.Trainers
             int optimizerStep = 0;
             for (int e = 0; e < epochs; e++)
             {
+                if (!Training)
+                {
+                    FinalizeTraining(bestModel);
+                    return;
+                }
+
                 totalLoss = 0.0f;
 
                 if (decayLR)
@@ -114,6 +131,12 @@ namespace NNNCSharp.Components.Trainers
 
                 for (int i = 0; i < inputs.Length; i++) // train using each batch
                 {
+                    if (!Training)
+                    {
+                        FinalizeTraining(bestModel);
+                        return;
+                    }
+
                     // Release all native C++ memory used by intermediate tensor instances via 'using'
                     // (intermediate tensor instances are kept alive by native C++ autograd graph until no longer needed)
                     using var predictions = Model.Forward(inputs[i]);
@@ -149,6 +172,11 @@ namespace NNNCSharp.Components.Trainers
                         for (int i = 0; i < testLength; i++)
                         {
                             if (testFunc(Model, i)) successes++;
+                            if (!Training)
+                            {
+                                FinalizeTraining(bestModel);
+                                return;
+                            }
                         }
                         float successPercent = ((float)successes / testLength) * 100.0f;
                         if (successPercent >= bestAccuracy)
@@ -164,10 +192,24 @@ namespace NNNCSharp.Components.Trainers
 
             if (decayLR) Optimizer.LR = baseLR;
 
-            Model.Dispose(); // release native C++ memory used by model allocation
-            Model = bestModel;
+            FinalizeTraining(bestModel);
             totalTimer.Stop();
             NNNLog.WriteLine($"Total training time: {MathUtils.RoundToMS(totalTimer.Elapsed)}");
+        }
+
+        /// <summary>
+        /// Terminates the current training session.
+        /// </summary>
+        public void StopTraining() => Training = false;
+
+        /// <summary>
+        /// Finalizes the current training session.
+        /// </summary>
+        /// <param name="bestModel">Best-performing model cached during training.</param>
+        void FinalizeTraining(Model bestModel)
+        {
+            Model.Dispose();
+            Model = bestModel;
         }
     }
 }

@@ -120,6 +120,10 @@ namespace NNNCSharp.Components.Trainers
         /// Total loss accumulated during the episode.
         /// </summary>
         float totalLoss = 0.0f;
+        /// <summary>
+        /// Whether an agent is currently being trained.
+        /// </summary>
+        bool Training = false;
 
         // Persistent training buffers
         /// <summary>
@@ -200,6 +204,8 @@ namespace NNNCSharp.Components.Trainers
         /// <param name="episodes">Number of episodes to train for.</param>
         public void Train(ref FIFOBuffer<Episode>? episodeBuffer, int episodes = 1000, int testEvery = 100, int testEpisodes = 5000)
         {
+            Training = true;
+
             List<Experience> episodeExperiences = new();
             Tensor state; // normalized state
             Tensor trueState; // unnormalized state
@@ -222,9 +228,20 @@ namespace NNNCSharp.Components.Trainers
             NNNLog.WriteLine("\nEvaluating initial agent performance...");
             var bestAgent = Agent.Copy();
             float bestScore = Environment.TestTrainingProgress(Agent, testEpisodes);
+            if (!Training)
+            {
+                FinalizeTraining(bestAgent);
+                return;
+            }
 
             for (int e = 0; e < episodes; e++)
             {
+                if (!Training)
+                {
+                    FinalizeTraining(bestAgent);
+                    return;
+                }
+
                 // Freeze new opponent agent for self-play every OpponentCopyRate episodes
                 if (SelfPlay && ((e + 1) >= MinRandomOppEpisodes) && ((e + 1) % OpponentCopyRate == 0)) AgentBuffer.Add(Agent.Copy());
 
@@ -240,6 +257,12 @@ namespace NNNCSharp.Components.Trainers
                 totalReward = 0;
                 while (!done)
                 {
+                    if (!Training)
+                    {
+                        FinalizeTraining(bestAgent);
+                        return;
+                    }
+
                     step++;
                     trueState = Environment.GetState();
                     learnerTurn = Environment is not ISelfPlay sp || sp.AgentTurn; // agent acts on every step unless in self-play
@@ -296,6 +319,13 @@ namespace NNNCSharp.Components.Trainers
                     NNNLog.WriteLine($"\nAverage time per episode: {MathUtils.RoundToMS(avgElapsed)}");
                     NNNLog.WriteLine($"Estimated time remaining: {MathUtils.RoundToMS(eta)}");
                     NNNLog.WriteLine($"\nEvaluating agent performance...");
+
+                    if (!Training)
+                    {
+                        FinalizeTraining(bestAgent);
+                        return;
+                    }
+
                     float score = Environment.TestTrainingProgress(Agent, testEpisodes);
                     if (score >= bestScore)
                     {
@@ -303,14 +333,34 @@ namespace NNNCSharp.Components.Trainers
                         bestAgent = Agent.Copy();
                         bestScore = score;
                     }
+
+                    if (!Training)
+                    {
+                        FinalizeTraining(bestAgent);
+                        return;
+                    }
                 }
                 stopwatch.Restart();
             }
 
-            Agent.Dispose(); // release native C++ memory used by agent allocation
-            Agent = bestAgent;
+            FinalizeTraining(bestAgent);
             totalStopwatch.Stop();
             NNNLog.WriteLine($"Total Training Duration: {MathUtils.RoundToMS(totalStopwatch.Elapsed):g}");
+        }
+
+        /// <summary>
+        /// Terminates the current training session.
+        /// </summary>
+        public void StopTraining() => Training = false;
+
+        /// <summary>
+        /// Finalizes the current training session.
+        /// </summary>
+        /// <param name="bestAgent">Best-performing agent cached during training.</param>
+        void FinalizeTraining(Model bestAgent)
+        {
+            Agent.Dispose();
+            Agent = bestAgent;
         }
 
         /// <summary>
