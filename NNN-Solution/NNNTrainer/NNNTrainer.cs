@@ -43,7 +43,7 @@ public class NNNTrainer
     static void DQNTraining()
     {
         Model model;
-        DQNEnvironment env = new TicTacToe();
+        DQNEnvironment env = new MovementGrid2D(-10, 10, -10, 10);
         float exploration = 1.0f;
         float explorationDecay = 0.999f;
         float minExploration = 0.01f;
@@ -79,9 +79,9 @@ public class NNNTrainer
         {
             // Create a new model
             model = new([
-                new Dense(256, new LeakyReLU(activTau)),
-                new Dense(256, new LeakyReLU(activTau)),
-                new Dense(128, new LeakyReLU(activTau)),
+                new Dense(64, new LeakyReLU(activTau)),
+                new Dense(64, new LeakyReLU(activTau)),
+                new Dense(32, new LeakyReLU(activTau)),
                 new Dense(env.ActionCount, new Linear())
             ], env.StateFormat);
         }
