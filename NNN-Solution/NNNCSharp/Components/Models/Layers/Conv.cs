@@ -1,6 +1,7 @@
 ﻿using NNNCSharp.Components.Activations;
 using NNNCSharp.Components.Autodiff;
 using NNNCSharp.Components.Utilities.SaveSystem;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -24,19 +25,31 @@ namespace NNNCSharp.Components.Models.Layers
         /// Tensor storing the kernels of the layer.
         /// </summary>
         public Tensor Kernels { get; private set; } = new();
+        /// <summary>
+        /// Type of padding to use.
+        /// </summary>
+        Padding PaddingType;
+        /// <summary>
+        /// Padding to add at start of every forward pass.
+        /// </summary>
+        int[] PaddingDims = new int[0];
+
+        public enum Padding { Valid, Same }
 
         /// <summary>
         /// Creates a new convolutional layer instance.
         /// </summary>
         /// <param name="filterCount">Number of filters in the layer.</param>
         /// <param name="kernelDims">Dimensions of the kernels used by the layer.</param>
-        /// <param name="activation">Activation function of the new layer.</param>
-        /// <param name="dropout">Dropout rate of the new layer.</param>
-        public Conv(int filterCount, int[] kernelDims, Activation activation, float dropout = 0.0f)
+        /// <param name="activation">Activation function of the layer.</param>
+        /// <param name="padding">Type of padding used by the layer.</param>
+        /// <param name="dropout">Dropout rate of the layer.</param>
+        public Conv(int filterCount, int[] kernelDims, Activation activation, Padding padding = Padding.Valid, float dropout = 0.0f)
             : base(activation, dropout)
         {
             FilterCount = filterCount;
             KernelDims = kernelDims;
+            PaddingType = padding;
         }
 
         /// <summary>
@@ -44,11 +57,11 @@ namespace NNNCSharp.Components.Models.Layers
         /// </summary>
         /// <param name="filterCount">Number of filters in the layer.</param>
         /// <param name="kernelDims">Dimensions of the kernels used by the layer.</param>
-        /// <param name="kernels">Kernels tensor of the new layer.</param>
-        /// <param name="biases">Bias tensor of the new layer.</param>
-        /// <param name="activation">Activation function of the new layer.</param>
-        /// <param name="dropout">Dropout rate of the new layer.</param>
-        public Conv(int filterCount, int[] kernelDims, Tensor kernels, Tensor biases, Activation activation, float dropout)
+        /// <param name="kernels">Kernels tensor of the layer.</param>
+        /// <param name="biases">Bias tensor of the layer.</param>
+        /// <param name="activation">Activation function of the layer.</param>
+        /// <param name="dropout">Dropout rate of the layer.</param>
+        public Conv(int filterCount, int[] kernelDims, Tensor kernels, Tensor biases, Activation activation, Padding padding, int[] paddingDims, float dropout)
             : base(activation, dropout)
         {
             FilterCount = filterCount;
@@ -57,6 +70,8 @@ namespace NNNCSharp.Components.Models.Layers
             Kernels = kernels;
             Biases.Dispose(); // release native C++ memory used by default allocation
             Biases = biases;
+            PaddingType = padding;
+            PaddingDims = paddingDims;
         }
 
         /// <summary>
@@ -73,17 +88,40 @@ namespace NNNCSharp.Components.Models.Layers
             Kernels = Tensor.InitKernels(FilterCount, KernelDims, inputFormat.Dimensions[^1]);
             Biases.Dispose(); // release native C++ memory used by default allocation
             Biases = Tensor.InitBiases(FilterCount);
+            ComputePadding(inputFormat);
 
             // Compute output dimensions
             var outputDims = new int[inputFormat.Rank];
             outputDims[0] = 1;
-            for (int i = 0; i < KernelDims.Length; i++)
+
+            if (PaddingType == Padding.Valid)
             {
-                outputDims[i + 1] = inputFormat.Dimensions[i + 1] - KernelDims[i] + 1;
+                for (int i = 0; i < KernelDims.Length; i++)
+                {
+                    outputDims[i + 1] = inputFormat.Dimensions[i + 1] - KernelDims[i] + 1;
+                }
+            }
+            else
+            {
+                inputFormat.Dimensions[1..^1].CopyTo(outputDims.AsSpan(1, KernelDims.Length));
             }
             outputDims[^1] = FilterCount;
             OutputFormat.Dispose(); // release native C++ memory used by default allocation
             OutputFormat = new(outputDims);
+        }
+
+        void ComputePadding(Tensor inputFormat)
+        {
+            PaddingDims = new int[KernelDims.Length * 2];
+            if (PaddingType == Padding.Same)
+            {
+                for (int i = 0; i < KernelDims.Length; i++)
+                {
+                    int total = KernelDims[i] - 1;
+                    PaddingDims[i * 2] = total / 2;
+                    PaddingDims[i * 2 + 1] = total - total / 2;
+                }
+            }
         }
 
         public override Tensor Forward(Tensor input)
@@ -91,7 +129,15 @@ namespace NNNCSharp.Components.Models.Layers
             // Compute convolution and bias addition result
             // Release all native C++ memory used by intermediate tensor instances via 'using'
             // (intermediate tensor instances are kept alive by native C++ autograd graph until no longer needed)
-            using var conv = Tensor.Convolve(input, Kernels);
+            Tensor convInput = input;
+            Tensor? padded = null;
+            if (PaddingType == Padding.Same)
+            {
+                padded = Tensor.Pad(input, PaddingDims);
+                convInput = padded;
+            }
+            using var conv = Tensor.Convolve(convInput, Kernels);
+            padded?.Dispose();
             using var biasBroadcast = Tensor.Broadcast(Biases, conv.Dimensions.ToArray());
             using var biasAdd = conv + biasBroadcast;
             var output = Activation.Forward(biasAdd);
@@ -115,13 +161,15 @@ namespace NNNCSharp.Components.Models.Layers
 
         public override Layer Copy()
         {
-            return new Conv(FilterCount, KernelDims.ToArray(), Kernels.Copy(), Biases.Copy(), Activation.Copy(), Dropout);
+            return new Conv(FilterCount, KernelDims.ToArray(), Kernels.Copy(), Biases.Copy(), Activation.Copy(), PaddingType, PaddingDims, Dropout);
         }
 
         internal override void WriteUniqueData(FileStream stream)
         {
             FileUtils.WriteInt32(stream, FilterCount);
             FileUtils.WriteTensor(stream, Kernels);
+            FileUtils.WriteInt32(stream, (int)PaddingType);
+            FileUtils.WriteInt32Array(stream, PaddingDims);
         }
 
         protected override void ReadUniqueData(FileStream stream)
@@ -130,6 +178,8 @@ namespace NNNCSharp.Components.Models.Layers
             Kernels.Dispose(); // release native C++ memory used by previous allocation
             Kernels = FileUtils.ReadTensor(stream);
             KernelDims = Kernels.Dimensions[1..^1].ToArray();
+            PaddingType = (Padding)FileUtils.ReadInt32(stream);
+            PaddingDims = FileUtils.ReadInt32Array(stream);
         }
 
         protected override string PrintUniqueLayer(FileStream stream)
@@ -137,6 +187,8 @@ namespace NNNCSharp.Components.Models.Layers
             int filterCount = FileUtils.ReadInt32(stream);
             var kernels = FileUtils.ReadTensor(stream);
             var kernelDims = kernels.Dimensions[1..^1];
+            Padding paddingType = (Padding)FileUtils.ReadInt32(stream);
+            _ = FileUtils.ReadInt32Array(stream); // skip padding dimensions
 
             string kernelDimsString = "Kernel Dimensions: [";
             for (int i = 0; i < kernelDims.Length; i++)
@@ -154,7 +206,9 @@ namespace NNNCSharp.Components.Models.Layers
             }
             kernelsString += $"], # of parameter values: {kernels.ElementCount}";
 
-            return $"Filters: {filterCount}\n{kernelDimsString}\n{kernelsString}";
+            string paddingString = $"Padding: {paddingType}";
+
+            return $"Filters: {filterCount}\n{kernelDimsString}\n{kernelsString}\n{paddingString}";
         }
 
         public override void Dispose() // release native C++ memory used by shared layer tensor allocations and kernels tensor allocation

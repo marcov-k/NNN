@@ -325,6 +325,102 @@ std::shared_ptr<Tensor> Tensor::wrap_batch(const std::shared_ptr<Tensor>& t)
 	return batch;
 }
 
+std::shared_ptr<Tensor> Tensor::pad(const std::shared_ptr<Tensor>& t, const std::vector<int>& padding_dims)
+{
+	const size_t spatial_rank = t->_dimensions.size() - 2;
+
+	// Compute output dimensions
+	std::vector<int> result_dims(t->_dimensions);
+	for (size_t i = 0; i < spatial_rank; ++i)
+	{
+		result_dims[i + 1] += padding_dims[i * 2] + padding_dims[i * 2 + 1];
+	}
+	
+	auto result = get_result_tensor(t, result_dims, t->requires_grad);
+
+	const size_t channels = t->_dimensions.back();
+	const size_t batches = t->_dimensions[0];
+
+	std::vector<int> front_offsets(spatial_rank);
+	for (size_t i = 0; i < spatial_rank; ++i)
+	{
+		front_offsets[i] = padding_dims[i * 2];
+	}
+
+	size_t input_spatial_size = 1;
+	for (size_t i = 0; i < spatial_rank; ++i)
+	{
+		input_spatial_size *= t->_dimensions[i + 1];
+	}
+
+	std::fill(result->_data.begin(), result->_data.end(), 0.0f);
+
+	// Copy input values into padded result
+	for (size_t b = 0; b < batches; ++b)
+	{
+		const size_t input_base = b * t->_strides[0];
+		const size_t result_base = b * result->_strides[0];
+
+		for (size_t s = 0; s < input_spatial_size; ++s)
+		{
+			size_t remaining = s;
+			size_t result_spatial_offset = 0;
+			for (size_t d = 0; d < spatial_rank; ++d)
+			{
+				const size_t dim_size = t->_dimensions[d + 1];
+
+				const size_t coord = (remaining / t->_strides[d + 1]) % dim_size;
+				result_spatial_offset += (coord + front_offsets[d]) * result->_strides[d + 1];
+			}
+
+			const size_t input_offset = input_base + s * channels;
+			const size_t result_offset = result_base + result_spatial_offset;
+
+			std::copy_n(t->_data.begin() + input_offset, channels, result->_data.begin() + result_offset);
+		}
+	}
+	
+	// Connect result tensor to autograd graph if needed
+	if (!inference)
+	{
+		result->_parents.push_back(t);
+
+		// Gradient calculation function -> crop grad_r back down to input's region and accumulate
+		result->_backward = [t, padding_dims, spatial_rank, input_spatial_size, result, front_offsets, channels, batches]()
+			{
+				if (!t->requires_grad) return;
+
+				for (size_t b = 0; b < batches; ++b)
+				{
+					const size_t input_base = b * t->_strides[0];
+					const size_t result_base = b * result->_strides[0];
+
+					for (size_t s = 0; s < input_spatial_size; ++s)
+					{
+						size_t remaining = s;
+						size_t result_spatial_offset = 0;
+						for (size_t d = 0; d < spatial_rank; ++d)
+						{
+							const size_t dim_size = t->_dimensions[d + 1];
+							const size_t coord = (remaining / t->_strides[d + 1]) % dim_size;
+							result_spatial_offset += (coord + front_offsets[d]) * result->_strides[d + 1];
+						}
+
+						const size_t input_offset = input_base + s * channels;
+						const size_t result_offset = result_base + result_spatial_offset;
+
+						for (size_t c = 0; c < channels; ++c)
+						{
+							t->_grad[input_offset + c] += result->_grad[result_offset + c];
+						}
+					}
+				}
+			};
+	}
+
+	return result;
+}
+
 std::shared_ptr<Tensor> Tensor::clip(const std::shared_ptr<Tensor>& t, float min, float max)
 {
 	std::shared_ptr<Tensor> result = get_result_tensor(t, t->dimensions(), t->requires_grad);

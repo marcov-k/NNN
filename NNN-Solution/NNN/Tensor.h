@@ -296,6 +296,9 @@ public:
 	// Wraps a tensor into a batched tensor with a single input.
 	static std::shared_ptr<Tensor> wrap_batch(const std::shared_ptr<Tensor>& t);
 
+	// Adds padding to a tensor.
+	static std::shared_ptr<Tensor> pad(const std::shared_ptr<Tensor>& t, const std::vector<int>& padding_dims);
+
 	// Clips all the values in a tensor between the given min and max values.
 	static std::shared_ptr<Tensor> clip(const std::shared_ptr<Tensor>& t, float min, float max);
 

@@ -405,6 +405,13 @@ extern "C"
 		return wrap_handle(Tensor::wrap_batch(*tensor_handle));
 	}
 
+	void* tensor_pad(void* handle, const int* padding_dims, int dims_length)
+	{
+		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);
+		std::vector<int> dims_vec(padding_dims, padding_dims + dims_length);
+		return wrap_handle(Tensor::pad(*tensor_handle, dims_vec));
+	}
+
 	void* tensor_clip(void* handle, float min, float max)
 	{
 		auto* tensor_handle = static_cast<std::shared_ptr<Tensor>*>(handle);

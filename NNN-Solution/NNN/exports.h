@@ -204,6 +204,9 @@ extern "C"
 	// Wraps the given tensor into a batch of a single input.
 	__declspec(dllexport) void* tensor_wrap_batch(void* handle);
 
+	// Pads the given tensor using the given padding dimensions.
+	__declspec(dllexport) void* tensor_pad(void* handle, const int* padding_dims, int dims_length);
+
 	// Clips the values of the given tensor to within the given min and max bounds.
 	__declspec(dllexport) void* tensor_clip(void* handle, float min, float max);
 

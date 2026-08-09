@@ -555,6 +555,16 @@ namespace NNNCSharp.Components.Interop
         internal static extern IntPtr tensor_wrap_batch(IntPtr handle);
 
         /// <summary>
+        /// Adds padding to the given C++ tensor.
+        /// </summary>
+        /// <param name="handle">void* handle of hte C++ tensor.</param>
+        /// <param name="padding_dims">Padding dimensions to use.</param>
+        /// <param name="dims_length">Length of the padding dimensions array.</param>
+        /// <returns>void* handle of the padded C++ tensor.</returns>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr tensor_pad(IntPtr handle, int[] padding_dims, int dims_length);
+
+        /// <summary>
         /// Clips the values of the given C++ tensor to within the given min and max bounds.
         /// </summary>
         /// <param name="handle">void* handle of the C++ tensor.</param>

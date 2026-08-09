@@ -740,6 +740,19 @@ namespace NNNCSharp.Components.Autodiff
         }
 
         /// <summary>
+        /// Adds padding to the given tensor.
+        /// </summary>
+        /// <param name="t">Tensor to add padding to.</param>
+        /// <param name="paddingDimensions">Padding dimensions to use.</param>
+        /// <returns>Padded tensor.</returns>
+        public static Tensor Pad(Tensor t, int[] paddingDimensions)
+        {
+            IntPtr h = NativeMethods.tensor_pad(t.Handle, paddingDimensions, paddingDimensions.Length);
+            GC.KeepAlive(t);
+            return new(h);
+        }
+
+        /// <summary>
         /// Clips the values of the given tensor to within the given min and max bounds.
         /// </summary>
         /// <param name="t">Tensor to clip.</param>
