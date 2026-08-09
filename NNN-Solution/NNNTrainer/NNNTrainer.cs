@@ -141,8 +141,8 @@ public class NNNTrainer
         else
         {
             model = new([
-                new Conv(8, [5, 5], new LeakyReLU(tau)),
-            new Conv(16, [5, 5], new LeakyReLU(tau), dropout: convDropout),
+                new Conv(8, [3, 3], new LeakyReLU(tau), Conv.Padding.Same),
+            new Conv(16, [3, 3], new LeakyReLU(tau), Conv.Padding.Same, dropout: convDropout),
             new Dense(128, new LeakyReLU(tau), true, denseDropout),
             new Dense(10, new Linear())
             ], new([1, 28, 28, 1]));
