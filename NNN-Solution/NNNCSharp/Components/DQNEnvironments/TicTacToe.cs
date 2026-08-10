@@ -22,6 +22,7 @@ namespace NNNCSharp.Components.DQNEnvironments
         public override string EnvironmentName => "Tic-Tac-Toe";
 
         // Self-play interface API overrides
+        public bool Won { get; set; } = false;
         public bool AgentTurn { get; set; } = true;
         public int OpponentCount { get; set; }
         public int OpponentIndex { get; set; }
@@ -95,6 +96,7 @@ namespace NNNCSharp.Components.DQNEnvironments
 
         public override void Reset()
         {
+            Won = false;
             AgentTurn = Random.Next(2) == 1; // randomly pick agent to play X or O
             (this as ISelfPlay).UpdateOpponentIndex(); // select a new opponent agent for the next episode
 
@@ -142,7 +144,7 @@ namespace NNNCSharp.Components.DQNEnvironments
             if (!ValidAction(action)) throw new ArgumentException("Invalid Action"); // ensure action being taken is valid
 
             State[action] = State[9] == 1.0f ? 1.0f : -1.0f; // fill position at the action index with current player's encoding
-            var (reward, done) = EvaluateAction(action); // evaluate the reward of the action
+            var (reward, Won) = EvaluateAction(action); // evaluate the reward of the action
 
             // Flip current player
             AgentTurn = !AgentTurn;
@@ -150,7 +152,7 @@ namespace NNNCSharp.Components.DQNEnvironments
 
             var nextState = GetNormalizedState();
 
-            done = done || BoardFilled() || steps >= MaxSteps;
+            bool done = Won || BoardFilled() || steps >= MaxSteps;
 
             return (reward, nextState, done);
         }

@@ -208,12 +208,15 @@ namespace NNNCSharp.Components.Trainers
 
             List<Experience> episodeExperiences = new();
             Tensor state; // normalized state
+            Tensor? pendingState = null; // normalized state pending to be committed (self-play only)
             Tensor trueState; // unnormalized state
             Tensor trueNextState; // unnormalized next state
             bool done;
             bool learnerTurn;
             int action;
+            int pendingAction = 0; // action pending to be committed (self-play only)
             float reward;
+            float pendingReward = 0.0f; // reward pending to be committed (self-play only)
             float totalReward;
             int step;
             int trainSteps;
@@ -268,17 +271,50 @@ namespace NNNCSharp.Components.Trainers
                     learnerTurn = Environment is not ISelfPlay sp || sp.AgentTurn; // agent acts on every step unless in self-play
                     action = PickNextAction(state);
 
-                    (reward, nextState, done) = Environment.Step(action, step);
-                    totalReward += reward;
-                    trueNextState = Environment.GetState();
+                    if (SelfPlay && learnerTurn) // deferred committing of experiences for self-play
+                    {
+                        (reward, nextState, done) = Environment.Step(action, step);
+                        totalReward += reward;
 
-                    // Store experience for training and episode review
-                    if (learnerTurn) ReplayBuffer.Add(new(state, action, reward, nextState, done));
+                        if (done) // commit experience immediately - training episode ended
+                        {
+                            ReplayBuffer.Add(new(state, action, reward, nextState, done));
+                            pendingState?.Dispose();
+                            pendingState = null;
+                        }
+                        else // defer committing experience until end of opponent's turn
+                        {
+                            pendingState = state.Copy();
+                            pendingAction = action;
+                            pendingReward = reward;
+                        }
+                    }
+                    else if (SelfPlay) // perform opponent step
+                    {
+                        (reward, nextState, done) = Environment.Step(action, step);
+
+                        if (pendingState is not null) // commit deferred learner agent experience
+                        {
+                            var spEnv = Environment as ISelfPlay;
+                            float commitReward = done ? (spEnv!.Won ? -reward : reward) : pendingReward;
+                            ReplayBuffer.Add(new(pendingState, pendingAction, commitReward, nextState, done));
+                            pendingState.Dispose();
+                            pendingState = null;
+                        }
+                    }
+                    else // standard committing of every experience
+                    {
+                        (reward, nextState, done) = Environment.Step(action, step);
+                        totalReward += reward;
+                        ReplayBuffer.Add(new(state, action, reward, nextState, done));
+                    }
+
+                    trueNextState = Environment.GetState();
                     episodeExperiences.Add(new(trueState, action, reward, trueNextState, done));
 
                     // Release native C++ memory used by unnormalized state allocations
-                    trueState.Dispose();
                     trueNextState.Dispose();
+                    trueState.Dispose();
 
                     if ((step - 1) % TrainEvery == 0)
                     {
@@ -551,7 +587,7 @@ namespace NNNCSharp.Components.Trainers
                     if (bestAction != -1)
                     {
                         float evalQ = targetQValues[i * actionCount + bestAction]; // get future value predicted by target model
-                        qTarget += Discount * evalQ * (SelfPlay ? -1.0f : 1.0f); // add future value to the target Q-Value using the Bellman equation - negate if self-play to emulate mini-max algorithm
+                        qTarget += Discount * evalQ; // add future value to the target Q-Value using the Bellman equation
                     }
                 }
 

@@ -101,6 +101,12 @@ namespace NNNCSharp.Components.DQNEnvironments
     /// </summary>
     public interface ISelfPlay
     {
+        // Additional environment data
+        /// <summary>
+        /// Whether the agent won during the most recent step.
+        /// </summary>
+        public bool Won { get; set; }
+
         // Opponent agent data
 
         /// <summary>
