@@ -20,6 +20,10 @@ namespace NNNCSharp.Components.Autodiff
         /// SafeHandle instance for the wrapped C++ tensor.
         /// </summary>
         readonly TensorSafeHandle _handle;
+        /// <summary>
+        /// Whether the native C++ memory wrapped by this instance has been released.
+        /// </summary>
+        bool Disposed = false;
 
         /// <summary>
         /// Creates a new C# tensor wrapper around the given void* handle of a C++ tensor.
@@ -127,7 +131,10 @@ namespace NNNCSharp.Components.Autodiff
         /// </summary>
         public void Dispose()
         {
+            if (Disposed) return; // prevent double disposal
+
             _handle.Dispose();
+            Disposed = true;
         }
 
         // Data access
