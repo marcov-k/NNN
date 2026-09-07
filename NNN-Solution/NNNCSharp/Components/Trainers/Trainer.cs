@@ -4,6 +4,7 @@ using NNNCSharp.Components.Costs;
 using NNNCSharp.Components.Models;
 using NNNCSharp.Components.Optimizers;
 using NNNCSharp.Components.Utilities;
+using NNNCSharp.Components.Utilities.SaveSystem;
 using System;
 using System.Diagnostics;
 
@@ -58,9 +59,10 @@ namespace NNNCSharp.Components.Trainers
         /// <param name="minLRFraction">Minimum allowed fraction of the original learning rate.</param>
         /// <param name="testEvery">How many epochs to run between performance tests.</param>
         /// <param name="testLength">How many iterations to run per performance test.</param>
+        /// <param name="saveTo">File to save intermediate models to.</param>
         public void Train(BatchBuffer batchBuffer, int batchSize, int epochs, bool batchAllInputs = true,
             Func<Model, int, bool>? testFunc = null, bool decayLR = true, float minLRFraction = 0.1f, int testEvery = 100,
-            int testLength = 1000)
+            int testLength = 1000, string? saveTo = null)
         {
             Training = true;
 
@@ -187,6 +189,13 @@ namespace NNNCSharp.Components.Trainers
                         }
                         NNNLog.WriteLine($"Model success percentage: {successPercent:F2}%");
                     }
+                    else
+                    {
+                        bestModel.Dispose();
+                        bestModel = Model.Copy();
+                    }
+
+                    if (saveTo != null) Saver.SaveModel(bestModel, saveTo);
                 }
             }
 

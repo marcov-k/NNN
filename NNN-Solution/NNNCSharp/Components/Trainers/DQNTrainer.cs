@@ -7,6 +7,7 @@ using NNNCSharp.Components.Interop;
 using NNNCSharp.Components.Models;
 using NNNCSharp.Components.Optimizers;
 using NNNCSharp.Components.Utilities;
+using NNNCSharp.Components.Utilities.SaveSystem;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -202,7 +203,10 @@ namespace NNNCSharp.Components.Trainers
         /// </summary>
         /// <param name="episodeBuffer">Buffer in which to store episodes for reviewing.</param>
         /// <param name="episodes">Number of episodes to train for.</param>
-        public void Train(ref FIFOBuffer<Episode>? episodeBuffer, int episodes = 1000, int testEvery = 100, int testEpisodes = 5000)
+        /// <param name="testEvery">How many episodes to run between performance tests.</param>
+        /// <param name="testEpisodes">How many episodes to run per performance test.</param>
+        /// <param name="saveTo">File to save intermediate agents to.</param>
+        public void Train(ref FIFOBuffer<Episode>? episodeBuffer, int episodes = 1000, int testEvery = 100, int testEpisodes = 5000, string? saveTo = null)
         {
             Training = true;
 
@@ -375,6 +379,8 @@ namespace NNNCSharp.Components.Trainers
                         FinalizeTraining(bestAgent);
                         return;
                     }
+
+                    if (saveTo != null) Saver.SaveModel(bestAgent, saveTo);
                 }
                 stopwatch.Restart();
             }
