@@ -215,7 +215,7 @@ yourTrainer.Train(yourBatchBuffer, [batch size], [epochs to train for],
   [whether to train on all batches every epoch (true/false)],
   [optional function for testing performance*], [optional learning rate decay rate],
   [optional minimum learning rate fraction], [how many epochs to run between performance tests],
-  [how many inputs to test per performance test]);
+  [how many inputs to test per performance test], [optional file name to save training progress to]);
 // *The performance test function must match the declaration 'Func<Model, int, bool>'
 // receiving the model to test and the test index as inputs, and returning a boolean
 // based on whether the model passed the test or not.
@@ -259,7 +259,8 @@ DQNTrainer yourTrainer = new(yourModel, yourEnv, [initial exploration rate], [ex
   [maximum gradient norm (for gradient clipping)], [minimum number of experiences before starting to train (must be >= batch size)]);
 
 yourTrainer.Train([optional ref FIFOBuffer<Episode> buffer for storing past episodes], [episodes to train for],
-  [number of episodes between performance tests], [number of episodes run during each performance test]);
+  [number of episodes between performance tests], [number of episodes run during each performance test],
+  [optional file name to save training progress to]);
 
 yourModel = yourTrainer.Agent; // get the best-performing agent from the trainer
 ```
