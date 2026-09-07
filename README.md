@@ -24,7 +24,7 @@ I originally intended for this project to simply be my experimentation with impl
  performance to train such networks on my own personal computer, I would have to completely rewrite the entire framework. At this point I discovered the automatic differentiation algorithms used by libraries such as
  PyTorch, and decided that my new framework would follow a similar approach. Additionally, in order to gain as thorough of an understanding of the mathematics and logic behind these systems, I opted to avoid using
  any features not provided in the C# and C++ standard libraries, which I also believed would provide me with valuable experience in designing full-scale frameworks from scratch. Now, many months after I first began
- experimenting with the Neural Network Nonsense project, I can proudly say that those initial efforts have grown into something far larger than I could have ever anticipated.
+ experimenting with the Neural Network Notions project, I can proudly say that those initial efforts have grown into something far larger than I could have ever anticipated.
 
 ## Installation
 ### Compatibility:
