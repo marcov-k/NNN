@@ -1,6 +1,5 @@
 ﻿using NNNCSharp.Components.Autodiff;
 using NNNCSharp.Components.DQNEnvironments;
-using NNNCSharp.Components.Models;
 using NNNCSharp.Components.Utilities;
 using NNNCSharp.Components.Utilities.DataLoaders;
 using NNNCSharp.Components.Utilities.SaveSystem;
@@ -17,7 +16,7 @@ public class NNNDemo
     /// Array of all environments with trained and implemented demonstrations.
     /// </summary>
     static readonly DQNEnvironment[] DQNDemoEnvs = [new MovementGrid2D(-10, 10, -10, 10),
-        new TicTacToe(), new Snake()];
+        new TicTacToe(), new Snake(10, 10)];
     /// <summary>
     /// Array of all standard supervised training demo functions.
     /// </summary>
@@ -41,7 +40,7 @@ public class NNNDemo
     /// </summary>
     static void RunDemo()
     {
-        NNNLog.WriteLine("Welcome to the Neural Network Nonsense library demonstration.");
+        NNNLog.WriteLine("Welcome to the Neural Network Notions library demonstration.");
         NNNLog.WriteLine("Enter Q at any time to close the demonstration.");
 
         // Main interaction loop

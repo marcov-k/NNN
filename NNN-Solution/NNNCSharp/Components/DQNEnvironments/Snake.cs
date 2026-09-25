@@ -632,17 +632,14 @@ namespace NNNCSharp.Components.DQNEnvironments
         static void ShowDemoInstructions()
         {
             NNNLog.WriteLine("Welcome to the Snake agent demonstration.");
-            NNNLog.WriteLine("The agent contains a total of 131 neurons.");
-            NNNLog.WriteLine("These are arranged in two layers of 64 neurons each and an output layer of 3 neurons - one each for moving forward, left, and right.");
-            NNNLog.WriteLine("The agent receives 7 inputs.");
-            NNNLog.WriteLine("These include: the X and Y distances to the apple, the direction the snake's head is currently facing,");
-            NNNLog.WriteLine("The distances to the nearest obstacle to the front, left, and right, and the proportion of empty spaces which it can currently reach.");
-            NNNLog.WriteLine("This agent was trained over the course of roughly 40,000 games of Snake.");
-            NNNLog.WriteLine("It is nowhere near perfect, and is unlikely to reach high scores.");
-            NNNLog.WriteLine("But this seems to be approaching the limit of what this specific architecture is able to achieve with its limited view of the game.");
-            NNNLog.WriteLine("My next plan is to implement support for convolutional neural networks, which will be far more capable of understanding the full board.");
-            NNNLog.WriteLine("But, until that happens, enjoy watching this current limited version.");
-            NNNLog.WriteLine("I still find it impressive that it was able to learn how to survive as long as it usually does, given it started out being completely random.");
+            NNNLog.WriteLine("The model has one convolutional layer with 32 filters and 3x3 kernels, followed by 2 convolutional layers, each with 64 filters and 3x3 kernels.");
+            NNNLog.WriteLine("These are followed by a dense layer with 256 neurons which flattens the output of the third convolutional layer.");
+            NNNLog.WriteLine("Finally, the model has an output layer with 3 neurons, one for each of the possible actions - left, forward, and right.");
+            NNNLog.WriteLine("The agent receives a one-hot encoded view of the game board with 8 encoding layers - apple, snake head, snake body, snake tail,");
+            NNNLog.WriteLine("and one for each of the possible directions a snake segment could move in on the next step.");
+            NNNLog.WriteLine("This agent was trained over the course of roughly 10,000 games of Snake.");
+            NNNLog.WriteLine("This demo also uses a smaller 10x10 game board for training efficiency purposes.");
+            NNNLog.WriteLine("The model is nowhere near perfect, and is unlikely to reach particularly high scores.");
             NNNLog.WriteLine("Keep in mind that there may be certain initial starting layouts in which it may just simply fail.");
             NNNLog.WriteLine("Feel free to run the demo again if that were to happen.\n");
             NNNLog.WriteLine("Press any key to continue...");
@@ -652,9 +649,6 @@ namespace NNNCSharp.Components.DQNEnvironments
         /// <summary>
         /// Class representing a single node of the linked list representing the snake.
         /// </summary>
-        /// <param name="parent">Node ahead of the new node in the linked list.</param>
-        /// <param name="x">X coordinate of the new node.</param>
-        /// <param name="y">Y coordinate of the new node.</param>
         class SnakeNode
         {
             // Linked list properties
@@ -681,6 +675,12 @@ namespace NNNCSharp.Components.DQNEnvironments
             /// </summary>
             Int2 PrevPosition { get; set; } = new();
 
+            /// <summary>
+            /// Initializes a new node representing a segment of the snake.
+            /// </summary>
+            /// <param name="parent">Node ahead of the new node in the linked list.</param>
+            /// <param name="x">X coordinate of the new node.</param>
+            /// <param name="y">Y coordinate of the new node.</param>
             public SnakeNode(SnakeNode? parent = null, int x = 0, int y = 0)
             {
                 Parent = parent;
@@ -729,8 +729,6 @@ namespace NNNCSharp.Components.DQNEnvironments
         /// <summary>
         /// Struct representing a position within the game's grid.
         /// </summary>
-        /// <param name="x">X coordinate of the new position within the grid.</param>
-        /// <param name="y">Y coordinate of the new position within the grid.</param>
         struct Int2
         {
             /// <summary>
@@ -742,6 +740,11 @@ namespace NNNCSharp.Components.DQNEnvironments
             /// </summary>
             public int Y { get; set; }
 
+            /// <summary>
+            /// Creates a new position instance.
+            /// </summary>
+            /// <param name="x">X coordinate of the new position within the grid.</param>
+            /// <param name="y">Y coordinate of the new position within the grid.</param>
             public Int2(int x = 0, int y = 0)
             {
                 X = x;

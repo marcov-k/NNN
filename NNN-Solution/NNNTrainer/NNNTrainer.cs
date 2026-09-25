@@ -43,9 +43,9 @@ public class NNNTrainer
     static void DQNTraining()
     {
         Model model;
-        DQNEnvironment env = new MovementGrid2D(-10, 10, -10, 10);
+        DQNEnvironment env = new Snake(10, 10);
         float exploration = 1.0f;
-        float explorationDecay = 0.999f;
+        float explorationDecay = 0.9995f;
         float minExploration = 0.01f;
         int trainEvery = 3;
         float discount = 0.95f;
@@ -60,7 +60,7 @@ public class NNNTrainer
         float maxGradNorm = 1.0f;
         int minExperiences = 2000;
         int episodeMemorySize = 100;
-        int testEpisodes = 5000;
+        int testEpisodes = 10;
         DQNTrainer dqnTrainer;
         FIFOBuffer<Episode> episodeBuffer = new(episodeMemorySize);
 
@@ -79,9 +79,10 @@ public class NNNTrainer
         {
             // Create a new model
             model = new([
-                new Dense(64, new LeakyReLU(activTau)),
-                new Dense(64, new LeakyReLU(activTau)),
-                new Dense(32, new LeakyReLU(activTau)),
+                new Conv(32, [3, 3], new LeakyReLU(activTau), Conv.Padding.Same),
+                new Conv(64, [3, 3], new LeakyReLU(activTau), Conv.Padding.Same),
+                new Conv(64, [3, 3], new LeakyReLU(activTau), Conv.Padding.Same),
+                new Dense(256, new LeakyReLU(activTau), flatten: true),
                 new Dense(env.ActionCount, new Linear())
             ], env.StateFormat);
         }
@@ -199,7 +200,7 @@ public class NNNTrainer
                 int episodes = GetInteger("Enter number of episodes to train");
                 int testEvery = GetInteger("Enter episodes per training progress test");
                 NNNLog.WriteLine($"\n\nTraining for {episodes} episodes...");
-                dqnTrainer.Train(ref episodeBuffer!, episodes, testEvery, testEpisodes);
+                dqnTrainer.Train(ref episodeBuffer!, episodes, testEvery, testEpisodes, "temp");
                 model = dqnTrainer.Agent;
 
                 if (env is TicTacToe ticTacToe && GetInput("Play against model? y/n", [userInputs[UserInput.Yes], userInputs[UserInput.No]]) == userInputs[UserInput.Yes])
