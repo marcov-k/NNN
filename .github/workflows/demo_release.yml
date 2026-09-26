@@ -56,14 +56,25 @@ jobs:
         id: build
         shell: pwsh
         run: |
-          $NNNDemo = (Get-ChildItem "NNN-Solution/NNNDemo" -Recurse -Filter NNNDemo.exe |
-            Select-Object -First 1).FullName
-          $NNNDemoDLL = (Get-ChildItem "NNN-Solution/NNNDemo" -Recurse -Filter NNNDemo.dll |
-            Select-Object -First 1).FullName
-          $NNNCSharp = (Get-ChildItem "NNN-Solution/NNNDemo" -Recurse -Filter NNNCSharp.dll |
-            Select-Object -First 1).FullName
-          $Native = (Get-ChildItem "NNN-Solution/NNNDemo" -Recurse -Filter NNN.dll |
-            Select-Object -First 1).FullName
+          function Get-BuildOutput($filter) {
+            $matches = Get-ChildItem "NNN-Solution/NNNDemo" -Recurse -Filter $filter |
+              Where-Object { $_.FullName -notmatch '\\obj\\' }
+
+            if ($matches.Count -eq 0) {
+              Write-Error "$filter not found"
+              exit 1
+            }
+            if ($matches.Count -gt 0) {
+              Write-Error "Expected exactly one match for $filter, found $($matches.Count): $($matches.FullName -join ', ')"
+              exit 1
+            }
+            return $matches[0].FullName
+          }
+
+          $NNNDemo = Get-BuildOutput "NNNDemo.exe"
+          $NNNDemoDLL = Get-BuildOutput "NNNDemo.dll"
+          $NNNCSharp = Get-BuildOutput "NNNCSharp.dll"
+          $Native = Get-BuildOutput "NNN.dll"
 
           if (-not $NNNDemo) { Write-Error "NNNDemo.exe not found"; exit 1 }
           if (-not $NNNDemoDLL) { Write-Error "NNNDemo.dll not found"; exit 1 }
