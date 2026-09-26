@@ -1,0 +1,82 @@
+name: Build Demo
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup NuGet
+        uses: nuget/setup-nuget@v2
+        with:
+          nuget-version: 'latest'
+
+      - name: Restore NuGet packages
+        run: nuget restore NNN-Solution/NNN-Solution.sln
+
+      - name: Build ReleaseDemo
+        shell: cmd
+        run: |
+          msbuild NNN-Solution/NNN-Solution.sln ^
+            /p:Configuration=ReleaseDemo ^
+            /p:Platform=x64
+
+      - name: Locate build outputs
+        id: build
+        shell: pwsh
+        run: |
+          $NNNDemo = (Get-ChildItem "NNN-Solution/NNNDemo" -Recurse -Filter NNNDemo.exe |
+            Select-Object -First 1).FullName
+          $NNNCSharp = (Get-ChildItem "NNN-Solution/NNNDemo" -Recurse -Filter NNNCSharp.dll |
+            Select-Object - First 1).FullName
+          $Native = (Get-ChildItem "NNN-Solution/NNNDemo" -Recurse -Filter NNN.dll |
+            Select-Object -First 1).FullName
+
+          echo "EXECUTABLE=$NNNDemo" >> $env:GITHUB_OUTPUT
+          echo "MANAGED=$NNNCSharp" >> $env:GITHUB_OUTPUT
+          echo "NATIVE=$Native" >> $env:GITHUB_OUTPUT
+
+      - name: Locate models directory
+        id: models
+        shell: pwsh
+        run: |
+          $Models = (Get-ChildItem "NNN-Solution" -Recurse -Filter Models/ |
+            Select-Object -First 1).FullName
+          echo "MODELS=$Models" >> $env:GITHUB_OUTPUT
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $Version = "${{ github.ref_name }}".TrimStart("v")
+
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
+            "/DAppVersion=$Version" `
+            "/DExecutablePath=${{ steps.build.outputs.EXECUTABLE }}" `
+            "/DManagedPath=${{ steps.build.outputs.MANAGED }}" `
+            "/DNativePath=${{ steps.build.outputs.NATIVE }}" `
+            "/DModelsDir=${{ steps.models.outputs.MODELS }}" `
+            "$env:GITHUB_WORKSPACE\installer\NNNDemo.iss"
+
+      - name: Update release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: $env:GITHUB_WORKSPACE/installer/output/NNNDemo-${{ github.ref_name }}.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
