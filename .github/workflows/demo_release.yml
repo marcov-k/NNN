@@ -12,8 +12,23 @@ jobs:
     runs-on: windows-latest
 
     steps:
+      - name: Get latest release
+        id: latest_release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $Tag = gh release view --repo ${{ github.repository }} --json tagName -q ".tagName"
+          if (-not tag) {
+            Write-Error "Could not determine latest release tag"
+            exit 1
+          }
+          echo "TAG=$Tag" >> $env:GITHUB_OUTPUT
+    
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.latest_release.outputs.TAG }}
 
       - name: Install Inno Setup
         shell: pwsh
@@ -76,7 +91,7 @@ jobs:
       - name: Update release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ github.ref_name }}
-          files: $env:GITHUB_WORKSPACE/installer/output/NNNDemo-${{ github.ref_name }}.exe
+          tag_name: ${{ steps.latest_release.outputs.TAG }}
+          files: ${{ github.workspace }}\installer\output\NNNDemo-${{ steps.latest_release.outputs.TAG }}.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
