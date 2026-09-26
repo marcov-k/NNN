@@ -104,6 +104,6 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.latest_release.outputs.TAG }}
-          files: ${{ github.workspace }}/installer/output/NNNDemo-${{ steps.latest_release.outputs.TAG }}.exe
+          files: installer/output/NNNDemo-${{ steps.latest_release.outputs.TAG }}.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
