@@ -35,6 +35,7 @@ Source: "{#DepsPath}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#ManagedPath}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#NativePath}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#ModelsDir}\*"; DestDir: "{app}\Models"; Flags: recursesubdirs createallsubdirs ignoreversion
+Source: "{#MNISTDir}\*"; DestDir: "{app}\MNIST"; Flags: recursesubdirs createallsubdirs ignoreversion
 
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#ExecutableName}"; WorkingDir: "{app}"
