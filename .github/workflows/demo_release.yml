@@ -19,7 +19,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $Tag = gh release view --repo ${{ github.repository }} --json tagName -q ".tagName"
-          if (-not Tag) {
+          if (-not $Tag) {
             Write-Error "Could not determine latest release tag"
             exit 1
           }
@@ -71,14 +71,14 @@ jobs:
         id: models
         shell: pwsh
         run: |
-          $Models = (Get-ChildItem "NNN-Solution" -Recurse -Filter Models/ |
+          $Models = (Get-ChildItem "NNN-Solution" -Recurse -Directory -Filter Models |
             Select-Object -First 1).FullName
           echo "MODELS=$Models" >> $env:GITHUB_OUTPUT
 
       - name: Build installer
         shell: pwsh
         run: |
-          $Version = "${{ github.ref_name }}".TrimStart("v")
+          $Version = "${{ steps.latest_release.outputs.TAG }}".TrimStart("v")
 
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
             "/DAppVersion=$Version" `
