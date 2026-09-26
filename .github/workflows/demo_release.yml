@@ -44,7 +44,7 @@ jobs:
           $NNNDemo = (Get-ChildItem "NNN-Solution/NNNDemo" -Recurse -Filter NNNDemo.exe |
             Select-Object -First 1).FullName
           $NNNCSharp = (Get-ChildItem "NNN-Solution/NNNDemo" -Recurse -Filter NNNCSharp.dll |
-            Select-Object - First 1).FullName
+            Select-Object -First 1).FullName
           $Native = (Get-ChildItem "NNN-Solution/NNNDemo" -Recurse -Filter NNN.dll |
             Select-Object -First 1).FullName
 
