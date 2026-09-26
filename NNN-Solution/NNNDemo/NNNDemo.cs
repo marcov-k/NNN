@@ -32,6 +32,7 @@ public class NNNDemo
     public static void Main(string[] args)
     {
         NNNLog.Output = Console.Write;
+        Saver.DirectoryPath = "/Models";
         RunDemo();
     }
 

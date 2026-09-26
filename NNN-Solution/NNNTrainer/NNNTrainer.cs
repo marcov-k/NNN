@@ -60,7 +60,7 @@ public class NNNTrainer
         float maxGradNorm = 1.0f;
         int minExperiences = 2000;
         int episodeMemorySize = 100;
-        int testEpisodes = 10;
+        int testEpisodes = 100;
         DQNTrainer dqnTrainer;
         FIFOBuffer<Episode> episodeBuffer = new(episodeMemorySize);
 
