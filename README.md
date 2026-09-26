@@ -17,10 +17,11 @@ A Unity-compatible neural network framework created from scratch in C# and C++ i
 - Custom file type for saving trained models (.nnn)
 - Compatible with the Unity game engine
 
-## Demo Installation
+## Demo
 ### System Requirements:
 - Requires 64-bit Windows
 
+### Installation:
 1. Download the NNNDemo-v[version].exe installer from the most recent GitHub release.
 2. Run the installer to install the demo and all required files.
 3. Run the installed NNNDemo executable and explore the capabilities of Neural Network Notions.
