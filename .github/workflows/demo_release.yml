@@ -58,16 +58,20 @@ jobs:
         run: |
           $NNNDemo = (Get-ChildItem "NNN-Solution/NNNDemo" -Recurse -Filter NNNDemo.exe |
             Select-Object -First 1).FullName
+          $NNNDemoDLL = (Get-ChildItem "NNN-Solution/NNNDemo" -Recurse -Filter NNNDemo.dll |
+            Select-Object -First 1).FullName
           $NNNCSharp = (Get-ChildItem "NNN-Solution/NNNDemo" -Recurse -Filter NNNCSharp.dll |
             Select-Object -First 1).FullName
           $Native = (Get-ChildItem "NNN-Solution/NNNDemo" -Recurse -Filter NNN.dll |
             Select-Object -First 1).FullName
 
           if (-not $NNNDemo) { Write-Error "NNNDemo.exe not found"; exit 1 }
+          if (-not $NNNDemoDLL) { Write-Error "NNNDemo.dll not found"; exit 1 }
           if (-not $NNNCSharp) { Write-Error "NNNCSharp.dll not found"; exit 1 }
           if (-not $Native) { Write-Error "NNN.dll not found"; exit 1 }
 
           echo "EXECUTABLE=$NNNDemo" >> $env:GITHUB_OUTPUT
+          echo "DLL=$NNNDemoDLL" >> $env:GITHUB_OUTPUT
           echo "MANAGED=$NNNCSharp" >> $env:GITHUB_OUTPUT
           echo "NATIVE=$Native" >> $env:GITHUB_OUTPUT
 
@@ -92,6 +96,7 @@ jobs:
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
             "/DAppVersion=$Version" `
             "/DExecutablePath=${{ steps.build.outputs.EXECUTABLE }}" `
+            "/DDLLPath=${{ steps.build.outputs.DLL }}" `
             "/DManagedPath=${{ steps.build.outputs.MANAGED }}" `
             "/DNativePath=${{ steps.build.outputs.NATIVE }}" `
             "/DModelsDir=${{ steps.models.outputs.MODELS }}" `
