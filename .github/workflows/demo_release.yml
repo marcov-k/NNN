@@ -73,16 +73,22 @@ jobs:
 
           $NNNDemo = Get-BuildOutput "NNNDemo.exe"
           $NNNDemoDLL = Get-BuildOutput "NNNDemo.dll"
+          $NNNDemoRuntimeConfig = Get-BuildOutput "NNNDemo.runtimeconfig.json"
+          $NNNDemoDeps = Get-BuildOutput "NNNDemo.deps.json"
           $NNNCSharp = Get-BuildOutput "NNNCSharp.dll"
           $Native = Get-BuildOutput "NNN.dll"
 
           if (-not $NNNDemo) { Write-Error "NNNDemo.exe not found"; exit 1 }
           if (-not $NNNDemoDLL) { Write-Error "NNNDemo.dll not found"; exit 1 }
+          if (-not $NNNDemoRuntimeConfig) { Write-Error "NNNDemo.runtimeconfig.json not found"; exit 1 }
+          if (-not $NNNDemoDeps) { Write-Error "NNNDemo.deps.json not found"; exit 1 }
           if (-not $NNNCSharp) { Write-Error "NNNCSharp.dll not found"; exit 1 }
           if (-not $Native) { Write-Error "NNN.dll not found"; exit 1 }
 
           echo "EXECUTABLE=$NNNDemo" >> $env:GITHUB_OUTPUT
           echo "DLL=$NNNDemoDLL" >> $env:GITHUB_OUTPUT
+          echo "RUNTIME=$NNNDemoRuntimeConfig" >> $env:GITHUB_OUTPUT
+          echo "DEPS=$NNNDemoDeps" >> $env:GITHUB_OUTPUT
           echo "MANAGED=$NNNCSharp" >> $env:GITHUB_OUTPUT
           echo "NATIVE=$Native" >> $env:GITHUB_OUTPUT
 
@@ -108,6 +114,8 @@ jobs:
             "/DAppVersion=$Version" `
             "/DExecutablePath=${{ steps.build.outputs.EXECUTABLE }}" `
             "/DDLLPath=${{ steps.build.outputs.DLL }}" `
+            "/DRuntimeConfigPath=${{ steps.build.outputs.RUNTIME }}" `
+            "/DDepsPath=${{ steps.build.outputs.DEPS }}" `
             "/DManagedPath=${{ steps.build.outputs.MANAGED }}" `
             "/DNativePath=${{ steps.build.outputs.NATIVE }}" `
             "/DModelsDir=${{ steps.models.outputs.MODELS }}" `
