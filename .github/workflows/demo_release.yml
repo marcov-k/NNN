@@ -75,10 +75,12 @@ jobs:
         id: models
         shell: pwsh
         run: |
-          $Models = (Get-ChildItem "NNN-Solution" -Recurse -Directory -Filter Models |
-            Select-Object -First 1).FullName
+          $Models = Join-Path $PWD "NNN-Solution\Models"
 
-          if (-not $Models) { Write-Error "Models directory not found"; exit 1 }
+          if (-not (Test-Path $Models -PathType Container)) {
+            Write-Error "Models directory not found at $Models"
+            exit 1
+          }
             
           echo "MODELS=$Models" >> $env:GITHUB_OUTPUT
 
