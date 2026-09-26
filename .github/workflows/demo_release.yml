@@ -64,7 +64,7 @@ jobs:
               Write-Error "$filter not found"
               exit 1
             }
-            if ($matches.Count -gt 0) {
+            if ($matches.Count -gt 1) {
               Write-Error "Expected exactly one match for $filter, found $($matches.Count): $($matches.FullName -join ', ')"
               exit 1
             }
