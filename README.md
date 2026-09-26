@@ -628,7 +628,7 @@ NNN-Solution - Directory (Full project solution)\
 │&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;├── DataLoaders - Directory\
 │&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;└── MNISTLoader - C# Script\
 │&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;│\
-|&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;├── Exceptions - Directory\
+│&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;├── Exceptions - Directory\
 │&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;│&emsp;&ensp;└── InvalidFileFormatException - C# Script\
 │&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;│\
 │&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;├── SaveSystem - Directory\
