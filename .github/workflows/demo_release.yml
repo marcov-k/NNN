@@ -19,7 +19,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $Tag = gh release view --repo ${{ github.repository }} --json tagName -q ".tagName"
-          if (-not tag) {
+          if (-not Tag) {
             Write-Error "Could not determine latest release tag"
             exit 1
           }
