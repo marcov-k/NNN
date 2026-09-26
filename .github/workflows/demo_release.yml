@@ -92,18 +92,25 @@ jobs:
           echo "MANAGED=$NNNCSharp" >> $env:GITHUB_OUTPUT
           echo "NATIVE=$Native" >> $env:GITHUB_OUTPUT
 
-      - name: Locate models directory
-        id: models
+      - name: Locate resource directories
+        id: resources
         shell: pwsh
         run: |
           $Models = Join-Path $PWD "NNN-Solution\Models"
+          $MNIST = Join-Path $PWD "NNN-Solutions\TrainingData\MNIST"
 
           if (-not (Test-Path $Models -PathType Container)) {
             Write-Error "Models directory not found at $Models"
             exit 1
           }
+
+          if (-not (Test-Path $MNIST -PathType Container)) {
+            Write-Error "MNIST directory not found at $MNIST"
+            exit 1
+          }
             
           echo "MODELS=$Models" >> $env:GITHUB_OUTPUT
+          echo "MNIST=$MNIST" >> $env:GITHUB_OUTPUT
 
       - name: Build installer
         shell: pwsh
@@ -118,7 +125,8 @@ jobs:
             "/DDepsPath=${{ steps.build.outputs.DEPS }}" `
             "/DManagedPath=${{ steps.build.outputs.MANAGED }}" `
             "/DNativePath=${{ steps.build.outputs.NATIVE }}" `
-            "/DModelsDir=${{ steps.models.outputs.MODELS }}" `
+            "/DModelsDir=${{ steps.resources.outputs.MODELS }}" `
+            "/DMNISTDir=${{ steps.resources.outputs.MNIST }}" `
             "$env:GITHUB_WORKSPACE\installer\NNNDemo.iss"
 
           if ($LASTEXITCODE -ne 0) {
