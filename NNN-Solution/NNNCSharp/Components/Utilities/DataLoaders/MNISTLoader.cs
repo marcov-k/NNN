@@ -1,4 +1,5 @@
 ﻿using NNNCSharp.Components.Autodiff;
+using NNNCSharp.Components.Utilities.Exceptions;
 using System;
 using System.IO;
 
@@ -12,7 +13,7 @@ namespace NNNCSharp.Components.Utilities.DataLoaders
         /// <summary>
         /// Path to the directory containing MNIST dataset files.
         /// </summary>
-        const string DirectoryPath = @"../../../../TrainingData/MNIST";
+        public static string DirectoryPath { get; set; } = @"../../../../TrainingData/MNIST";
         /// <summary>
         /// Name of the file containing training image data.
         /// </summary>
@@ -70,14 +71,14 @@ namespace NNNCSharp.Components.Utilities.DataLoaders
         /// <exception cref="Exception">File was not found or incorrect magic number found.</exception>
         static Tensor[] ReadImageData(string filePath)
         {
-            if (!File.Exists(filePath)) throw new Exception("Image data file not found.");
+            if (!File.Exists(filePath)) throw new FileNotFoundException("Image data file not found.");
 
             var bytes = File.ReadAllBytes(filePath);
             int offset = 0; // track current offset in main byte array
 
             // Extract magic number
             int magicNumber = Extract4ByteInt32(bytes, ref offset);
-            if (magicNumber != ImageMagicNumber) throw new Exception($"Invalid magic number: found {magicNumber} instead of {ImageMagicNumber}.");
+            if (magicNumber != ImageMagicNumber) throw new InvalidFileFormatException($"Invalid magic number: found {magicNumber} instead of {ImageMagicNumber}.");
 
             // Extract image count
             int imageCount = Extract4ByteInt32(bytes, ref offset);
@@ -111,14 +112,14 @@ namespace NNNCSharp.Components.Utilities.DataLoaders
         /// <exception cref="Exception">File was not found or incorrect magic number found.</exception>
         static Tensor[] ReadLabelData(string filePath)
         {
-            if (!File.Exists(filePath)) throw new Exception("Label data file not found.");
+            if (!File.Exists(filePath)) throw new FileNotFoundException("Label data file not found.");
 
             var bytes = File.ReadAllBytes(filePath);
             int offset = 0; // track current offset in main byte array
 
             // Extract magic number
             int magicNumber = Extract4ByteInt32(bytes, ref offset);
-            if (magicNumber != LabelMagicNumber) throw new Exception($"Invalid magic number: found {magicNumber} instead of {LabelMagicNumber}.");
+            if (magicNumber != LabelMagicNumber) throw new InvalidFileFormatException($"Invalid magic number: found {magicNumber} instead of {LabelMagicNumber}.");
 
             // Extract label count
             int labelCount = Extract4ByteInt32(bytes, ref offset);

@@ -2,6 +2,7 @@
 using NNNCSharp.Components.DQNEnvironments;
 using NNNCSharp.Components.Utilities;
 using NNNCSharp.Components.Utilities.DataLoaders;
+using NNNCSharp.Components.Utilities.Exceptions;
 using NNNCSharp.Components.Utilities.SaveSystem;
 using static NNNCSharp.Components.Utilities.UIUtils;
 
@@ -126,11 +127,26 @@ public class NNNDemo
     static void RunMNISTDemo(string fileName)
     {
         NNNLog.WriteLine("\nLoading MNIST test dataset...");
-        var (images, labels) = MNISTLoader.GetTestData();
-        var wrappedImages = new Tensor[images.Length];
-        for (int i = 0; i < images.Length; i++)
+        MNISTLoader.DirectoryPath = "MNIST";
+        Tensor[] images, labels, wrappedImages;
+        try
         {
-            wrappedImages[i] = Tensor.WrapBatch(images[i]);
+            (images, labels) = MNISTLoader.GetTestData();
+            wrappedImages = new Tensor[images.Length];
+            for (int i = 0; i < images.Length; i++)
+            {
+                wrappedImages[i] = Tensor.WrapBatch(images[i]);
+            }
+        }
+        catch (FileNotFoundException e)
+        {
+            NNNLog.WriteLine($"Error while loading MNIST data: {e.Message}");
+            return;
+        }
+        catch (InvalidFileFormatException e)
+        {
+            NNNLog.WriteLine($"Error while loading MNIST data: {e.Message}");
+            return;
         }
         NNNLog.WriteLine("Loaded MNIST test dataset");
 
@@ -159,10 +175,12 @@ public class NNNDemo
         catch (FileNotFoundException e)
         {
             NNNLog.WriteLine($"Error while loading model: {e.Message}");
+            return;
         }
         catch (InvalidFileFormatException e)
         {
             NNNLog.WriteLine($"Error while loading model: {e.Message}");
+            return;
         }
     }
 }

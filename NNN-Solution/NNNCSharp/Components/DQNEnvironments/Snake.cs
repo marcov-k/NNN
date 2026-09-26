@@ -2,6 +2,7 @@
 using NNNCSharp.Components.Episodes;
 using NNNCSharp.Components.Models;
 using NNNCSharp.Components.Utilities;
+using NNNCSharp.Components.Utilities.Exceptions;
 using NNNCSharp.Components.Utilities.SaveSystem;
 using static NNNCSharp.Components.Utilities.UIUtils;
 using System;
