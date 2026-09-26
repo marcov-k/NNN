@@ -17,6 +17,14 @@ A Unity-compatible neural network framework created from scratch in C# and C++ i
 - Custom file type for saving trained models (.nnn)
 - Compatible with the Unity game engine
 
+## Demo Installation
+### System Requirements:
+- Requires 64-bit Windows
+
+1. Download the NNNDemo-v[version].exe installer from the most recent GitHub release.
+2. Run the installer to install the demo and all required files.
+3. Run the installed NNNDemo executable and explore the capabilities of Neural Network Notions.
+
 ## Motivation
 I originally intended for this project to simply be my experimentation with implementing the systems described in Seth Weidman's _Deep Learning from Scratch_. However, after seeing my basic neural networks successfully
  train using the Boston housing dataset highlighted in Weidman's book, I became increasingly interested in creating a framework which could support Deep Q-Network training (DQN) for complex environments. After a number
