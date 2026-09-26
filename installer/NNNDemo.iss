@@ -31,7 +31,7 @@ UninstallDisplayIcon={app}\{#ExecutableName}
 Source: "{#ExecutablePath}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#ManagedPath}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#NativePath}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#ModelsDir}"; DestDir: "{app}\Models"; Flags: recursesubdirs createallsubdirs ignoreversion
+Source: "{#ModelsDir}\*"; DestDir: "{app}\Models"; Flags: recursesubdirs createallsubdirs ignoreversion
 
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#ExecutableName}"; WorkingDir: "{app}"
