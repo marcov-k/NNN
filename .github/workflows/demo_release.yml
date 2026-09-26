@@ -2,6 +2,7 @@ name: Build Demo
 
 on:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   id-token: write
@@ -10,7 +11,7 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
-
+    
     steps:
       - name: Get latest release
         id: latest_release
@@ -97,7 +98,7 @@ jobs:
         shell: pwsh
         run: |
           $Models = Join-Path $PWD "NNN-Solution\Models"
-          $MNIST = Join-Path $PWD "NNN-Solutions\TrainingData\MNIST"
+          $MNIST = Join-Path $PWD "NNN-Solution\TrainingData\MNIST"
 
           if (-not (Test-Path $Models -PathType Container)) {
             Write-Error "Models directory not found at $Models"
