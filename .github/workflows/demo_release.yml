@@ -63,6 +63,10 @@ jobs:
           $Native = (Get-ChildItem "NNN-Solution/NNNDemo" -Recurse -Filter NNN.dll |
             Select-Object -First 1).FullName
 
+          if (-not $NNNDemo) { Write-Error "NNNDemo.exe not found"; exit 1 }
+          if (-not $NNNCSharp) { Write-Error "NNNCSharp.dll not found"; exit 1 }
+          if (-not $Native) { Write-Error "NNN.dll not found"; exit 1 }
+
           echo "EXECUTABLE=$NNNDemo" >> $env:GITHUB_OUTPUT
           echo "MANAGED=$NNNCSharp" >> $env:GITHUB_OUTPUT
           echo "NATIVE=$Native" >> $env:GITHUB_OUTPUT
@@ -73,6 +77,9 @@ jobs:
         run: |
           $Models = (Get-ChildItem "NNN-Solution" -Recurse -Directory -Filter Models |
             Select-Object -First 1).FullName
+
+          if (-not $Models) { Write-Error "Models directory not found"; exit 1 }
+            
           echo "MODELS=$Models" >> $env:GITHUB_OUTPUT
 
       - name: Build installer
@@ -87,6 +94,11 @@ jobs:
             "/DNativePath=${{ steps.build.outputs.NATIVE }}" `
             "/DModelsDir=${{ steps.models.outputs.MODELS }}" `
             "$env:GITHUB_WORKSPACE\installer\NNNDemo.iss"
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "ISCC.exe failed with exit code $LASTEXITCODE"
+            exit 1
+          }
 
       - name: Update release
         uses: softprops/action-gh-release@v1
