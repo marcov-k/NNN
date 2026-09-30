@@ -56,7 +56,7 @@ jobs:
         shell: pwsh
         run: |
           function Get-BuildOutput($filter) {
-            $matches = Get-ChildItem "NNN-Solution/NNNDemo/bin/ReleasePackage" -Recurse -Filter $filter |
+            $matches = Get-ChildItem "NNN-Solution/NNNDemo" -Recurse -Filter $filter |
               Where-Object { $_.FullName -notmatch '\\obj\\' }
 
             if ($matches.Count -eq 0) {
