@@ -56,7 +56,7 @@ jobs:
         shell: pwsh
         run: |
           function Get-BuildOutput($filter) {
-            $matches = Get-ChildItem "NNN-Solution/NNNDemo" -Recurse -Filter $filter |
+            $matches = Get-ChildItem "NNN-Solution/NNNDemo" -Recurse -Directory -Filter $filter |
               Where-Object { $_.FullName -notmatch '\\obj\\' }
 
             if ($matches.Count -eq 0) {
@@ -70,26 +70,9 @@ jobs:
             return $matches[0].FullName
           }
 
-          $NNNDemo = Get-BuildOutput "NNNDemo.exe"
-          $NNNDemoDLL = Get-BuildOutput "NNNDemo.dll"
-          $NNNDemoRuntimeConfig = Get-BuildOutput "NNNDemo.runtimeconfig.json"
-          $NNNDemoDeps = Get-BuildOutput "NNNDemo.deps.json"
-          $NNNCSharp = Get-BuildOutput "NNNCSharp.dll"
-          $Native = Get-BuildOutput "NNN.dll"
+          $BuildDir = Get-BuildOutput "ReleaseDemo\net10.0"
 
-          if (-not $NNNDemo) { Write-Error "NNNDemo.exe not found"; exit 1 }
-          if (-not $NNNDemoDLL) { Write-Error "NNNDemo.dll not found"; exit 1 }
-          if (-not $NNNDemoRuntimeConfig) { Write-Error "NNNDemo.runtimeconfig.json not found"; exit 1 }
-          if (-not $NNNDemoDeps) { Write-Error "NNNDemo.deps.json not found"; exit 1 }
-          if (-not $NNNCSharp) { Write-Error "NNNCSharp.dll not found"; exit 1 }
-          if (-not $Native) { Write-Error "NNN.dll not found"; exit 1 }
-
-          echo "EXECUTABLE=$NNNDemo" >> $env:GITHUB_OUTPUT
-          echo "DLL=$NNNDemoDLL" >> $env:GITHUB_OUTPUT
-          echo "RUNTIME=$NNNDemoRuntimeConfig" >> $env:GITHUB_OUTPUT
-          echo "DEPS=$NNNDemoDeps" >> $env:GITHUB_OUTPUT
-          echo "MANAGED=$NNNCSharp" >> $env:GITHUB_OUTPUT
-          echo "NATIVE=$Native" >> $env:GITHUB_OUTPUT
+          echo "BUILD_DIR=$BuildDir" >> $env:GITHUB_OUTPUT
 
       - name: Locate resource directories
         id: resources
@@ -118,14 +101,7 @@ jobs:
 
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
             "/DAppVersion=$Version" `
-            "/DExecutablePath=${{ steps.build.outputs.EXECUTABLE }}" `
-            "/DDLLPath=${{ steps.build.outputs.DLL }}" `
-            "/DRuntimeConfigPath=${{ steps.build.outputs.RUNTIME }}" `
-            "/DDepsPath=${{ steps.build.outputs.DEPS }}" `
-            "/DManagedPath=${{ steps.build.outputs.MANAGED }}" `
-            "/DNativePath=${{ steps.build.outputs.NATIVE }}" `
-            "/DModelsDir=${{ steps.resources.outputs.MODELS }}" `
-            "/DMNISTDir=${{ steps.resources.outputs.MNIST }}" `
+            "/DBuildDir=${{ steps.build.outputs.BUILD_DIR }}" `
             "$env:GITHUB_WORKSPACE\installer\NNNDemo.iss"
 
           if ($LASTEXITCODE -ne 0) {
