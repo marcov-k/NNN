@@ -11,7 +11,7 @@
     <AssemblyName>NNNCSharp</AssemblyName>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
     <PlatformTarget>x64</PlatformTarget>
-    <Configurations>Debug;Release;ReleasePackage</Configurations>
+    <Configurations>Debug;Release;ReleasePackage;ReleaseDemo</Configurations>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleasePackage|AnyCPU'">
@@ -19,7 +19,17 @@
     <WarningsAsErrors>$(WarningsAsErrors);NU1605</WarningsAsErrors>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseDemo|AnyCPU'">
+    <Optimize>True</Optimize>
+    <WarningsAsErrors>$(WarningsAsErrors);NU1605</WarningsAsErrors>
+  </PropertyGroup>
+
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleasePackage|x64'">
+    <Optimize>True</Optimize>
+    <WarningsAsErrors>$(WarningsAsErrors);NU1605</WarningsAsErrors>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseDemo|x64'">
     <Optimize>True</Optimize>
     <WarningsAsErrors>$(WarningsAsErrors);NU1605</WarningsAsErrors>
   </PropertyGroup>
