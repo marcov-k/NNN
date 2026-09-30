@@ -54,6 +54,9 @@
 		<None Include="$(SolutionDir)x64\$(Configuration)\NNN.dll">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
+		<None Include="native\libomp140.x86_64.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
 	</ItemGroup>
 
 </Project>
