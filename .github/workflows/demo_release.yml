@@ -28,8 +28,6 @@ jobs:
     
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          ref: ${{ steps.latest_release.outputs.TAG }}
 
       - name: Install Inno Setup
         shell: pwsh
