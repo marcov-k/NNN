@@ -12,6 +12,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\NNNCSharp\NNNCSharp.Core.csproj" />
+    <None Include="..\libomp140.x86_64.dll">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>
