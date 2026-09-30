@@ -70,7 +70,7 @@ jobs:
             return $matches[0].FullName
           }
 
-          $BuildDir = Get-BuildOutput "ReleaseDemo\net10.0"
+          $BuildDir = Get-BuildOutput "ReleaseDemo/net10.0/win-x64"
 
           echo "BUILD_DIR=$BuildDir" >> $env:GITHUB_OUTPUT
 
