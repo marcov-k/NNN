@@ -43,12 +43,12 @@ public class NNNTrainer
     static void DQNTraining()
     {
         Model model;
-        DQNEnvironment env = new Snake(10, 10);
+        DQNEnvironment env = new TicTacToe();
         float exploration = 1.0f;
-        float explorationDecay = 0.9995f;
-        float minExploration = 0.01f;
-        int trainEvery = 3;
-        float discount = 0.95f;
+        float explorationDecay = 0.999f;
+        float minExploration = 0.1f;
+        int trainEvery = 1;
+        float discount = 0.99f;
         Optimizer optimizer = new Adam(0.001f);
         Cost cost = new Huber();
         int replayBufferSize = 20000;
@@ -60,7 +60,7 @@ public class NNNTrainer
         float maxGradNorm = 1.0f;
         int minExperiences = 2000;
         int episodeMemorySize = 100;
-        int testEpisodes = 100;
+        int testEpisodes = 5000;
         DQNTrainer dqnTrainer;
         FIFOBuffer<Episode> episodeBuffer = new(episodeMemorySize);
 
@@ -79,10 +79,9 @@ public class NNNTrainer
         {
             // Create a new model
             model = new([
-                new Conv(32, [3, 3], new LeakyReLU(activTau), Conv.Padding.Same),
-                new Conv(64, [3, 3], new LeakyReLU(activTau), Conv.Padding.Same),
-                new Conv(64, [3, 3], new LeakyReLU(activTau), Conv.Padding.Same),
-                new Dense(256, new LeakyReLU(activTau), flatten: true),
+                new Dense(256, new LeakyReLU(activTau)),
+                new Dense(256, new LeakyReLU(activTau)),
+                new Dense(128, new LeakyReLU(activTau)),
                 new Dense(env.ActionCount, new Linear())
             ], env.StateFormat);
         }

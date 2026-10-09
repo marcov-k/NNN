@@ -145,7 +145,8 @@ namespace NNNCSharp.Components.DQNEnvironments
             if (!ValidAction(action)) throw new ArgumentException("Invalid Action"); // ensure action being taken is valid
 
             State[action] = State[9] == 1.0f ? 1.0f : -1.0f; // fill position at the action index with current player's encoding
-            var (reward, Won) = EvaluateAction(action); // evaluate the reward of the action
+            float reward;
+            (reward, Won) = EvaluateAction(action); // evaluate the reward of the action
 
             // Flip current player
             AgentTurn = !AgentTurn;
@@ -418,7 +419,8 @@ namespace NNNCSharp.Components.DQNEnvironments
 
                 State[action] = State[9] == 1.0f ? 1.0f : -1.0f;
 
-                if (agentTurn && CheckWin()) return (true, false);
+                if (CheckWin()) return (agentTurn, false);
+                if (BoardFilled()) return (false, true);
 
                 State[9] *= -1.0f;
                 agentTurn = !agentTurn;
